@@ -1,0 +1,29 @@
+# PostgreSQL for local development.
+#
+# The host port defaults to 5433, not 5432, so this can run alongside a
+# natively installed PostgreSQL without a port clash. Override POSTGRES_PORT
+# in `.env` if you would rather use 5432.
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: synapse_canvas_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-synapse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-synapse}
+      POSTGRES_DB: ${POSTGRES_DB:-synapse_canvas}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # Depending services can wait on `condition: service_healthy` rather
+      # than racing the server's startup.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-synapse} -d ${POSTGRES_DB:-synapse_canvas}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

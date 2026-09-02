@@ -1,0 +1,25 @@
+[project]
+name = "synapse-canvas"
+version = "0.1.0"
+description = "Real-time collaborative research assistant -- Part 1: auth and workspaces"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+# `auto` means async test functions and fixtures need no per-item marker.
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+filterwarnings = [
+    "error",
+    # passlib 1.7.4 probes bcrypt.__about__, removed in bcrypt >= 4.1. The
+    # probe failing is harmless; see app/core/config.py.
+    "ignore::DeprecationWarning:passlib",
+]
+
+[tool.ruff]
+line-length = 90
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
