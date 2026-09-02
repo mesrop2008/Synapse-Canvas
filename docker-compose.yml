@@ -1,12 +1,16 @@
-# PostgreSQL for local development.
+# Local development stack: PostgreSQL + the API.
 #
-# The host port defaults to 5433, not 5432, so this can run alongside a
-# natively installed PostgreSQL without a port clash. Override POSTGRES_PORT
-# in `.env` if you would rather use 5432.
+# Postgres is published on host port 5433 by default, chosen so it can run
+# alongside a natively installed server already holding 5432. Inside the
+# compose network the API reaches it as `postgres:5432`, which is why the two
+# DATABASE_URLs in .env.example differ by host and port.
 
 services:
   postgres:
-    image: postgres:18-alpine
+    # Tag is overridable so this can track whatever major version the
+    # deployment target runs. Defaults to 15-alpine because that image is
+    # already present locally; nothing here depends on a newer server.
+    image: postgres:${POSTGRES_IMAGE_TAG:-15-alpine}
     container_name: synapse_canvas_postgres
     restart: unless-stopped
     environment:
@@ -18,12 +22,43 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      # Depending services can wait on `condition: service_healthy` rather
-      # than racing the server's startup.
+      # `api` waits on this rather than racing the server's startup.
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-synapse} -d ${POSTGRES_DB:-synapse_canvas}"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  api:
+    build:
+      context: .
+      target: runtime
+    container_name: synapse_canvas_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Overrides whatever .env says: inside the network the database is
+      # `postgres:5432`, never localhost.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-synapse}:${POSTGRES_PASSWORD:-synapse}@postgres:5432/${POSTGRES_DB:-synapse_canvas}
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+      DEBUG: ${DEBUG:-false}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set in .env}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      # Development convenience: edit on the host, uvicorn reloads in the
+      # container. Drop both mounts and --reload for a production deployment,
+      # where the image should be immutable.
+      - ./app:/app/app:ro
+      - ./alembic:/app/alembic:ro
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
 volumes:
   postgres_data:

@@ -1,0 +1,27 @@
+# Keep the build context small and the image free of host-only artefacts.
+.git
+.gitignore
+.gitattributes
+.venv
+venv
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+htmlcov
+
+# Secrets must come from the environment, never be baked into a layer.
+.env
+.env.*
+!.env.example
+
+# Dev-only; the suite runs on the host against the containerised database.
+tests
+requirements-dev.txt
+
+Dockerfile
+docker-compose.yml
+README.md
