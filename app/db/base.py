@@ -29,9 +29,12 @@ class Base(DeclarativeBase):
 class UUIDPrimaryKeyMixin:
     """UUID primary key, generated client-side.
 
-    Generating in Python rather than with a database default means the id is
-    known before the INSERT, so a caller can build related rows (a workspace
-    and its owner membership, say) in one flush without a round trip.
+    Generating in Python rather than with a server-side `gen_random_uuid()`
+    means SQLAlchemy already knows the key it is inserting, so it does not
+    need a RETURNING round trip to learn it.
+
+    The default is evaluated during flush, not at construction: a freshly
+    built instance still has `id is None` until it is flushed.
     """
 
     id: Mapped[uuid.UUID] = mapped_column(

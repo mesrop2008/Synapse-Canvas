@@ -27,8 +27,12 @@ async def create_workspace(
     """
     workspace = Workspace(name=name, owner_id=owner.id)
     db.add(workspace)
-    # `workspace.id` is populated client-side by the mixin default, so the
-    # membership row can reference it without an intermediate flush.
+    # A mapped_column default is evaluated during flush, not at construction,
+    # so workspace.id is still None here. Flush to populate it before the
+    # membership row references it. This stays inside the same transaction --
+    # the single commit below still covers both rows.
+    await db.flush()
+
     db.add(
         WorkspaceMember(
             workspace_id=workspace.id,
