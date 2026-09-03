@@ -56,6 +56,17 @@ os.environ["BCRYPT_ROUNDS"] = "4"
 os.environ.setdefault(
     "JWT_SECRET_KEY", "test-only-secret-key-not-used-anywhere-real-0123456789"
 )
+# Throttling is off by default in tests: every request in the suite arrives
+# from the same client address, so a per-IP limit would have unrelated tests
+# throttling each other and turn failures into a function of ordering. The
+# tests that exercise throttling switch it on explicitly, via `rate_limits`.
+for _limit_var in (
+    "LOGIN_RATE_LIMIT_PER_IP",
+    "LOGIN_RATE_LIMIT_PER_ACCOUNT",
+    "REGISTER_RATE_LIMIT_PER_IP",
+    "REFRESH_RATE_LIMIT_PER_IP",
+):
+    os.environ[_limit_var] = "0"
 
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
@@ -270,3 +281,27 @@ async def shared_workspace(
         )
         assert response.status_code == 201, response.text
     return workspace
+
+
+@pytest.fixture
+def rate_limits() -> Any:
+    """Temporarily switch throttling on for one test.
+
+    Settings are a cached singleton, so overrides are applied to the live
+    object and restored afterwards rather than rebuilt from the environment.
+    """
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    saved: dict[str, Any] = {}
+
+    def _apply(**overrides: Any) -> None:
+        for key, value in overrides.items():
+            if key not in saved:
+                saved[key] = getattr(settings, key)
+            setattr(settings, key, value)
+
+    yield _apply
+
+    for key, value in saved.items():
+        setattr(settings, key, value)

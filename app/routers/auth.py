@@ -6,9 +6,15 @@ called from a non-HTTP entry point lives in `app.services.auth_service`.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
-from app.dependencies import CurrentUser, DbSession
+from app.dependencies import (
+    CurrentUser,
+    DbSession,
+    login_ip_rate_limit,
+    refresh_ip_rate_limit,
+    register_ip_rate_limit,
+)
 from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenPair
 from app.schemas.user import UserRead
 from app.services import auth_service
@@ -21,7 +27,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     response_model=UserRead,
     status_code=status.HTTP_201_CREATED,
     summary="Create a new account",
-    responses={409: {"description": "Email already registered"}},
+    dependencies=[Depends(register_ip_rate_limit)],
+    responses={
+        409: {"description": "Email already registered"},
+        429: {"description": "Too many registrations from this address"},
+    },
 )
 async def register(payload: RegisterRequest, db: DbSession) -> UserRead:
     user = await auth_service.register_user(db, payload)
@@ -32,7 +42,11 @@ async def register(payload: RegisterRequest, db: DbSession) -> UserRead:
     "/login",
     response_model=TokenPair,
     summary="Exchange credentials for an access/refresh token pair",
-    responses={401: {"description": "Incorrect email or password"}},
+    dependencies=[Depends(login_ip_rate_limit)],
+    responses={
+        401: {"description": "Incorrect email or password"},
+        429: {"description": "Too many attempts from this address or for this account"},
+    },
 )
 async def login(payload: LoginRequest, db: DbSession) -> TokenPair:
     user = await auth_service.authenticate_user(db, payload.email, payload.password)
@@ -43,7 +57,11 @@ async def login(payload: LoginRequest, db: DbSession) -> TokenPair:
     "/refresh",
     response_model=TokenPair,
     summary="Exchange a refresh token for a new token pair",
-    responses={401: {"description": "Invalid, expired, or wrong-type token"}},
+    dependencies=[Depends(refresh_ip_rate_limit)],
+    responses={
+        401: {"description": "Invalid, expired, or wrong-type token"},
+        429: {"description": "Too many refreshes from this address"},
+    },
 )
 async def refresh(payload: RefreshRequest, db: DbSession) -> TokenPair:
     return await auth_service.refresh_token_pair(db, payload.refresh_token)

@@ -26,6 +26,7 @@ from app.core.security import (
 )
 from app.models.user import User
 from app.schemas.auth import RegisterRequest, TokenPair
+from app.services import rate_limit_service
 
 
 def normalize_email(email: str) -> str:
@@ -72,14 +73,39 @@ async def register_user(db: AsyncSession, data: RegisterRequest) -> User:
 
 
 async def authenticate_user(db: AsyncSession, email: str, password: str) -> User:
+    """Verify credentials, throttling failed attempts per account.
+
+    Only *failures* count against the per-account bucket, and a success clears
+    it. Counting successes too would throttle a legitimate user for the crime
+    of logging in from several devices, and leaving the bucket set after a
+    correct password would keep punishing someone who simply mistyped twice.
+
+    The limit is checked before the password is verified, so an attacker who
+    is already over it cannot keep forcing bcrypt work.
+    """
+    settings = get_settings()
+    limit = settings.login_rate_limit_per_account
+    window = settings.login_rate_limit_per_account_window_seconds
+    bucket = rate_limit_service.account_key("login", email)
+
+    if limit > 0:
+        await rate_limit_service.ensure_under_limit(db, bucket, limit, window)
+
     user = await get_user_by_email(db, email)
 
     if user is None:
         await burn_password_verification()
+        if limit > 0:
+            await rate_limit_service.enforce(db, bucket, limit, window)
         raise AuthenticationError("Incorrect email or password")
 
     if not await verify_password(password, user.hashed_password):
+        if limit > 0:
+            await rate_limit_service.enforce(db, bucket, limit, window)
         raise AuthenticationError("Incorrect email or password")
+
+    if limit > 0:
+        await rate_limit_service.reset(db, bucket)
 
     return user
 

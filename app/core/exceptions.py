@@ -16,8 +16,13 @@ class AppError(Exception):
     status_code: int = 500
     detail: str = "Internal server error"
 
-    def __init__(self, detail: str | None = None) -> None:
+    def __init__(
+        self, detail: str | None = None, headers: dict[str, str] | None = None
+    ) -> None:
         self.detail = detail or self.__class__.detail
+        # Some failures are only actionable with a header attached -- a 429 is
+        # not much use to a client without Retry-After.
+        self.headers = headers
         super().__init__(self.detail)
 
 
@@ -39,3 +44,15 @@ class NotFoundError(AppError):
 class ConflictError(AppError):
     status_code = 409
     detail = "Resource already exists"
+
+
+class RateLimitExceededError(AppError):
+    status_code = 429
+    detail = "Too many requests. Please try again later."
+
+    def __init__(self, retry_after_seconds: int) -> None:
+        self.retry_after_seconds = retry_after_seconds
+        super().__init__(
+            self.__class__.detail,
+            headers={"Retry-After": str(retry_after_seconds)},
+        )

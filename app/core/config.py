@@ -47,6 +47,26 @@ class Settings(BaseSettings):
     # in the test environment so the suite is not dominated by KDF time.
     bcrypt_rounds: int = 12
 
+    # --- Abuse resistance -------------------------------------------------
+    # Throttling, not account lockout. NIST SP 800-63B recommends throttling
+    # precisely because a lockout keyed on an account is itself a denial of
+    # service: anyone who knows an address can lock its owner out at will.
+    # Limits are applied per client IP *and* per targeted account, so neither
+    # a single noisy address nor a single targeted account can be hammered.
+    login_rate_limit_per_ip: int = 10
+    login_rate_limit_per_ip_window_seconds: int = 300
+    login_rate_limit_per_account: int = 5
+    login_rate_limit_per_account_window_seconds: int = 900
+    register_rate_limit_per_ip: int = 5
+    register_rate_limit_per_ip_window_seconds: int = 3600
+    refresh_rate_limit_per_ip: int = 30
+    refresh_rate_limit_per_ip_window_seconds: int = 300
+
+    # X-Forwarded-For is trivially spoofable by the client, and trusting it
+    # blindly lets an attacker mint a fresh rate-limit identity per request.
+    # Only enable this when a proxy you control appends the header.
+    trust_proxy_headers: bool = False
+
     # --- HTTP -------------------------------------------------------------
     # Comma-separated in the environment; exposed as a list via `cors_origins`.
     # Kept as a plain `str` because pydantic-settings JSON-decodes complex

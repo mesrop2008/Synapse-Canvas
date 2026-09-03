@@ -34,11 +34,13 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     this is the only place in the codebase that maps business failures onto
     status codes -- and the service layer stays transport-agnostic.
     """
-    headers = {"WWW-Authenticate": "Bearer"} if exc.status_code == 401 else None
+    headers = dict(exc.headers or {})
+    if exc.status_code == 401:
+        headers.setdefault("WWW-Authenticate", "Bearer")
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
-        headers=headers,
+        headers=headers or None,
     )
 
 
