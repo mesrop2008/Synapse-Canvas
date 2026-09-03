@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     # rather than silently honoured.
     jwt_issuer: str = "synapse-canvas"
     jwt_audience: str = "synapse-canvas-api"
+    # --- Email verification ----------------------------------------------
+    email_verification_expire_hours: int = 24
+    # Where the emailed link points. In a deployed system this is the
+    # frontend route that reads the token and POSTs it to /auth/verify-email.
+    email_verification_link_base: str = "http://localhost:3000/verify-email"
+
     # Work factor for bcrypt. 12 is a reasonable 2020s default; lowered to 4
     # in the test environment so the suite is not dominated by KDF time.
     bcrypt_rounds: int = 12

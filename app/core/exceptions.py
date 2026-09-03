@@ -56,3 +56,15 @@ class RateLimitExceededError(AppError):
             self.__class__.detail,
             headers={"Retry-After": str(retry_after_seconds)},
         )
+
+
+class EmailNotVerifiedError(AppError):
+    """Credentials were correct, but the address has not been proven.
+
+    Checked only *after* the password verifies, so it tells an attacker who
+    does not already hold valid credentials nothing about whether an account
+    exists.
+    """
+
+    status_code = 403
+    detail = "Email address has not been verified"

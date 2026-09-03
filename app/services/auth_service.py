@@ -7,16 +7,18 @@ WebSocket handshake and background workers planned for later parts.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.exceptions import AuthenticationError, ConflictError
+from app.core.exceptions import AuthenticationError, EmailNotVerifiedError
 from app.core.security import (
     REFRESH_TOKEN,
+    generate_url_token,
+    hash_url_token,
     refresh_token_lifetime,
     token_jti,
     burn_password_verification,
@@ -27,10 +29,11 @@ from app.core.security import (
     subject_uuid,
     verify_password,
 )
+from app.models.email_verification import EmailVerificationToken
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
 from app.schemas.auth import RegisterRequest, TokenPair
-from app.services import rate_limit_service
+from app.services import email_service, rate_limit_service
 
 
 def normalize_email(email: str) -> str:
@@ -51,29 +54,114 @@ async def get_user_by_id(db: AsyncSession, user_id: uuid.UUID) -> User | None:
     return await db.get(User, user_id)
 
 
-async def register_user(db: AsyncSession, data: RegisterRequest) -> User:
+async def register_user(db: AsyncSession, data: RegisterRequest) -> None:
+    """Create an account, or silently do nothing if the address is taken.
+
+    Returns nothing on purpose. The endpoint answers identically whether or
+    not the address was already registered, because telling an anonymous
+    caller otherwise is an account-enumeration oracle -- and this endpoint is
+    reachable without credentials. The address's real owner is informed
+    instead, by email, which is the one party entitled to know.
+
+    The password is hashed *before* the existence check so both paths pay the
+    same ~250 ms of bcrypt. Skipping it on the duplicate path would restore
+    the same oracle through response timing.
+    """
     email = normalize_email(data.email)
+    hashed_password = await hash_password(data.password)
 
     if await get_user_by_email(db, email) is not None:
-        raise ConflictError("A user with this email already exists")
+        await email_service.send_duplicate_registration_notice(to=email)
+        return
 
-    user = User(
-        email=email,
-        name=data.name,
-        hashed_password=await hash_password(data.password),
-    )
+    user = User(email=email, name=data.name, hashed_password=hashed_password)
     db.add(user)
     try:
         await db.commit()
-    except IntegrityError as exc:
-        # The pre-check above is racy: two concurrent registrations for the
-        # same address both pass it, and the unique index settles the tie.
-        # The database is the actual authority, so translate its verdict.
+    except IntegrityError:
+        # Two concurrent registrations for the same address both passed the
+        # pre-check; the unique index settled it. Same silent outcome.
         await db.rollback()
-        raise ConflictError("A user with this email already exists") from exc
+        await email_service.send_duplicate_registration_notice(to=email)
+        return
 
     await db.refresh(user)
+    raw_token = await create_email_verification(db, user)
+    await email_service.send_verification_email(to=user.email, raw_token=raw_token)
+
+
+async def create_email_verification(db: AsyncSession, user: User) -> str:
+    """Issue a fresh verification token, invalidating any still outstanding.
+
+    Only the hash is stored; the raw value is returned here so it can be
+    emailed, and then exists nowhere on the server.
+    """
+    now = datetime.now(timezone.utc)
+    settings = get_settings()
+
+    # One live token per user: re-requesting a link must retire the previous
+    # one, so an old message in an inbox stops working.
+    await db.execute(
+        update(EmailVerificationToken)
+        .where(
+            EmailVerificationToken.user_id == user.id,
+            EmailVerificationToken.used_at.is_(None),
+        )
+        .values(used_at=now)
+    )
+
+    raw_token = generate_url_token()
+    db.add(
+        EmailVerificationToken(
+            user_id=user.id,
+            token_hash=hash_url_token(raw_token),
+            expires_at=now + timedelta(hours=settings.email_verification_expire_hours),
+        )
+    )
+    await db.commit()
+    return raw_token
+
+
+async def verify_email(db: AsyncSession, raw_token: str) -> User:
+    """Redeem a verification token. Single use, and expiring."""
+    now = datetime.now(timezone.utc)
+
+    result = await db.execute(
+        select(EmailVerificationToken).where(
+            EmailVerificationToken.token_hash == hash_url_token(raw_token)
+        )
+    )
+    token = result.scalar_one_or_none()
+
+    # One message for every failure mode: unknown, spent and expired are
+    # indistinguishable to the caller.
+    if token is None or token.used_at is not None or token.expires_at <= now:
+        raise AuthenticationError("Invalid or expired verification token")
+
+    user = await db.get(User, token.user_id)
+    if user is None:
+        raise AuthenticationError("Invalid or expired verification token")
+
+    token.used_at = now
+    if user.email_verified_at is None:
+        user.email_verified_at = now
+    await db.commit()
+    await db.refresh(user)
     return user
+
+
+async def resend_verification(db: AsyncSession, email: str) -> None:
+    """Re-issue a verification link, if that is a sensible thing to do.
+
+    Silent in every case -- unknown address, already verified, or sent -- for
+    the same enumeration reason as registration.
+    """
+    user = await get_user_by_email(db, email)
+    if user is None or user.is_email_verified:
+        return
+
+    raw_token = await create_email_verification(db, user)
+    await email_service.send_verification_email(to=user.email, raw_token=raw_token)
 
 
 async def authenticate_user(db: AsyncSession, email: str, password: str) -> User:
@@ -110,6 +198,12 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> User
 
     if limit > 0:
         await rate_limit_service.reset(db, bucket)
+
+    # Checked only after the password verified. Ordering it this way means the
+    # distinct 403 is visible only to someone who already holds valid
+    # credentials, so it is not an enumeration signal.
+    if not user.is_email_verified:
+        raise EmailNotVerifiedError()
 
     return user
 

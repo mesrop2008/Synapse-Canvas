@@ -73,7 +73,7 @@ async def test_registration_is_throttled_per_ip(
                 "name": "New",
             },
         )
-        assert created.status_code == 201
+        assert created.status_code == 202
 
     blocked = await client.post(
         "/auth/register",

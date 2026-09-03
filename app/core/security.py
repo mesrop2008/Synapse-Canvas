@@ -16,6 +16,7 @@ Two things here are deliberate rather than incidental:
 from __future__ import annotations
 
 import hashlib
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
@@ -65,6 +66,28 @@ async def verify_password(password: str, hashed_password: str) -> bool:
             return False
 
     return await to_thread.run_sync(_verify)
+
+
+# --- Opaque single-use tokens ----------------------------------------------
+
+
+def generate_url_token() -> str:
+    """A high-entropy token safe to put in a URL.
+
+    32 bytes of CSPRNG output. Unguessable by brute force, so the value alone
+    is sufficient proof of possession.
+    """
+    return secrets.token_urlsafe(32)
+
+
+def hash_url_token(raw_token: str) -> str:
+    """Hex SHA-256 of an opaque token, for storage and lookup.
+
+    A plain hash, deliberately: unlike a password there is no dictionary to
+    attack and no low-entropy input, so a slow KDF would buy nothing. What
+    matters is that the database never holds a redeemable value.
+    """
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
 
 # --- Tokens ----------------------------------------------------------------

@@ -15,7 +15,15 @@ from app.dependencies import (
     refresh_ip_rate_limit,
     register_ip_rate_limit,
 )
-from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenPair
+from app.schemas.auth import (
+    AcceptedResponse,
+    LoginRequest,
+    RefreshRequest,
+    RegisterRequest,
+    ResendVerificationRequest,
+    TokenPair,
+    VerifyEmailRequest,
+)
 from app.schemas.user import UserRead
 from app.services import auth_service
 
@@ -24,18 +32,53 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post(
     "/register",
-    response_model=UserRead,
-    status_code=status.HTTP_201_CREATED,
-    summary="Create a new account",
+    response_model=AcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Create an account and send a verification email",
     dependencies=[Depends(register_ip_rate_limit)],
     responses={
-        409: {"description": "Email already registered"},
         429: {"description": "Too many registrations from this address"},
     },
 )
-async def register(payload: RegisterRequest, db: DbSession) -> UserRead:
-    user = await auth_service.register_user(db, payload)
+async def register(payload: RegisterRequest, db: DbSession) -> AcceptedResponse:
+    """Always 202, whether or not the address was already registered.
+
+    A 409 here would let anyone test which addresses have accounts. The real
+    owner of an already-registered address is notified by email instead.
+    """
+    await auth_service.register_user(db, payload)
+    return AcceptedResponse(
+        detail="If that address can receive mail, a verification link is on its way."
+    )
+
+
+@router.post(
+    "/verify-email",
+    response_model=UserRead,
+    summary="Redeem an emailed verification token",
+    responses={401: {"description": "Invalid, expired or already-used token"}},
+)
+async def verify_email(payload: VerifyEmailRequest, db: DbSession) -> UserRead:
+    user = await auth_service.verify_email(db, payload.token)
     return UserRead.model_validate(user)
+
+
+@router.post(
+    "/resend-verification",
+    response_model=AcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Request a fresh verification link",
+    dependencies=[Depends(register_ip_rate_limit)],
+    responses={429: {"description": "Too many requests from this address"}},
+)
+async def resend_verification(
+    payload: ResendVerificationRequest, db: DbSession
+) -> AcceptedResponse:
+    """Also always 202 -- unknown, already verified and sent look identical."""
+    await auth_service.resend_verification(db, payload.email)
+    return AcceptedResponse(
+        detail="If that address needs verifying, a new link is on its way."
+    )
 
 
 @router.post(
@@ -45,6 +88,7 @@ async def register(payload: RegisterRequest, db: DbSession) -> UserRead:
     dependencies=[Depends(login_ip_rate_limit)],
     responses={
         401: {"description": "Incorrect email or password"},
+        403: {"description": "Email address has not been verified"},
         429: {"description": "Too many attempts from this address or for this account"},
     },
 )

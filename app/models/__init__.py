@@ -6,6 +6,7 @@ silently vanishes from migrations.
 """
 
 from app.db.base import Base
+from app.models.email_verification import EmailVerificationToken
 from app.models.enums import WORKSPACE_ROLE_ENUM_NAME, WorkspaceRole
 from app.models.rate_limit import RateLimitBucket
 from app.models.refresh_token import RefreshToken
@@ -15,6 +16,7 @@ from app.models.workspace_member import WorkspaceMember
 
 __all__ = [
     "Base",
+    "EmailVerificationToken",
     "RateLimitBucket",
     "RefreshToken",
     "User",
