@@ -1,8 +1,5 @@
-"""Authentication endpoints.
-
-Handlers here do request/response translation only. Anything that could be
-called from a non-HTTP entry point lives in `app.services.auth_service`.
-"""
+"""Authentication endpoints: request/response translation only; logic is in
+`app.services.auth_service`."""
 
 from __future__ import annotations
 
@@ -41,11 +38,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     },
 )
 async def register(payload: RegisterRequest, db: DbSession) -> AcceptedResponse:
-    """Always 202, whether or not the address was already registered.
-
-    A 409 here would let anyone test which addresses have accounts. The real
-    owner of an already-registered address is notified by email instead.
-    """
+    # Always 202: a 409 would reveal which addresses have accounts.
     await auth_service.register_user(db, payload)
     return AcceptedResponse(
         detail="If that address can receive mail, a verification link is on its way."
@@ -74,7 +67,7 @@ async def verify_email(payload: VerifyEmailRequest, db: DbSession) -> UserRead:
 async def resend_verification(
     payload: ResendVerificationRequest, db: DbSession
 ) -> AcceptedResponse:
-    """Also always 202 -- unknown, already verified and sent look identical."""
+    # Always 202: unknown, already-verified and sent look identical.
     await auth_service.resend_verification(db, payload.email)
     return AcceptedResponse(
         detail="If that address needs verifying, a new link is on its way."
@@ -127,11 +120,7 @@ async def me(current_user: CurrentUser) -> UserRead:
     summary="End the session the refresh token belongs to",
 )
 async def logout(payload: RefreshRequest, db: DbSession) -> None:
-    """Always 204, even for a token that is unknown or already revoked.
-
-    Reporting which is which would turn logout into an oracle for probing
-    token validity, and the caller's intent is satisfied either way.
-    """
+    # Always 204, even for an unknown/revoked token: logout is not an oracle.
     await auth_service.revoke_refresh_token(db, payload.refresh_token)
 
 
@@ -142,9 +131,6 @@ async def logout(payload: RefreshRequest, db: DbSession) -> None:
     responses={401: {"description": "Missing or invalid access token"}},
 )
 async def logout_all(current_user: CurrentUser, db: DbSession) -> None:
-    """The lever to pull after a password change or a suspected compromise.
-
-    Note that already-issued access tokens keep working until they expire --
-    see the README on why revocation is enforced at the refresh boundary.
-    """
+    # After a password change/compromise. Existing access tokens live out their
+    # 30 min; revocation bites at the refresh boundary (see README).
     await auth_service.revoke_all_for_user(db, current_user.id)

@@ -11,18 +11,9 @@ from app.db.base import Base, UUIDPrimaryKeyMixin
 class RateLimitBucket(UUIDPrimaryKeyMixin, Base):
     """One fixed window of request counts for one rate-limit key.
 
-    Kept in PostgreSQL rather than in process memory because an in-memory
-    counter is per-worker: with four workers an attacker gets four times the
-    allowance, and a restart resets it to zero. The database is the one piece
-    of state every replica already shares.
-
-    The counter is incremented with a single INSERT ... ON CONFLICT DO UPDATE,
-    so concurrent requests cannot interleave a read and a write and lose
-    increments.
-
-    Redis would be the usual choice at high volume -- this table takes a write
-    per throttled request. It is only applied to authentication endpoints,
-    where request rates are low and durability is worth more than latency.
+    In PostgreSQL, not process memory: an in-memory counter is per-worker (N
+    workers = N x allowance) and clears on restart. Redis is the usual choice
+    at high volume; this is fine for low-rate auth endpoints.
     """
 
     __tablename__ = "rate_limit_buckets"
@@ -30,11 +21,10 @@ class RateLimitBucket(UUIDPrimaryKeyMixin, Base):
         UniqueConstraint(
             "bucket_key", "window_start", name="uq_rate_limit_buckets_key_window"
         ),
-        # Supports deleting windows that have rolled over.
-        Index("ix_rate_limit_buckets_window_start", "window_start"),
+        Index("ix_rate_limit_buckets_window_start", "window_start"),  # purge rolled-over
     )
 
-    # Opaque, caller-composed: "login:ip:203.0.113.4", "login:account:<sha256>".
+    # Caller-composed, e.g. "login:ip:203.0.113.4" or "login:account:<sha256>".
     bucket_key: Mapped[str] = mapped_column(String(255), nullable=False)
     window_start: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

@@ -30,21 +30,16 @@ def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
     return async_sessionmaker(
         bind=get_engine(),
         class_=AsyncSession,
-        # ORM objects are routinely serialised by Pydantic *after* the commit
-        # that ends the request. Expiring on commit would make every attribute
-        # access a lazy reload against a closed session.
+        # Objects are serialised after the request's commit; expiring would
+        # make attribute access reload against a closed session.
         expire_on_commit=False,
         autoflush=False,
     )
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """FastAPI dependency yielding a session scoped to a single request.
-
-    The session is *not* committed here. Services commit their own units of
-    work, which keeps the transaction boundary visible at the place that
-    knows what a complete operation is.
-    """
+    """Per-request session. Not committed here -- services own their own
+    transaction boundaries."""
     async with get_sessionmaker()() as session:
         try:
             yield session

@@ -14,29 +14,18 @@ if TYPE_CHECKING:
 
 
 class EmailVerificationToken(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """A single-use proof that someone can read a given mailbox.
+    """Single-use proof that someone can read a given mailbox.
 
-    Only the SHA-256 of the token is stored. The raw value exists in the
-    email and nowhere else, so a leaked database yields nothing that can be
-    redeemed -- the same reasoning as storing password hashes rather than
-    passwords. A plain hash is right here where it would be wrong for a
-    password: the token is 32 bytes of CSPRNG output, so there is no
-    dictionary to attack and no need for a slow KDF.
-
-    Why this table exists at all: registration otherwise lets anyone claim an
-    address they do not control. Since workspace membership is granted *by
-    email address*, an unverified claim on someone else's address is a route
-    into workspaces meant for them.
+    Stores only the SHA-256, so a leaked DB yields nothing redeemable (a plain
+    hash suffices: the token is 32 CSPRNG bytes, no dictionary to attack).
     """
 
     __tablename__ = "email_verification_tokens"
     __table_args__ = (
-        # Supports purging expired rows.
-        Index("ix_email_verification_tokens_expires_at", "expires_at"),
+        Index("ix_email_verification_tokens_expires_at", "expires_at"),  # purge expired
     )
 
-    # Hex SHA-256 of the emailed token. Unique: a redeemed token must resolve
-    # to exactly one row.
+    # Hex SHA-256 of the emailed token; unique so redemption resolves to one row.
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
@@ -44,8 +33,7 @@ class EmailVerificationToken(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
-    # Set on redemption. Non-null means the token is spent and must be
-    # refused, so a link forwarded or leaked from an inbox cannot be reused.
+    # Non-null once redeemed, so a spent link cannot be reused.
     used_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
