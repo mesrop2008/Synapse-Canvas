@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
 from app.core.exceptions import AppError
+from app.core.logging import configure_logging
 from app.core.middleware import (
     BodySizeLimitMiddleware,
     SecurityHeadersMiddleware,
@@ -66,6 +67,7 @@ async def unhandled_error_handler(request: Request, exc: Exception) -> JSONRespo
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    configure_logging(logging.DEBUG if settings.debug else logging.INFO)
 
     app = FastAPI(
         title=settings.project_name,
