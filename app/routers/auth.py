@@ -50,7 +50,7 @@ async def register(payload: RegisterRequest, db: DbSession) -> UserRead:
 )
 async def login(payload: LoginRequest, db: DbSession) -> TokenPair:
     user = await auth_service.authenticate_user(db, payload.email, payload.password)
-    return auth_service.issue_token_pair(user)
+    return await auth_service.issue_token_pair(db, user)
 
 
 @router.post(
@@ -75,3 +75,32 @@ async def refresh(payload: RefreshRequest, db: DbSession) -> TokenPair:
 )
 async def me(current_user: CurrentUser) -> UserRead:
     return UserRead.model_validate(current_user)
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="End the session the refresh token belongs to",
+)
+async def logout(payload: RefreshRequest, db: DbSession) -> None:
+    """Always 204, even for a token that is unknown or already revoked.
+
+    Reporting which is which would turn logout into an oracle for probing
+    token validity, and the caller's intent is satisfied either way.
+    """
+    await auth_service.revoke_refresh_token(db, payload.refresh_token)
+
+
+@router.post(
+    "/logout-all",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="End every session for the authenticated user",
+    responses={401: {"description": "Missing or invalid access token"}},
+)
+async def logout_all(current_user: CurrentUser, db: DbSession) -> None:
+    """The lever to pull after a password change or a suspected compromise.
+
+    Note that already-issued access tokens keep working until they expire --
+    see the README on why revocation is enforced at the refresh boundary.
+    """
+    await auth_service.revoke_all_for_user(db, current_user.id)

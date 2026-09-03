@@ -73,6 +73,7 @@ def create_token(
     subject: uuid.UUID | str,
     token_type: TokenType,
     expires_delta: timedelta,
+    jti: uuid.UUID | None = None,
 ) -> str:
     settings = get_settings()
     now = datetime.now(timezone.utc)
@@ -81,10 +82,10 @@ def create_token(
         "type": token_type,
         "iat": now,
         "exp": now + expires_delta,
-        # Unique per token. Unused today, but it is the join key a refresh
-        # token denylist would need, and adding it later would invalidate
-        # every token already in the wild.
-        "jti": str(uuid.uuid4()),
+        # Unique per token, and the join key for server-side revocation: the
+        # refresh_tokens table is addressed by this value. Callers that need
+        # to record the token pass their own.
+        "jti": str(jti or uuid.uuid4()),
     }
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
@@ -98,13 +99,18 @@ def create_access_token(subject: uuid.UUID | str) -> str:
     )
 
 
-def create_refresh_token(subject: uuid.UUID | str) -> str:
-    settings = get_settings()
-    return create_token(
-        subject,
-        REFRESH_TOKEN,
-        timedelta(days=settings.refresh_token_expire_days),
-    )
+def refresh_token_lifetime() -> timedelta:
+    return timedelta(days=get_settings().refresh_token_expire_days)
+
+
+def create_refresh_token(subject: uuid.UUID | str, jti: uuid.UUID) -> str:
+    """Mint a refresh token with a caller-supplied `jti`.
+
+    The jti is required rather than generated here because the caller has to
+    persist it in the same unit of work: a token whose row was never written
+    would be rejected on first use.
+    """
+    return create_token(subject, REFRESH_TOKEN, refresh_token_lifetime(), jti=jti)
 
 
 def decode_token(token: str, expected_type: TokenType) -> dict[str, Any]:
@@ -119,7 +125,7 @@ def decode_token(token: str, expected_type: TokenType) -> dict[str, Any]:
             token,
             settings.jwt_secret_key,
             algorithms=[settings.jwt_algorithm],
-            options={"require": ["exp", "sub", "type"]},
+            options={"require": ["exp", "sub", "type", "jti"]},
         )
     except jwt.ExpiredSignatureError as exc:
         raise AuthenticationError("Token has expired") from exc
@@ -139,6 +145,20 @@ def subject_uuid(payload: dict[str, Any]) -> uuid.UUID:
         return uuid.UUID(payload["sub"])
     except (KeyError, ValueError, TypeError) as exc:
         raise AuthenticationError("Invalid token subject") from exc
+
+
+def token_jti(payload: dict[str, Any]) -> uuid.UUID:
+    """Extract the `jti` claim as a UUID.
+
+    Required on every token, so revocation has something to key on. It is in
+    `decode_token`'s required-claims list rather than checked here, which
+    means a token minted before this existed is rejected outright instead of
+    silently bypassing revocation.
+    """
+    try:
+        return uuid.UUID(payload["jti"])
+    except (KeyError, ValueError, TypeError) as exc:
+        raise AuthenticationError("Invalid token identifier") from exc
 
 
 @lru_cache(maxsize=1)
