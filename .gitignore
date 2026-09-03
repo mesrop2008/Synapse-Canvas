@@ -27,3 +27,6 @@ Thumbs.db
 
 # Generated documentation (not tracked)
 docs/
+
+# Local API log from the manual-testing walkthrough
+api.log
