@@ -1,13 +1,5 @@
-"""Outbound email.
-
-Part 1 has no mail provider, and inventing one is out of scope -- but the
-verification flow is meaningless without a delivery seam. This is that seam:
-a `Protocol` the rest of the code depends on, plus a console implementation
-that logs what would have been sent.
-
-Swapping in SES, Postmark or SMTP later means writing one class and changing
-what `get_email_sender` returns; nothing in `auth_service` moves.
-"""
+"""Outbound email: a `Protocol` seam plus a console implementation. Swapping in
+SES/Postmark/SMTP is one class, with nothing in `auth_service` moving."""
 
 from __future__ import annotations
 
@@ -25,14 +17,8 @@ class EmailSender(Protocol):
 
 
 class ConsoleEmailSender:
-    """Writes the message to the log instead of delivering it.
-
-    The verification link is included so local and manual testing can complete
-    the flow. That is safe here and would be a serious leak in production --
-    anyone with log access could verify any address -- which is exactly why
-    the sender is swappable rather than hardcoded.
-    """
-
+    # Logs the message (link included) instead of sending. Fine locally, a leak
+    # in production -- which is why the sender is swappable.
     async def send(self, *, to: str, subject: str, body: str) -> None:
         logger.info(
             "[email:console] to=%s subject=%s\n%s", to, subject, body
@@ -64,13 +50,8 @@ async def send_verification_email(*, to: str, raw_token: str) -> None:
 
 
 async def send_duplicate_registration_notice(*, to: str) -> None:
-    """Sent when someone tries to register an address that already exists.
-
-    Registration answers identically whether or not the account existed, so
-    this message is the only place the difference surfaces -- and it goes to
-    the address's real owner, who is the one person entitled to know. It also
-    warns them that somebody is probing for their account.
-    """
+    # The only place a duplicate registration surfaces: to the address's real
+    # owner, since the HTTP response is identical either way.
     await get_email_sender().send(
         to=to,
         subject="Someone tried to register with your email address",
