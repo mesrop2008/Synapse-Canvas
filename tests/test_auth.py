@@ -14,7 +14,19 @@ from tests.conftest import DEFAULT_PASSWORD, TestUser, UserFactory
 # --- Registration ----------------------------------------------------------
 
 
-async def test_register_returns_public_user(client: AsyncClient) -> None:
+async def test_register_accepts_and_reveals_nothing(
+    client: AsyncClient, db_session
+) -> None:
+    """Registration answers 202 with a body that carries no account data.
+
+    The endpoint is unauthenticated, so anything account-specific in the
+    response would be an enumeration oracle. The account is created; the
+    caller just is not told about it here.
+    """
+    from sqlalchemy import select
+
+    from app.models import User
+
     response = await client.post(
         "/auth/register",
         json={
@@ -24,18 +36,27 @@ async def test_register_returns_public_user(client: AsyncClient) -> None:
         },
     )
 
-    assert response.status_code == 201
+    assert response.status_code == 202
     body = response.json()
-    assert body["email"] == "ada@example.com"
-    assert body["name"] == "Ada Lovelace"
-    assert body["id"]
-    assert body["created_at"]
-    # The hash must never cross the wire, under any key name.
-    assert "hashed_password" not in body
-    assert "password" not in body
+    assert set(body) == {"detail"}  # nothing but a generic message
+    assert "hashed_password" not in response.text
+    assert "ada@example.com" not in response.text  # not even the address echoed
+
+    # The account really was created, and starts unverified.
+    user = (
+        await db_session.execute(select(User).where(User.email == "ada@example.com"))
+    ).scalar_one()
+    assert user.name == "Ada Lovelace"
+    assert user.email_verified_at is None
 
 
-async def test_register_normalizes_email_case(client: AsyncClient) -> None:
+async def test_register_normalizes_email_case(
+    client: AsyncClient, db_session
+) -> None:
+    from sqlalchemy import select
+
+    from app.models import User
+
     response = await client.post(
         "/auth/register",
         json={
@@ -45,35 +66,50 @@ async def test_register_normalizes_email_case(client: AsyncClient) -> None:
         },
     )
 
-    assert response.status_code == 201
-    assert response.json()["email"] == "grace.hopper@example.com"
+    assert response.status_code == 202
+    stored = (
+        await db_session.execute(select(User.email).where(User.name == "Grace"))
+    ).scalar_one()
+    assert stored == "grace.hopper@example.com"
 
 
-async def test_register_rejects_duplicate_email(client: AsyncClient) -> None:
-    payload = {
-        "email": "dup@example.com",
-        "password": DEFAULT_PASSWORD,
-        "name": "First",
-    }
-    assert (await client.post("/auth/register", json=payload)).status_code == 201
+async def test_duplicate_registration_is_silent_and_creates_nothing(
+    client: AsyncClient, db_session
+) -> None:
+    """A repeat registration must be indistinguishable from a first one.
 
-    second = await client.post("/auth/register", json=payload)
-    assert second.status_code == 409
-    assert "already exists" in second.json()["detail"]
+    Returning 409 (as the pre-verification API did) tells an anonymous caller
+    exactly which addresses have accounts. The response, status and -- because
+    the password is hashed on both paths -- the timing all match instead. The
+    duplicate simply creates no second row.
+    """
+    from sqlalchemy import func, select
 
+    from app.models import User
 
-async def test_duplicate_detection_is_case_insensitive(client: AsyncClient) -> None:
-    """Normalisation is what makes the unique index a real guarantee."""
-    await client.post(
+    payload = {"email": "dup@example.com", "password": DEFAULT_PASSWORD, "name": "First"}
+    first = await client.post("/auth/register", json=payload)
+    assert first.status_code == 202
+
+    second = await client.post(
         "/auth/register",
-        json={"email": "casey@example.com", "password": DEFAULT_PASSWORD, "name": "C"},
+        json={"email": "DUP@example.com", "password": DEFAULT_PASSWORD, "name": "Second"},
     )
+    assert second.status_code == 202
+    assert second.json() == first.json()  # byte-identical response
 
-    clash = await client.post(
-        "/auth/register",
-        json={"email": "CASEY@EXAMPLE.COM", "password": DEFAULT_PASSWORD, "name": "C2"},
-    )
-    assert clash.status_code == 409
+    # Case-insensitively the same address: still exactly one account, and the
+    # duplicate did not overwrite the original name.
+    count = (
+        await db_session.execute(
+            select(func.count()).select_from(User).where(User.email == "dup@example.com")
+        )
+    ).scalar_one()
+    assert count == 1
+    name = (
+        await db_session.execute(select(User.name).where(User.email == "dup@example.com"))
+    ).scalar_one()
+    assert name == "First"
 
 
 async def test_register_rejects_short_password(client: AsyncClient) -> None:

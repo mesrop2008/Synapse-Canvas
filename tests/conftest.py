@@ -56,6 +56,17 @@ os.environ["BCRYPT_ROUNDS"] = "4"
 os.environ.setdefault(
     "JWT_SECRET_KEY", "test-only-secret-key-not-used-anywhere-real-0123456789"
 )
+# Throttling is off by default in tests: every request in the suite arrives
+# from the same client address, so a per-IP limit would have unrelated tests
+# throttling each other and turn failures into a function of ordering. The
+# tests that exercise throttling switch it on explicitly, via `rate_limits`.
+for _limit_var in (
+    "LOGIN_RATE_LIMIT_PER_IP",
+    "LOGIN_RATE_LIMIT_PER_ACCOUNT",
+    "REGISTER_RATE_LIMIT_PER_IP",
+    "REFRESH_RATE_LIMIT_PER_IP",
+):
+    os.environ[_limit_var] = "0"
 
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
@@ -181,18 +192,61 @@ class TestUser:
 UserFactory = Callable[..., Awaitable[TestUser]]
 
 
-@pytest_asyncio.fixture
-async def make_user(client: AsyncClient) -> UserFactory:
-    """Register and log in a user through the real endpoints.
+async def latest_verification_token_hash(
+    db_session: AsyncSession, email: str
+) -> str | None:
+    """The token_hash of a user's newest live verification token, or None.
 
-    Going through the API rather than inserting rows keeps fixtures honest: if
-    registration breaks, every test that needs a user fails loudly.
+    The raw token only ever exists in the (console) email, so a test cannot
+    know it. Instead it looks the account up and confirms a token was issued;
+    `verify_user_email` below redeems it directly through the service, which
+    is the same code path the endpoint drives.
     """
+    from sqlalchemy import select
+
+    from app.models import EmailVerificationToken, User
+
+    user = (
+        await db_session.execute(select(User).where(User.email == email))
+    ).scalar_one_or_none()
+    if user is None:
+        return None
+    row = await db_session.execute(
+        select(EmailVerificationToken)
+        .where(
+            EmailVerificationToken.user_id == user.id,
+            EmailVerificationToken.used_at.is_(None),
+        )
+        .order_by(EmailVerificationToken.created_at.desc())
+    )
+    token = row.scalars().first()
+    return token.token_hash if token else None
+
+
+@pytest_asyncio.fixture
+async def make_user(client: AsyncClient, db_session: AsyncSession) -> UserFactory:
+    """Register, verify and log in a user through the real endpoints.
+
+    Registration returns only 202 now and login refuses an unverified address,
+    so the fixture completes verification the way a real client would: it
+    marks the account verified (mirroring a redeemed token) and then logs in.
+    Going through the endpoints rather than inserting rows keeps the fixture
+    honest -- if registration or login breaks, every dependent test fails.
+
+    Pass `verified=False` to get an account that has registered but not yet
+    verified, for tests that exercise the gate itself.
+    """
+    from datetime import datetime, timezone
+
+    from sqlalchemy import select
+
+    from app.models import User
 
     async def _make(
         email: str | None = None,
         password: str = DEFAULT_PASSWORD,
         name: str = "Test User",
+        verified: bool = True,
     ) -> TestUser:
         email = email or "user-%s@example.com" % uuid.uuid4().hex[:12]
 
@@ -200,7 +254,29 @@ async def make_user(client: AsyncClient) -> UserFactory:
             "/auth/register",
             json={"email": email, "password": password, "name": name},
         )
-        assert registered.status_code == 201, registered.text
+        assert registered.status_code == 202, registered.text
+
+        # A verification token must have been issued regardless.
+        assert await latest_verification_token_hash(db_session, email) is not None
+
+        user = (
+            await db_session.execute(select(User).where(User.email == email))
+        ).scalar_one()
+
+        if not verified:
+            return TestUser(
+                id=user.id,
+                email=email,
+                name=name,
+                password=password,
+                access_token="",
+                refresh_token="",
+            )
+
+        # Stand in for the user clicking the emailed link. The redemption path
+        # itself is covered directly in test_email_verification.
+        user.email_verified_at = datetime.now(timezone.utc)
+        await db_session.commit()
 
         logged_in = await client.post(
             "/auth/login", json={"email": email, "password": password}
@@ -209,7 +285,7 @@ async def make_user(client: AsyncClient) -> UserFactory:
         tokens = logged_in.json()
 
         return TestUser(
-            id=uuid.UUID(registered.json()["id"]),
+            id=user.id,
             email=email,
             name=name,
             password=password,
@@ -270,3 +346,27 @@ async def shared_workspace(
         )
         assert response.status_code == 201, response.text
     return workspace
+
+
+@pytest.fixture
+def rate_limits() -> Any:
+    """Temporarily switch throttling on for one test.
+
+    Settings are a cached singleton, so overrides are applied to the live
+    object and restored afterwards rather than rebuilt from the environment.
+    """
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    saved: dict[str, Any] = {}
+
+    def _apply(**overrides: Any) -> None:
+        for key, value in overrides.items():
+            if key not in saved:
+                saved[key] = getattr(settings, key)
+            setattr(settings, key, value)
+
+    yield _apply
+
+    for key, value in saved.items():
+        setattr(settings, key, value)

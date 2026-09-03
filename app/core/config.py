@@ -43,9 +43,49 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
+
+    # Retired signing keys, comma-separated. Tokens signed with one of these
+    # still verify, so the active key can be replaced without logging every
+    # user out; drop a key from the list once its tokens have all expired.
+    # Each token carries a `kid` header naming the key that signed it.
+    previous_jwt_secret_keys_raw: str = Field(
+        default="", alias="PREVIOUS_JWT_SECRET_KEYS"
+    )
+
+    # Pinned into every token and verified on decode, so a token minted by a
+    # different system -- or by staging against production -- is rejected
+    # rather than silently honoured.
+    jwt_issuer: str = "synapse-canvas"
+    jwt_audience: str = "synapse-canvas-api"
+    # --- Email verification ----------------------------------------------
+    email_verification_expire_hours: int = 24
+    # Where the emailed link points. In a deployed system this is the
+    # frontend route that reads the token and POSTs it to /auth/verify-email.
+    email_verification_link_base: str = "http://localhost:3000/verify-email"
+
     # Work factor for bcrypt. 12 is a reasonable 2020s default; lowered to 4
     # in the test environment so the suite is not dominated by KDF time.
     bcrypt_rounds: int = 12
+
+    # --- Abuse resistance -------------------------------------------------
+    # Throttling, not account lockout. NIST SP 800-63B recommends throttling
+    # precisely because a lockout keyed on an account is itself a denial of
+    # service: anyone who knows an address can lock its owner out at will.
+    # Limits are applied per client IP *and* per targeted account, so neither
+    # a single noisy address nor a single targeted account can be hammered.
+    login_rate_limit_per_ip: int = 10
+    login_rate_limit_per_ip_window_seconds: int = 300
+    login_rate_limit_per_account: int = 5
+    login_rate_limit_per_account_window_seconds: int = 900
+    register_rate_limit_per_ip: int = 5
+    register_rate_limit_per_ip_window_seconds: int = 3600
+    refresh_rate_limit_per_ip: int = 30
+    refresh_rate_limit_per_ip_window_seconds: int = 300
+
+    # X-Forwarded-For is trivially spoofable by the client, and trusting it
+    # blindly lets an attacker mint a fresh rate-limit identity per request.
+    # Only enable this when a proxy you control appends the header.
+    trust_proxy_headers: bool = False
 
     # --- HTTP -------------------------------------------------------------
     # Comma-separated in the environment; exposed as a list via `cors_origins`.
@@ -66,9 +106,19 @@ class Settings(BaseSettings):
             )
         return v
 
+    # Requests larger than this are refused before the body is read. A proxy
+    # should enforce a limit too; this is the backstop for when one is absent.
+    max_request_body_bytes: int = 1_048_576
+
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.cors_origins_raw.split(",") if o.strip()]
+
+    @property
+    def previous_jwt_secret_keys(self) -> list[str]:
+        return [
+            k.strip() for k in self.previous_jwt_secret_keys_raw.split(",") if k.strip()
+        ]
 
     @property
     def is_testing(self) -> bool:

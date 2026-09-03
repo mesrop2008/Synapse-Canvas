@@ -115,6 +115,15 @@ async def add_member(
         # this workspace, so there is no existence to protect here.
         raise NotFoundError("No user with that email address")
 
+    if not user.is_email_verified:
+        # Membership is granted by email address, so admitting an account that
+        # never proved control of its address would let a squatter inherit an
+        # invitation meant for the address's real owner. Defence in depth:
+        # login already refuses unverified accounts.
+        raise ConflictError(
+            "That user has not verified their email address yet"
+        )
+
     existing = await db.execute(
         select(WorkspaceMember).where(
             WorkspaceMember.workspace_id == workspace.id,

@@ -13,10 +13,11 @@ import uuid
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.exceptions import (
     AuthenticationError,
     NotFoundError,
@@ -27,7 +28,7 @@ from app.db.session import get_db
 from app.models.enums import WorkspaceRole
 from app.models.user import User
 from app.models.workspace import Workspace
-from app.services import auth_service, workspace_service
+from app.services import auth_service, rate_limit_service, workspace_service
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
@@ -108,3 +109,59 @@ class WorkspaceAccess:
 RequireViewer = Annotated[WorkspaceContext, Depends(WorkspaceAccess(WorkspaceRole.VIEWER))]
 RequireEditor = Annotated[WorkspaceContext, Depends(WorkspaceAccess(WorkspaceRole.EDITOR))]
 RequireOwner = Annotated[WorkspaceContext, Depends(WorkspaceAccess(WorkspaceRole.OWNER))]
+
+
+# --- Throttling -------------------------------------------------------------
+
+
+def client_ip(request: Request) -> str:
+    """Resolve the caller's address for rate-limiting purposes.
+
+    X-Forwarded-For is set by the client and only becomes trustworthy once a
+    proxy you control overwrites it. Honouring it unconditionally would hand
+    an attacker a fresh rate-limit identity per request -- simply vary the
+    header and every bucket is empty again. So it is read only when
+    `trust_proxy_headers` is explicitly enabled, and then only the first hop.
+    """
+    if get_settings().trust_proxy_headers:
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            first_hop = forwarded.split(",")[0].strip()
+            if first_hop:
+                return first_hop
+    return request.client.host if request.client else "unknown"
+
+
+class IPRateLimit:
+    """Per-IP throttle for one endpoint family.
+
+    Limits are read from settings at call time rather than captured at import,
+    so a deployment (or a test) can change them without rebuilding the routes.
+    A limit of 0 or less disables the check.
+    """
+
+    def __init__(self, prefix: str, limit_attr: str, window_attr: str) -> None:
+        self.prefix = prefix
+        self.limit_attr = limit_attr
+        self.window_attr = window_attr
+
+    async def __call__(self, request: Request, db: DbSession) -> None:
+        settings = get_settings()
+        limit = int(getattr(settings, self.limit_attr))
+        if limit <= 0:
+            return
+        window = int(getattr(settings, self.window_attr))
+        await rate_limit_service.enforce(
+            db, rate_limit_service.ip_key(self.prefix, client_ip(request)), limit, window
+        )
+
+
+login_ip_rate_limit = IPRateLimit(
+    "login", "login_rate_limit_per_ip", "login_rate_limit_per_ip_window_seconds"
+)
+register_ip_rate_limit = IPRateLimit(
+    "register", "register_rate_limit_per_ip", "register_rate_limit_per_ip_window_seconds"
+)
+refresh_ip_rate_limit = IPRateLimit(
+    "refresh", "refresh_rate_limit_per_ip", "refresh_rate_limit_per_ip_window_seconds"
+)
