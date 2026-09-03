@@ -203,15 +203,26 @@ All endpoints return errors as `{"detail": "..."}`.
 
 ### Auth
 
-| Method | Path             | Notes                                        |
-| ------ | ---------------- | -------------------------------------------- |
-| POST   | `/auth/register` | 201 with the public user; 409 on duplicate    |
-| POST   | `/auth/login`    | Returns an access + refresh pair              |
-| POST   | `/auth/refresh`  | Exchanges a refresh token for a new pair      |
-| GET    | `/auth/me`       | The authenticated user                        |
+| Method | Path                        | Notes                                                     |
+| ------ | --------------------------- | --------------------------------------------------------- |
+| POST   | `/auth/register`            | Always 202 with a generic body; verification email sent   |
+| POST   | `/auth/verify-email`        | Redeems the emailed token; single-use, expiring           |
+| POST   | `/auth/resend-verification` | Reissues a link; always 202                               |
+| POST   | `/auth/login`               | Access + refresh pair; 403 if the address is unverified   |
+| POST   | `/auth/refresh`             | Rotates the refresh token, returns a new pair             |
+| POST   | `/auth/logout`              | Revokes the presented refresh token                       |
+| GET    | `/auth/me`                  | The authenticated user                                    |
 
 Access tokens live 30 minutes, refresh tokens 7 days. Send the access token as
 `Authorization: Bearer <token>`.
+
+A new account must verify its email before it can log in or be added to a
+workspace. In local development no mail is sent — the verification link is
+written to the API logs by the console email sender (see
+`app/services/email_service.py`).
+
+`/auth/register`, `/auth/login` and `/auth/refresh` are rate-limited; over the
+limit they return `429` with a `Retry-After` header.
 
 ### Workspaces
 
@@ -286,19 +297,37 @@ the backend probe fails outright.
 
 ---
 
-## What I would do differently at production scale
+## Security hardening (done on `feat/security-hardening`)
 
-- **Refresh tokens are stateless.** Nothing can revoke one before it expires,
-  so logout is client-side only and a stolen refresh token is good for seven
-  days. Production wants them persisted (or their `jti` denylisted), rotated
-  on every use, with reuse detection to invalidate the family. The `jti` claim
-  is already issued so this can be added without invalidating live tokens.
-- **`HS256` with one shared secret.** Any service that validates tokens can
-  also mint them. `RS256`/`EdDSA` with a published JWKS splits those
-  capabilities and makes key rotation possible.
-- **No rate limiting.** `/auth/login` and `/auth/register` are open to
-  credential stuffing and enumeration by volume. Needs a per-IP and
-  per-account limiter, plus lockout/backoff.
+The gaps flagged in the first review have been closed on this branch:
+
+- **Refresh tokens are revocable.** Each issued token is recorded server-side
+  (only its `jti`), rotated on every refresh, and its family revoked on reuse
+  — so a stolen-then-replayed token forces re-authentication instead of
+  granting seven days of silent access. `/auth/logout` revokes for real.
+- **Signing keys rotate.** Every token carries a `kid`; `PREVIOUS_JWT_SECRET_KEYS`
+  keeps retired keys valid for verification only, so the active key can be
+  replaced without logging everyone out. Tokens also pin `iss`/`aud`.
+- **Auth endpoints are throttled** per IP and, for login, per targeted
+  account (throttling, not lockout — a lockout keyed on an account lets anyone
+  lock out its owner).
+- **Email verification** gates login and workspace membership, closing the
+  address-squatting path. Registration is enumeration-resistant (identical
+  202 either way, matched timing).
+- **Transport hardening**: security headers and a strict CSP on every
+  response, a request-body size cap, a catch-all handler so no stack trace
+  reaches a client, and a refusal to boot with a wildcard CORS origin.
+
+### Still open at production scale
+
+- **`HS256` with one shared secret.** Rotation now works, but any service that
+  validates tokens can still mint them. `RS256`/`EdDSA` with a published JWKS
+  would split those capabilities.
+- **The rate limiter is a database table.** Correct and good enough here, but a
+  hot path hitting Postgres per request; Redis (or the API gateway) is the
+  right home at volume.
+- **Email delivery is a console stub.** The `EmailSender` seam is in place;
+  a real provider (SES/Postmark/SMTP) is one class.
 - **`GET /workspaces` is unpaginated.** Fine for tens of workspaces, not for
   thousands. Wants keyset pagination before that becomes a problem.
 - **Native PostgreSQL enum for `role`.** Adding a role later means
