@@ -15,6 +15,7 @@ Two things here are deliberate rather than incidental:
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
@@ -69,6 +70,32 @@ async def verify_password(password: str, hashed_password: str) -> bool:
 # --- Tokens ----------------------------------------------------------------
 
 
+def _key_id(secret: str) -> str:
+    """Stable, non-reversible identifier for a signing key.
+
+    Published in the token's `kid` header so a verifier knows which key to
+    try. It is a hash rather than the key itself, and truncated, so the header
+    reveals nothing usable about the secret.
+    """
+    return hashlib.sha256(secret.encode("utf-8")).hexdigest()[:16]
+
+
+def _keyring() -> dict[str, str]:
+    """Map of key id to secret: the active key plus any retired ones.
+
+    Rotation without mass logout: sign with the active key, keep verifying
+    tokens signed by recently retired ones, and drop a retired key from the
+    list once every token it signed has expired.
+    """
+    settings = get_settings()
+    ring = {_key_id(settings.jwt_secret_key): settings.jwt_secret_key}
+    for retired in settings.previous_jwt_secret_keys:
+        ring.setdefault(_key_id(retired), retired)
+    return ring
+
+
+
+
 def create_token(
     subject: uuid.UUID | str,
     token_type: TokenType,
@@ -86,8 +113,17 @@ def create_token(
         # refresh_tokens table is addressed by this value. Callers that need
         # to record the token pass their own.
         "jti": str(jti or uuid.uuid4()),
+        # Bind the token to this system. A token from another deployment that
+        # happens to share a secret is still rejected.
+        "iss": settings.jwt_issuer,
+        "aud": settings.jwt_audience,
     }
-    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return jwt.encode(
+        payload,
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+        headers={"kid": _key_id(settings.jwt_secret_key)},
+    )
 
 
 def create_access_token(subject: uuid.UUID | str) -> str:
@@ -120,17 +156,44 @@ def decode_token(token: str, expected_type: TokenType) -> dict[str, Any]:
     cannot forget one of them.
     """
     settings = get_settings()
+    ring = _keyring()
+
+    # The kid header is untrusted input, so it only selects a candidate from
+    # keys we already hold -- it can never introduce one. An unrecognised or
+    # absent kid falls back to trying every key, which keeps tokens minted
+    # before rotation (or before kid existed) verifiable.
     try:
-        payload = jwt.decode(
-            token,
-            settings.jwt_secret_key,
-            algorithms=[settings.jwt_algorithm],
-            options={"require": ["exp", "sub", "type", "jti"]},
-        )
-    except jwt.ExpiredSignatureError as exc:
-        raise AuthenticationError("Token has expired") from exc
+        kid = jwt.get_unverified_header(token).get("kid")
     except jwt.PyJWTError as exc:
         raise AuthenticationError("Invalid token") from exc
+
+    candidates = [ring[kid]] if kid in ring else list(ring.values())
+
+    payload = None
+    for secret in candidates:
+        try:
+            payload = jwt.decode(
+                token,
+                secret,
+                algorithms=[settings.jwt_algorithm],
+                audience=settings.jwt_audience,
+                issuer=settings.jwt_issuer,
+                options={
+                    "require": ["exp", "sub", "type", "jti", "iss", "aud"],
+                },
+            )
+            break
+        except jwt.ExpiredSignatureError as exc:
+            # Expiry does not depend on which key verified it; stop here
+            # rather than reporting "invalid" after trying the rest.
+            raise AuthenticationError("Token has expired") from exc
+        except jwt.InvalidSignatureError:
+            continue
+        except jwt.PyJWTError as exc:
+            raise AuthenticationError("Invalid token") from exc
+
+    if payload is None:
+        raise AuthenticationError("Invalid token")
 
     if payload.get("type") != expected_type:
         raise AuthenticationError(
