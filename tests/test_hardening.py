@@ -1,9 +1,5 @@
-"""Transport-level and token-level hardening.
-
-These assert behaviour that is invisible in the happy path: response headers,
-request-size refusal, the claims pinned into every token, and that a signing
-key can be rotated without logging everyone out.
-"""
+"""Transport- and token-level hardening: response headers, request-size
+refusal, pinned token claims, and signing-key rotation."""
 
 from __future__ import annotations
 
@@ -20,11 +16,8 @@ from app.main import create_app
 
 @pytest.fixture
 def settings_sandbox(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Let a test change settings, and put them back afterwards.
-
-    get_settings is cached, so both the change and the restore have to bust
-    the cache or later tests inherit whatever this one did.
-    """
+    # get_settings is cached, so both the change and the restore must bust it
+    # or later tests inherit this one's settings.
     get_settings.cache_clear()
     yield
     monkeypatch.undo()
@@ -56,11 +49,8 @@ async def test_api_responses_carry_a_locked_down_csp(client: AsyncClient) -> Non
 
 
 async def test_interactive_docs_are_exempt_from_the_csp(client: AsyncClient) -> None:
-    """Swagger loads its assets from a CDN, which default-src 'none' blocks.
-
-    The exemption is why /docs still renders; everything else keeps the strict
-    policy.
-    """
+    """Swagger's CDN assets would be blocked by default-src 'none'; the
+    exemption is why /docs still renders."""
     response = await client.get("/docs")
 
     assert response.status_code == 200
@@ -127,11 +117,8 @@ async def test_tokens_carry_kid_issuer_and_audience(owner) -> None:
 async def test_token_from_another_deployment_is_rejected(
     label: str, overrides: dict[str, str]
 ) -> None:
-    """Even signed with our own secret, a token minted elsewhere is refused.
-
-    This is what stops a staging token being replayed against production when
-    the two share a secret by accident.
-    """
+    """Even signed with our own secret, a token minted elsewhere is refused --
+    what stops a staging token being replayed against production."""
     settings = get_settings()
     claims = {
         "sub": "00000000-0000-0000-0000-000000000001",
@@ -208,11 +195,8 @@ async def test_dropping_a_retired_key_invalidates_its_tokens(
 async def test_wildcard_cors_origin_is_refused_at_startup(
     monkeypatch: pytest.MonkeyPatch, settings_sandbox: None
 ) -> None:
-    """A wildcard plus credentials is an any-origin credentialed allowance.
-
-    Starlette implements that combination by echoing the caller's own origin,
-    so it must fail loudly at boot rather than be served quietly.
-    """
+    """Starlette implements wildcard-plus-credentials by echoing the caller's
+    origin, so it must fail loudly at boot rather than be served quietly."""
     monkeypatch.setenv("CORS_ORIGINS", "*")
     get_settings.cache_clear()
 

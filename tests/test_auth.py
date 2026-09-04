@@ -17,12 +17,8 @@ from tests.conftest import DEFAULT_PASSWORD, TestUser, UserFactory
 async def test_register_accepts_and_reveals_nothing(
     client: AsyncClient, db_session
 ) -> None:
-    """Registration answers 202 with a body that carries no account data.
-
-    The endpoint is unauthenticated, so anything account-specific in the
-    response would be an enumeration oracle. The account is created; the
-    caller just is not told about it here.
-    """
+    """202 with no account data: this endpoint is unauthenticated, so anything
+    account-specific in the response would be an enumeration oracle."""
     from sqlalchemy import select
 
     from app.models import User
@@ -76,13 +72,8 @@ async def test_register_normalizes_email_case(
 async def test_duplicate_registration_is_silent_and_creates_nothing(
     client: AsyncClient, db_session
 ) -> None:
-    """A repeat registration must be indistinguishable from a first one.
-
-    Returning 409 (as the pre-verification API did) tells an anonymous caller
-    exactly which addresses have accounts. The response, status and -- because
-    the password is hashed on both paths -- the timing all match instead. The
-    duplicate simply creates no second row.
-    """
+    """A repeat registration is indistinguishable from a first: same status and
+    body (and matched timing, since both paths hash), and no second row."""
     from sqlalchemy import func, select
 
     from app.models import User
@@ -276,11 +267,8 @@ async def test_refresh_rejects_an_access_token(
 async def test_refresh_rejects_a_token_for_an_unknown_user(
     client: AsyncClient,
 ) -> None:
-    """The subject is re-read from the database rather than blindly trusted.
-
-    A correctly signed, unexpired token whose user no longer exists must not
-    keep minting access tokens for the rest of its seven-day life.
-    """
+    """The subject is re-read from the DB: a signed, unexpired token whose user
+    is gone must not keep minting access tokens."""
     orphan = create_token(uuid.uuid4(), REFRESH_TOKEN, timedelta(days=1))
 
     response = await client.post("/auth/refresh", json={"refresh_token": orphan})

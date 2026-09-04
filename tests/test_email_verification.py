@@ -17,11 +17,8 @@ from tests.conftest import DEFAULT_PASSWORD, UserFactory
 
 
 class _CapturingSender:
-    """Stands in for the email provider and remembers what was 'sent'.
-
-    Lets a test recover the raw verification token, which otherwise exists
-    only inside the outgoing message.
-    """
+    """Stands in for the provider, so a test can recover the raw token that
+    otherwise exists only inside the outgoing message."""
 
     def __init__(self) -> None:
         self.sent: list[dict[str, str]] = []
@@ -217,11 +214,8 @@ async def test_duplicate_registration_notifies_the_real_owner(
 async def test_unverified_user_cannot_be_added_to_a_workspace(
     client: AsyncClient, make_user: UserFactory
 ) -> None:
-    """The takeover path: an unverified account must not gain membership.
-
-    Membership is granted by email address, so admitting an account that never
-    proved control of its address would hand an invitation to a squatter.
-    """
+    """The takeover path: membership is granted by email address, so an
+    unverified account would hand a squatter someone else's invitation."""
     owner = await make_user(name="Owner")
     ws = await client.post(
         "/workspaces", json={"name": "Private"}, headers=owner.headers

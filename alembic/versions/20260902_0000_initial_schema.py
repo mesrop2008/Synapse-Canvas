@@ -19,9 +19,8 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-# `create_type=False` stops SQLAlchemy from emitting an implicit CREATE TYPE
-# as a side effect of create_table, so the type's lifecycle is explicit and
-# the downgrade can actually reverse it.
+# create_type=False keeps the type's lifecycle explicit, so the downgrade can
+# actually reverse it.
 workspace_role = postgresql.ENUM(
     "owner", "editor", "viewer", name="workspace_role", create_type=False
 )

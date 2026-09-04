@@ -36,16 +36,10 @@ def upgrade() -> None:
     op.create_index(op.f('ix_email_verification_tokens_user_id'), 'email_verification_tokens', ['user_id'], unique=False)
     op.add_column('users', sa.Column('email_verified_at', sa.DateTime(timezone=True), nullable=True))
 
-    # Grandfather every account that predates this migration.
-    #
-    # Login now refuses an unverified address, so without this backfill the
-    # deploy would lock out the entire existing user base at once -- they have
-    # no verification token, and no way to request one they could act on
-    # before being locked out. Their addresses are no less proven than they
-    # were yesterday; the new requirement applies from here forward.
-    #
-    # If you would rather force existing users through verification, drop this
-    # statement and send them all a link *before* deploying, not after.
+    # Grandfather accounts that predate this migration: login now refuses an
+    # unverified address, so without this the deploy locks out every existing
+    # user. To force them through verification instead, drop this and send the
+    # links *before* deploying.
     op.execute(
         sa.text("UPDATE users SET email_verified_at = now() "
                 "WHERE email_verified_at IS NULL")
