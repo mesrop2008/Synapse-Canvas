@@ -20,17 +20,11 @@ from app.services import auth_service
 async def create_workspace(
     db: AsyncSession, owner: User, name: str
 ) -> tuple[Workspace, WorkspaceRole]:
-    """Create a workspace and its owner membership as one unit of work.
-
-    Both rows are added before a single commit, so there is no window in which
-    a workspace exists with nobody able to administer it.
-    """
+    """Create a workspace and its owner membership in one transaction."""
     workspace = Workspace(name=name, owner_id=owner.id)
     db.add(workspace)
-    # A mapped_column default is evaluated during flush, not at construction,
-    # so workspace.id is still None here. Flush to populate it before the
-    # membership row references it. This stays inside the same transaction --
-    # the single commit below still covers both rows.
+    # The UUID default is evaluated at flush, not construction, so flush to
+    # populate workspace.id before the membership row references it.
     await db.flush()
 
     db.add(
@@ -48,11 +42,10 @@ async def create_workspace(
 async def get_workspace_with_role(
     db: AsyncSession, workspace_id: uuid.UUID, user_id: uuid.UUID
 ) -> tuple[Workspace, WorkspaceRole] | None:
-    """Fetch a workspace together with `user_id`'s role in it.
+    """Fetch a workspace with `user_id`'s role in it.
 
-    The inner join is the whole point: a workspace that does not exist and a
-    workspace the caller is not a member of both produce no row, so callers
-    physically cannot distinguish the two and leak existence by accident.
+    The inner join makes a nonexistent workspace and a non-member both return
+    no row, so callers cannot tell them apart and leak existence.
     """
     result = await db.execute(
         select(Workspace, WorkspaceMember.role)
@@ -111,15 +104,12 @@ async def add_member(
 ) -> WorkspaceMember:
     user = await auth_service.get_user_by_email(db, email)
     if user is None:
-        # Distinct from "workspace not found": the caller is a proven owner of
-        # this workspace, so there is no existence to protect here.
+        # Not the 404-existence case: the caller is a proven owner here.
         raise NotFoundError("No user with that email address")
 
     if not user.is_email_verified:
-        # Membership is granted by email address, so admitting an account that
-        # never proved control of its address would let a squatter inherit an
-        # invitation meant for the address's real owner. Defence in depth:
-        # login already refuses unverified accounts.
+        # Membership is by email address, so an unverified account would let a
+        # squatter inherit an invitation meant for the address's real owner.
         raise ConflictError(
             "That user has not verified their email address yet"
         )
@@ -138,9 +128,8 @@ async def add_member(
         user_id=user.id,
         role=role,
     )
-    # Populate the relationship from the object already in the identity map.
-    # The response serialises `member.user`, and a lazy load after commit
-    # would raise MissingGreenlet under async SQLAlchemy.
+    # Set the relationship from the loaded user: the response serialises
+    # member.user, and a lazy load after commit raises MissingGreenlet.
     member.user = user
     db.add(member)
 
@@ -158,9 +147,7 @@ async def remove_member(
     db: AsyncSession, workspace: Workspace, user_id: uuid.UUID
 ) -> None:
     if user_id == workspace.owner_id:
-        # A workspace with no owner would be unadministrable, and every
-        # owner-only route would 403 forever. Transferring ownership is a
-        # separate operation, out of scope for Part 1.
+        # An ownerless workspace would be unadministrable; transfer is separate.
         raise ConflictError(
             "The workspace owner cannot be removed. Transfer ownership first."
         )

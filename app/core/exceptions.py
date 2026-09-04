@@ -1,10 +1,7 @@
 """Domain-level exceptions.
 
-The service layer must not import FastAPI or know about HTTP. It raises these
-instead, and a single handler registered in `app.main` maps them onto
-responses. That keeps `routers/` the only layer aware of the transport, and
-means services stay directly reusable from the WebSocket and background-worker
-entry points planned for later parts.
+Services raise these instead of HTTP errors; a single handler in `app.main`
+maps them to responses, so the service layer stays FastAPI-free and reusable.
 """
 
 from __future__ import annotations
@@ -20,9 +17,7 @@ class AppError(Exception):
         self, detail: str | None = None, headers: dict[str, str] | None = None
     ) -> None:
         self.detail = detail or self.__class__.detail
-        # Some failures are only actionable with a header attached -- a 429 is
-        # not much use to a client without Retry-After.
-        self.headers = headers
+        self.headers = headers  # e.g. Retry-After on a 429
         super().__init__(self.detail)
 
 
@@ -59,12 +54,6 @@ class RateLimitExceededError(AppError):
 
 
 class EmailNotVerifiedError(AppError):
-    """Credentials were correct, but the address has not been proven.
-
-    Checked only *after* the password verifies, so it tells an attacker who
-    does not already hold valid credentials nothing about whether an account
-    exists.
-    """
-
+    # Raised only after the password verifies, so it is not an enumeration signal.
     status_code = 403
     detail = "Email address has not been verified"

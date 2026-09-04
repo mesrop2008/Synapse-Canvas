@@ -1,9 +1,7 @@
-"""Application settings, loaded from environment variables / `.env`.
+"""Application settings, resolved once via cached `get_settings()`.
 
-Settings are resolved once and cached (`get_settings`) so that the same object
-is shared everywhere. Modules should depend on `get_settings()` rather than
-importing a module-level singleton, which keeps tests free to override the
-environment before the first access.
+Depend on `get_settings()` rather than a module-level singleton so tests can
+override the environment before first access.
 """
 
 from __future__ import annotations
@@ -26,53 +24,39 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # --- General ----------------------------------------------------------
     project_name: str = "Synapse Canvas API"
     environment: Environment = "local"
     debug: bool = False
 
-    # --- Database ---------------------------------------------------------
     # Must use the asyncpg driver: the whole data layer is async.
     database_url: str
-    # Separate database for the test suite so `pytest` can drop/create tables
-    # without touching development data.
+    # Separate database for the suite, which drops/creates tables in it.
     test_database_url: str | None = None
 
-    # --- Auth -------------------------------------------------------------
     jwt_secret_key: str = Field(min_length=32)
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
 
-    # Retired signing keys, comma-separated. Tokens signed with one of these
-    # still verify, so the active key can be replaced without logging every
-    # user out; drop a key from the list once its tokens have all expired.
-    # Each token carries a `kid` header naming the key that signed it.
+    # Retired signing keys (comma-separated): tokens they signed still verify,
+    # so the active key rotates without logging everyone out. Drop a key once
+    # its tokens have all expired.
     previous_jwt_secret_keys_raw: str = Field(
         default="", alias="PREVIOUS_JWT_SECRET_KEYS"
     )
 
-    # Pinned into every token and verified on decode, so a token minted by a
-    # different system -- or by staging against production -- is rejected
-    # rather than silently honoured.
+    # Pinned into every token and checked on decode.
     jwt_issuer: str = "synapse-canvas"
     jwt_audience: str = "synapse-canvas-api"
-    # --- Email verification ----------------------------------------------
     email_verification_expire_hours: int = 24
-    # Where the emailed link points. In a deployed system this is the
-    # frontend route that reads the token and POSTs it to /auth/verify-email.
+    # Frontend route that reads the token and POSTs it to /auth/verify-email.
     email_verification_link_base: str = "http://localhost:3000/verify-email"
 
-    # Work factor for bcrypt. 12 is a reasonable 2020s default; lowered to 4
-    # in the test environment so the suite is not dominated by KDF time.
+    # 12 is a sane default; the suite lowers it to 4 so tests aren't KDF-bound.
     bcrypt_rounds: int = 12
 
-    # --- Abuse resistance -------------------------------------------------
-    # Throttling, not account lockout. NIST SP 800-63B recommends throttling
-    # precisely because a lockout keyed on an account is itself a denial of
-    # service: anyone who knows an address can lock its owner out at will.
-    # Limits are applied per client IP *and* per targeted account, so neither
-    # a single noisy address nor a single targeted account can be hammered.
+    # Throttling, not lockout: a lockout keyed on an account lets anyone lock
+    # its owner out. Applied per IP and per account.
     login_rate_limit_per_ip: int = 10
     login_rate_limit_per_ip_window_seconds: int = 300
     login_rate_limit_per_account: int = 5
@@ -82,16 +66,12 @@ class Settings(BaseSettings):
     refresh_rate_limit_per_ip: int = 30
     refresh_rate_limit_per_ip_window_seconds: int = 300
 
-    # X-Forwarded-For is trivially spoofable by the client, and trusting it
-    # blindly lets an attacker mint a fresh rate-limit identity per request.
-    # Only enable this when a proxy you control appends the header.
+    # X-Forwarded-For is client-spoofable; only trust it behind a proxy you
+    # control, or a client can mint a fresh rate-limit identity per request.
     trust_proxy_headers: bool = False
 
-    # --- HTTP -------------------------------------------------------------
-    # Comma-separated in the environment; exposed as a list via `cors_origins`.
-    # Kept as a plain `str` because pydantic-settings JSON-decodes complex
-    # types before validators run, which makes CSV env vars awkward to type
-    # directly as `list[str]`.
+    # Plain str, not list[str]: pydantic-settings JSON-decodes complex types
+    # before validators run, which makes CSV env vars awkward.
     cors_origins_raw: str = Field(default="", alias="CORS_ORIGINS")
 
     @field_validator("database_url", "test_database_url")
@@ -106,8 +86,7 @@ class Settings(BaseSettings):
             )
         return v
 
-    # Requests larger than this are refused before the body is read. A proxy
-    # should enforce a limit too; this is the backstop for when one is absent.
+    # Refused before the body is read; a proxy should also cap this.
     max_request_body_bytes: int = 1_048_576
 
     @property
@@ -132,11 +111,6 @@ def get_settings() -> Settings:
 
 
 def _configure_third_party_logging() -> None:
-    """Silence a known-noisy, harmless passlib probe.
-
-    passlib 1.7.4 reads `bcrypt.__about__.__version__` to detect the backend
-    version. bcrypt >= 4.1 removed that attribute, so passlib logs a warning
-    with a traceback on first use. Hashing and verification are unaffected --
-    only the version probe fails -- so the log record is pure noise.
-    """
+    # passlib 1.7.4 probes bcrypt.__about__ (removed in 4.1) and logs a
+    # traceback on first use; hashing is unaffected, so silence the noise.
     logging.getLogger("passlib.handlers.bcrypt").setLevel(logging.CRITICAL)

@@ -1,8 +1,5 @@
-"""Registration, login and token refresh.
-
-Contains no FastAPI imports on purpose: everything here is callable from the
-WebSocket handshake and background workers planned for later parts.
-"""
+"""Registration, verification, login and token refresh. No FastAPI imports,
+so this stays callable from non-HTTP entry points."""
 
 from __future__ import annotations
 
@@ -37,11 +34,7 @@ from app.services import email_service, rate_limit_service
 
 
 def normalize_email(email: str) -> str:
-    """Emails are case-insensitive in practice; store one canonical form.
-
-    Doing this in one place means the unique index on `users.email` is a
-    genuine uniqueness guarantee rather than one that "Bob@x.com" slips past.
-    """
+    # One canonical form, so the unique index on users.email actually holds.
     return email.strip().lower()
 
 
@@ -55,17 +48,11 @@ async def get_user_by_id(db: AsyncSession, user_id: uuid.UUID) -> User | None:
 
 
 async def register_user(db: AsyncSession, data: RegisterRequest) -> None:
-    """Create an account, or silently do nothing if the address is taken.
+    """Create an account, or silently notice a duplicate.
 
-    Returns nothing on purpose. The endpoint answers identically whether or
-    not the address was already registered, because telling an anonymous
-    caller otherwise is an account-enumeration oracle -- and this endpoint is
-    reachable without credentials. The address's real owner is informed
-    instead, by email, which is the one party entitled to know.
-
-    The password is hashed *before* the existence check so both paths pay the
-    same ~250 ms of bcrypt. Skipping it on the duplicate path would restore
-    the same oracle through response timing.
+    Enumeration-resistant: identical outcome either way (this endpoint is
+    unauthenticated), and the real owner is notified by email instead. The
+    password is hashed on both paths so their timing matches too.
     """
     email = normalize_email(data.email)
     hashed_password = await hash_password(data.password)
@@ -79,8 +66,7 @@ async def register_user(db: AsyncSession, data: RegisterRequest) -> None:
     try:
         await db.commit()
     except IntegrityError:
-        # Two concurrent registrations for the same address both passed the
-        # pre-check; the unique index settled it. Same silent outcome.
+        # Concurrent duplicate; the unique index settled it. Same outcome.
         await db.rollback()
         await email_service.send_duplicate_registration_notice(to=email)
         return
@@ -91,16 +77,12 @@ async def register_user(db: AsyncSession, data: RegisterRequest) -> None:
 
 
 async def create_email_verification(db: AsyncSession, user: User) -> str:
-    """Issue a fresh verification token, invalidating any still outstanding.
-
-    Only the hash is stored; the raw value is returned here so it can be
-    emailed, and then exists nowhere on the server.
-    """
+    # Only the hash is stored; the raw token is returned to be emailed and then
+    # exists nowhere on the server.
     now = datetime.now(timezone.utc)
     settings = get_settings()
 
-    # One live token per user: re-requesting a link must retire the previous
-    # one, so an old message in an inbox stops working.
+    # Retire any outstanding token, so an old link in an inbox stops working.
     await db.execute(
         update(EmailVerificationToken)
         .where(
@@ -133,8 +115,7 @@ async def verify_email(db: AsyncSession, raw_token: str) -> User:
     )
     token = result.scalar_one_or_none()
 
-    # One message for every failure mode: unknown, spent and expired are
-    # indistinguishable to the caller.
+    # Unknown, spent and expired are one indistinguishable failure to the caller.
     if token is None or token.used_at is not None or token.expires_at <= now:
         raise AuthenticationError("Invalid or expired verification token")
 
@@ -151,11 +132,8 @@ async def verify_email(db: AsyncSession, raw_token: str) -> User:
 
 
 async def resend_verification(db: AsyncSession, email: str) -> None:
-    """Re-issue a verification link, if that is a sensible thing to do.
-
-    Silent in every case -- unknown address, already verified, or sent -- for
-    the same enumeration reason as registration.
-    """
+    # Silent in every case (unknown, already verified, sent) for the same
+    # enumeration reason as registration.
     user = await get_user_by_email(db, email)
     if user is None or user.is_email_verified:
         return
@@ -167,13 +145,8 @@ async def resend_verification(db: AsyncSession, email: str) -> None:
 async def authenticate_user(db: AsyncSession, email: str, password: str) -> User:
     """Verify credentials, throttling failed attempts per account.
 
-    Only *failures* count against the per-account bucket, and a success clears
-    it. Counting successes too would throttle a legitimate user for the crime
-    of logging in from several devices, and leaving the bucket set after a
-    correct password would keep punishing someone who simply mistyped twice.
-
-    The limit is checked before the password is verified, so an attacker who
-    is already over it cannot keep forcing bcrypt work.
+    Only failures count and a success clears the bucket. The limit is checked
+    before the password, so an attacker over it cannot keep forcing bcrypt work.
     """
     settings = get_settings()
     limit = settings.login_rate_limit_per_account
@@ -199,9 +172,7 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> User
     if limit > 0:
         await rate_limit_service.reset(db, bucket)
 
-    # Checked only after the password verified. Ordering it this way means the
-    # distinct 403 is visible only to someone who already holds valid
-    # credentials, so it is not an enumeration signal.
+    # After the password check, so the 403 is not an enumeration signal.
     if not user.is_email_verified:
         raise EmailNotVerifiedError()
 
@@ -213,8 +184,7 @@ async def issue_token_pair(
 ) -> TokenPair:
     """Mint an access/refresh pair and record the refresh token server-side.
 
-    `family_id` links a rotated token to the login it descends from. Omit it
-    to start a new family, which is what a fresh login does.
+    `family_id` links a rotated token to its login; omit it to start a family.
     """
     settings = get_settings()
     jti = uuid.uuid4()
@@ -249,18 +219,9 @@ async def _revoke_family(db: AsyncSession, family_id: uuid.UUID) -> None:
 async def refresh_token_pair(db: AsyncSession, refresh_token: str) -> TokenPair:
     """Exchange a valid refresh token for a fresh pair, rotating it.
 
-    `decode_token` rejects an access token presented here, so the two token
-    lifetimes cannot be confused.
-
-    Beyond signature and expiry, the token must still be live server-side.
-    Presenting one that was already rotated away is treated as a compromise:
-    either the client replayed it or somebody stole it, and the server cannot
-    tell which, so the entire family is revoked and both parties have to log
-    in again. Without that, a stolen token would go on working silently
-    alongside the legitimate one.
-
-    The user is re-read from the database rather than trusted from the token,
-    so a deleted account cannot keep minting access tokens.
+    A token that was already rotated away is treated as a compromise (replay or
+    theft, indistinguishable): the whole family is revoked. The user is re-read
+    from the DB, so a deleted account cannot keep minting tokens.
     """
     payload = decode_token(refresh_token, REFRESH_TOKEN)
     jti = token_jti(payload)
@@ -292,15 +253,10 @@ async def refresh_token_pair(db: AsyncSession, refresh_token: str) -> TokenPair:
 
 
 async def revoke_refresh_token(db: AsyncSession, refresh_token: str) -> None:
-    """Log out one session.
+    """Log out one session by revoking its whole family.
 
-    Revokes the whole family, not just the presented token: the family is the
-    session, and leaving its other tokens live would make logout meaningless.
-
-    A token that is unparseable, unknown or already revoked is accepted
-    silently. Logout is not an oracle -- distinguishing those cases would tell
-    a caller which tokens exist, and the caller's intent (be logged out) is
-    satisfied either way.
+    A bad/unknown/revoked token is accepted silently: logout is not an oracle,
+    and the caller's intent is satisfied either way.
     """
     try:
         payload = decode_token(refresh_token, REFRESH_TOKEN)
@@ -314,10 +270,7 @@ async def revoke_refresh_token(db: AsyncSession, refresh_token: str) -> None:
 
 
 async def revoke_all_for_user(db: AsyncSession, user_id: uuid.UUID) -> int:
-    """Log out every session for one user.
-
-    The lever to pull after a password change or a suspected compromise.
-    """
+    """Log out every session for one user (e.g. after a password change)."""
     result = await db.execute(
         update(RefreshToken)
         .where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))

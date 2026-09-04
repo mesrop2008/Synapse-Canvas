@@ -1,9 +1,6 @@
-"""Workspace and membership endpoints.
-
-Every route below `/{workspace_id}` takes its workspace from a
-`WorkspaceAccess` dependency, which has already proven the caller's role and
-loaded the row. No handler re-fetches the workspace or re-checks permissions.
-"""
+"""Workspace and membership endpoints. Every `/{workspace_id}` route gets its
+workspace from a WorkspaceAccess dependency, so no handler re-fetches it or
+re-checks permissions."""
 
 from __future__ import annotations
 
@@ -24,8 +21,8 @@ from app.services import workspace_service
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
-# Applies to every `/{workspace_id}` route: the access dependency collapses
-# "no such workspace" and "you are not a member" into one response.
+# The access dependency collapses "no such workspace" and "not a member" into
+# one 404.
 _MEMBERSHIP_RESPONSES = {
     401: {"description": "Missing or invalid access token"},
     404: {"description": "Workspace not found, or caller is not a member"},
@@ -82,8 +79,7 @@ async def get_workspace(ctx: RequireViewer) -> WorkspaceWithRole:
 async def update_workspace(
     payload: WorkspaceUpdate, ctx: RequireOwner, db: DbSession
 ) -> WorkspaceWithRole:
-    # `exclude_unset` keeps PATCH honest: a field the client did not send is
-    # left alone rather than overwritten with the schema default.
+    # exclude_unset: a field the client didn't send is left alone.
     updates = payload.model_dump(exclude_unset=True)
     workspace = await workspace_service.update_workspace(db, ctx.workspace, **updates)
     return workspace_with_role(workspace, ctx.role)

@@ -1,24 +1,10 @@
-"""Test fixtures: a real PostgreSQL database, wrapped so every test rolls back.
+"""Test fixtures against a real PostgreSQL, with every test rolled back.
 
-Isolation strategy
-------------------
-Each test runs inside an outer transaction that is *never* committed::
-
-    connection = await engine.connect()
-    transaction = await connection.begin()   # outer; rolled back at teardown
-    session = AsyncSession(bind=connection,
-                           join_transaction_mode="create_savepoint")
-
-join_transaction_mode="create_savepoint" makes the session open a SAVEPOINT
-instead of a real transaction, so a commit() inside application code releases
-that savepoint rather than committing. The application therefore exercises its
-genuine commit path -- including IntegrityError handling that only fires
-against a real unique index -- while teardown still discards every row with a
-single ROLLBACK. That is faster than truncating tables between tests and keeps
-tests order-independent.
-
-The test client is wired to the same session through a dependency override, so
-rows created directly in a test are visible to the endpoints under test.
+Each test runs in an outer transaction that is never committed;
+join_transaction_mode="create_savepoint" turns the app's own commit() into a
+savepoint release, so the real commit path (including IntegrityError against a
+live unique index) runs while teardown discards everything in one ROLLBACK.
+The client shares that session via a dependency override.
 """
 
 from __future__ import annotations
@@ -34,8 +20,7 @@ import pytest
 import pytest_asyncio
 from dotenv import load_dotenv
 
-# --- Environment must be settled before any app module reads settings -------
-
+# Environment must be settled before any app module reads settings.
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(_PROJECT_ROOT / ".env")
 
@@ -46,20 +31,16 @@ if not _TEST_DATABASE_URL:
         "at a throwaway database -- the suite drops every table in it."
     )
 
-# The app reads DATABASE_URL; redirect it at the test database so no test can
-# reach development data even by accident.
+# Point the app at the test database so no test can reach development data.
 os.environ["DATABASE_URL"] = _TEST_DATABASE_URL
 os.environ["ENVIRONMENT"] = "test"
-# bcrypt at cost 12 is roughly 250 ms per hash. Cost 4 keeps the suite from
-# being dominated by key derivation; the production default stays 12.
-os.environ["BCRYPT_ROUNDS"] = "4"
+os.environ["BCRYPT_ROUNDS"] = "4"  # 12 would make the suite KDF-bound
 os.environ.setdefault(
     "JWT_SECRET_KEY", "test-only-secret-key-not-used-anywhere-real-0123456789"
 )
-# Throttling is off by default in tests: every request in the suite arrives
-# from the same client address, so a per-IP limit would have unrelated tests
-# throttling each other and turn failures into a function of ordering. The
-# tests that exercise throttling switch it on explicitly, via `rate_limits`.
+# Throttling off by default: every test shares one client address, so a per-IP
+# limit would make unrelated tests throttle each other. The throttling tests
+# switch it on via the `rate_limits` fixture.
 for _limit_var in (
     "LOGIN_RATE_LIMIT_PER_IP",
     "LOGIN_RATE_LIMIT_PER_ACCOUNT",

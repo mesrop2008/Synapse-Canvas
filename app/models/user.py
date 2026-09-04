@@ -18,17 +18,13 @@ if TYPE_CHECKING:
 class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "users"
 
-    # 320 is the maximum length of an addr-spec per RFC 5321. Emails are
-    # normalised to lowercase in the service layer before they reach here, so
-    # a plain unique index is enough to make them case-insensitively unique.
+    # 320 = max addr-spec (RFC 5321); normalised lowercase in the service layer,
+    # so a plain unique index suffices.
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    # Null until the address is proven reachable. Login refuses unverified
-    # accounts, and they cannot be added to a workspace -- membership is
-    # granted by email address, so an unproven claim on one is a way into
-    # somebody else's workspace.
+    # Null until proven; login and workspace invitations both require it.
     email_verified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

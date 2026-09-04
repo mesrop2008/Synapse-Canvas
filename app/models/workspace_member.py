@@ -16,12 +16,8 @@ if TYPE_CHECKING:
 
 
 class WorkspaceMember(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """Join row between a user and a workspace, carrying the user's role.
-
-    The owner of a workspace also gets a row here (role=owner) rather than
-    being implied by `Workspace.owner_id` alone. One membership table means
-    the permission check is a single lookup with no special case for owners.
-    """
+    """User-workspace join row carrying the role. The owner gets a row too
+    (role=owner), so the permission check is one lookup with no special case."""
 
     __tablename__ = "workspace_members"
     __table_args__ = (
@@ -39,9 +35,7 @@ class WorkspaceMember(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
     )
     role: Mapped[WorkspaceRole] = mapped_column(
-        # `values_callable` makes SQLAlchemy persist the enum *values*
-        # ("owner"), not the member names ("OWNER"), which is what the API
-        # exposes and what anyone reading the table by hand would expect.
+        # values_callable persists the values ("owner"), not the names ("OWNER").
         SAEnum(
             WorkspaceRole,
             name=WORKSPACE_ROLE_ENUM_NAME,

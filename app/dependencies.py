@@ -1,10 +1,8 @@
-"""Shared FastAPI dependencies: database session, current user, workspace access.
+"""Shared FastAPI dependencies: DB session, current user, workspace access.
 
-`WorkspaceAccess` is the piece worth reading. It turns "the caller must be at
-least an editor of the workspace named in the path" into a type annotation, so
-route handlers contain zero permission code and cannot forget the check --
-omitting the dependency also removes the handler's only source of the
-workspace object, which makes the mistake fail loudly instead of silently.
+`WorkspaceAccess` turns a role requirement into a type annotation, so handlers
+carry no permission code -- and since it is also the handler's only source of
+the workspace object, omitting the check fails loudly rather than silently.
 """
 
 from __future__ import annotations
@@ -49,8 +47,7 @@ async def get_current_user(
     payload = decode_token(credentials.credentials, ACCESS_TOKEN)
     user = await auth_service.get_user_by_id(db, subject_uuid(payload))
     if user is None:
-        # Signature was valid but the account is gone -- a token outliving its
-        # user must not keep working.
+        # Valid signature but the account is gone; the token must stop working.
         raise AuthenticationError("User no longer exists")
     return user
 
@@ -70,15 +67,9 @@ class WorkspaceContext:
 class WorkspaceAccess:
     """Dependency factory enforcing a minimum role on `{workspace_id}`.
 
-    Note the two different failure modes, which are deliberately asymmetric:
-
-    * Not a member (or no such workspace) -> 404. Returning 403 here would
-      confirm that a workspace with this id exists, letting an outsider probe
-      for valid ids. The service query is an inner join, so both cases arrive
-      as the same empty result and cannot be told apart even internally.
-    * A member, but too junior -> 403. The caller already knows the workspace
-      exists, so there is nothing left to hide and a truthful error is more
-      useful than a misleading 404.
+    Non-member or no such workspace -> 404 (both are one empty inner-join
+    result, so ids cannot be probed). A member below the required role -> 403,
+    since they already know it exists.
     """
 
     def __init__(self, minimum_role: WorkspaceRole) -> None:
@@ -115,13 +106,11 @@ RequireOwner = Annotated[WorkspaceContext, Depends(WorkspaceAccess(WorkspaceRole
 
 
 def client_ip(request: Request) -> str:
-    """Resolve the caller's address for rate-limiting purposes.
+    """Resolve the caller's address for rate limiting.
 
-    X-Forwarded-For is set by the client and only becomes trustworthy once a
-    proxy you control overwrites it. Honouring it unconditionally would hand
-    an attacker a fresh rate-limit identity per request -- simply vary the
-    header and every bucket is empty again. So it is read only when
-    `trust_proxy_headers` is explicitly enabled, and then only the first hop.
+    X-Forwarded-For is client-set, so it is honoured only when
+    trust_proxy_headers is on (else a client mints a new identity per request),
+    and then only the first hop.
     """
     if get_settings().trust_proxy_headers:
         forwarded = request.headers.get("X-Forwarded-For")
@@ -133,12 +122,8 @@ def client_ip(request: Request) -> str:
 
 
 class IPRateLimit:
-    """Per-IP throttle for one endpoint family.
-
-    Limits are read from settings at call time rather than captured at import,
-    so a deployment (or a test) can change them without rebuilding the routes.
-    A limit of 0 or less disables the check.
-    """
+    """Per-IP throttle for one endpoint family. Limits are read from settings
+    at call time (so tests/deployments can change them); <= 0 disables it."""
 
     def __init__(self, prefix: str, limit_attr: str, window_attr: str) -> None:
         self.prefix = prefix

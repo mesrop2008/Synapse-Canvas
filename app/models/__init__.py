@@ -1,9 +1,6 @@
-"""SQLAlchemy models.
-
-Importing every model here guarantees they are registered on `Base.metadata`
-before Alembic autogenerate or `create_all` inspects it. Miss one and it
-silently vanishes from migrations.
-"""
+"""SQLAlchemy models. Import every model here so it is registered on
+Base.metadata before Alembic inspects it -- a missed one vanishes from
+migrations."""
 
 from app.db.base import Base
 from app.models.email_verification import EmailVerificationToken

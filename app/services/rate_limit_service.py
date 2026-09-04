@@ -1,20 +1,9 @@
 """Fixed-window request throttling, backed by PostgreSQL.
 
-Why throttling and not account lockout
---------------------------------------
-Locking an account after N failures turns knowledge of an email address into a
-denial-of-service primitive against its owner. NIST SP 800-63B recommends
-throttling instead, which is what this does: limits are applied to the client
-IP *and*, separately, to the targeted account, so neither a single noisy
-source nor a single targeted account can be hammered, and a legitimate user is
-never locked out by someone else's failed guesses.
-
-Why the database
-----------------
-An in-process counter is per-worker, so N workers multiply the allowance by N,
-and a restart clears it. The database is the state every replica already
-shares. Increments use INSERT ... ON CONFLICT DO UPDATE, so concurrent
-requests cannot interleave a read and a write and lose counts.
+Throttling, not lockout, so knowing an address can't be used to lock its owner
+out; limits apply per IP and per account. The DB (not an in-process counter,
+which every worker would multiply) is the shared state, and INSERT ... ON
+CONFLICT DO UPDATE keeps concurrent increments from losing counts.
 """
 
 from __future__ import annotations
@@ -32,11 +21,7 @@ from app.models.rate_limit import RateLimitBucket
 
 
 def account_key(prefix: str, email: str) -> str:
-    """Build a per-account bucket key without storing the address itself.
-
-    The table would otherwise become a list of every address anyone has tried
-    to log in as, readable by anything with database access.
-    """
+    # Hashed, so the table isn't a readable list of every address anyone tried.
     digest = hashlib.sha256(email.strip().lower().encode("utf-8")).hexdigest()
     return f"{prefix}:account:{digest}"
 
@@ -61,18 +46,14 @@ async def enforce(
 ) -> int:
     """Count one request against `key`, raising if it exceeds `limit`.
 
-    Commits immediately and on its own. The increment has to outlive the
-    request that triggered it -- a failed login raises, and `get_db` rolls the
-    session back on the way out, which would otherwise discard the very count
-    that makes throttling work. Rate limiting runs in a dependency, before the
-    handler, so there is never unrelated pending work to commit alongside it.
-
+    Commits on its own: the increment must outlive the request that triggered
+    it (a failed login raises, and get_db would otherwise roll the count back).
     Returns the request's position in the current window.
     """
     window_start, retry_after = _window_bounds(window_seconds)
 
-    # The mixin's UUID default is an ORM-flush hook and does not apply to a
-    # Core insert, so the key is supplied explicitly.
+    # The mixin's UUID default is an ORM-flush hook, so a Core insert needs it
+    # supplied explicitly.
     statement = (
         pg_insert(RateLimitBucket)
         .values(
@@ -89,9 +70,8 @@ async def enforce(
     )
     count = await db.scalar(statement)
 
-    # One row per key at a time: drop this key's rolled-over windows while we
-    # are already here. A global sweep still belongs in a scheduled job --
-    # see purge_expired_buckets.
+    # Drop this key's rolled-over windows while we're here; a global sweep is
+    # purge_expired_buckets.
     await db.execute(
         delete(RateLimitBucket).where(
             RateLimitBucket.bucket_key == key,
@@ -111,9 +91,7 @@ async def ensure_under_limit(
 ) -> None:
     """Raise if `key` is already over its limit, without counting a request.
 
-    Lets an endpoint reject a caller *before* doing expensive work -- checking
-    a password costs a few hundred milliseconds of bcrypt, which is exactly
-    the work an attacker wants to force.
+    Lets an endpoint reject a caller before spending bcrypt on a password.
     """
     window_start, retry_after = _window_bounds(window_seconds)
 
@@ -128,21 +106,14 @@ async def ensure_under_limit(
 
 
 async def reset(db: AsyncSession, key: str) -> None:
-    """Clear every window for `key`.
-
-    Called after a successful login so that a run of failures followed by the
-    correct password does not leave the account throttled.
-    """
+    # After a successful login, so failures-then-success doesn't stay throttled.
     await db.execute(delete(RateLimitBucket).where(RateLimitBucket.bucket_key == key))
     await db.commit()
 
 
 async def purge_expired_buckets(db: AsyncSession, older_than: datetime) -> int:
-    """Delete windows that closed before `older_than`.
-
-    Keys are unbounded (every distinct client IP creates one), so a key that
-    is never seen again leaves a row behind. Run this periodically.
-    """
+    """Delete windows closed before `older_than`. Keys are unbounded (one per
+    IP), so run this periodically."""
     result = await db.execute(
         delete(RateLimitBucket).where(RateLimitBucket.window_start < older_than)
     )

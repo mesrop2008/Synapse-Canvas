@@ -8,26 +8,18 @@ from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-# Swagger UI and ReDoc pull scripts, styles and fonts from a CDN, which a
-# default-src 'none' policy would block outright. The strict policy is applied
-# everywhere else -- the API's own responses are JSON and need no resources at
-# all, so there is nothing to relax for them.
+# Swagger/ReDoc load assets from a CDN that default-src 'none' would block;
+# the API's own JSON responses need no resources, so only these are exempt.
 _CSP_EXEMPT_PATHS = frozenset({"/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect"})
 
 _STATIC_HEADERS = {
-    # Stop a browser second-guessing Content-Type; a JSON response that gets
-    # sniffed as HTML is the root of several XSS tricks.
     "X-Content-Type-Options": "nosniff",
-    # This API is never meant to be framed.
     "X-Frame-Options": "DENY",
-    # Do not leak API paths (which contain workspace and user ids) to
-    # third-party sites through the Referer header.
-    "Referrer-Policy": "no-referrer",
+    "Referrer-Policy": "no-referrer",  # API paths carry workspace/user ids
     "Cross-Origin-Opener-Policy": "same-origin",
     "Cross-Origin-Resource-Policy": "same-origin",
     "Permissions-Policy": "accelerometer=(), camera=(), geolocation=(), microphone=()",
-    # Browsers ignore HSTS on plaintext responses, so this is inert in local
-    # development and takes effect the moment the API is served over TLS.
+    # Inert over plaintext; takes effect once served over TLS.
     "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
 }
 
@@ -49,13 +41,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 class BodySizeLimitMiddleware(BaseHTTPMiddleware):
-    """Reject oversized requests before the body is buffered.
+    """Reject oversized requests on Content-Length before the body is buffered.
 
-    Only Content-Length is inspected, so a chunked request without that header
-    slips past. That is deliberate rather than overlooked: enforcing it
-    properly means counting bytes as they stream, which belongs in the reverse
-    proxy that already terminates the connection. This is the backstop for
-    deployments that have no such proxy in front.
+    A chunked request without that header slips past; counting streamed bytes
+    belongs in the reverse proxy. This is the backstop when there is none.
     """
 
     def __init__(self, app: object, max_bytes: int) -> None:

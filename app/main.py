@@ -1,8 +1,5 @@
-"""Application factory and wiring.
-
-`create_app()` is a factory rather than a module-level singleton so tests can
-build an isolated instance with its own dependency overrides.
-"""
+"""Application factory. `create_app()` is a factory, not a singleton, so tests
+build isolated instances with their own overrides."""
 
 from __future__ import annotations
 
@@ -30,18 +27,11 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
-    # Close pooled connections on shutdown so a reload or a container stop
-    # does not leave sockets open against PostgreSQL.
-    await get_engine().dispose()
+    await get_engine().dispose()  # close pooled connections on shutdown
 
 
 async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
-    """Single translation point from domain errors to HTTP responses.
-
-    Because services raise `AppError` subclasses rather than `HTTPException`,
-    this is the only place in the codebase that maps business failures onto
-    status codes -- and the service layer stays transport-agnostic.
-    """
+    """The one place domain errors map to HTTP status codes."""
     headers = dict(exc.headers or {})
     if exc.status_code == 401:
         headers.setdefault("WWW-Authenticate", "Bearer")
@@ -53,12 +43,8 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
 
 
 async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Last resort: never let an unexpected exception reach the client.
-
-    A stack trace or driver message in a response body is an information leak
-    -- it discloses table names, file paths and library versions. The detail
-    is logged server-side; the caller gets a fixed string.
-    """
+    # Never let a stack trace (table names, paths, versions) reach the client;
+    # log it, return a fixed string.
     logger.exception("Unhandled error on %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500, content={"detail": "Internal server error"}
@@ -87,10 +73,8 @@ def create_app() -> FastAPI:
 
     if settings.cors_origins:
         if "*" in settings.cors_origins:
-            # Starlette pairs a wildcard with allow_credentials by echoing the
-            # caller's own origin back, which means *any* site gets a
-            # credentialed cross-origin allowance. Refuse to start rather than
-            # serve that quietly.
+            # Starlette pairs a wildcard with credentials by echoing the
+            # caller's origin, granting any site access. Refuse to boot.
             raise RuntimeError(
                 "CORS_ORIGINS may not contain '*' while credentials are allowed. "
                 "List the exact origins that need access."
