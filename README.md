@@ -27,11 +27,16 @@ Planned for later parts: React + TypeScript, Tiptap, Redis, pgvector, Celery or 
 
 ## Running locally
 
-One command, no configuration:
+```bash
+cp .env.example .env
+```
 
 ```bash
 docker compose up -d --build
 ```
+
+That is the whole setup. `.env` ships with `JWT_SECRET_KEY` blank, and the container
+generates one on first run — edit anything in that file to override the defaults.
 
 That starts PostgreSQL, waits for its healthcheck, runs `alembic upgrade head` to completion,
 and only then starts the API on <http://localhost:8000>. Postgres is published on host port
@@ -42,13 +47,14 @@ command, so they execute exactly once no matter how many API replicas there are.
 **`migrate` showing `Exited (0)` afterwards is the success case, not a crash** — and if a
 migration fails, the API is not started at all.
 
-On first run the entrypoint generates a JWT signing key and stores it in a Docker volume, so
-there is nothing to set up and the key survives restarts. That happens **only** when
-`ENVIRONMENT` is `local` or `test`; anywhere else a missing `JWT_SECRET_KEY` is a hard startup
-failure, because replicas each inventing their own key would reject one another's tokens.
+The signing key is generated on first run and stored in a Docker volume, so it survives
+restarts. `.env.example` deliberately leaves `JWT_SECRET_KEY` blank rather than shipping a
+placeholder: a committed default would silently become the real key for everyone who copied
+the file. Set your own there to pin it — an explicit value always wins.
 
-To pin your own values instead, `cp .env.example .env` and edit it — anything you set there
-takes precedence.
+Generation happens **only** when `ENVIRONMENT` is `local` or `test`. Anywhere else a missing
+`JWT_SECRET_KEY` is a hard startup failure, because replicas each inventing their own key
+would reject one another's tokens.
 
 ```bash
 docker compose logs -f api
