@@ -37,8 +37,32 @@ Set `JWT_SECRET_KEY` in `.env` (minimum 32 characters):
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-Start PostgreSQL. It is published on host port **5433**, so it does not collide with a
-natively installed server on 5432:
+Then bring the whole stack up with one command:
+
+```bash
+docker compose up -d --build
+```
+
+That starts PostgreSQL, waits for its healthcheck, runs `alembic upgrade head` to completion,
+and only then starts the API on <http://localhost:8000>. Postgres is published on host port
+**5433**, so it does not collide with a natively installed server on 5432.
+
+Migrations run in their own one-shot `migrate` service rather than in the API's start
+command, so they execute exactly once no matter how many API replicas there are.
+**`migrate` showing `Exited (0)` afterwards is the success case, not a crash** — and if a
+migration fails, the API is not started at all.
+
+```bash
+docker compose logs -f api
+```
+
+```bash
+docker compose down          # add -v to also delete the database volume
+```
+
+### Running the API on the host instead
+
+Useful for debugging, and required for the test suite:
 
 ```bash
 docker compose up -d postgres
@@ -59,8 +83,6 @@ alembic upgrade head
 ```bash
 uvicorn app.main:app --reload
 ```
-
-To run the whole stack, API included, in Docker instead: `docker compose up -d --build`.
 
 ### Trying the API
 
