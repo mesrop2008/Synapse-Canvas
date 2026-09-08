@@ -46,8 +46,16 @@ COPY --chown=appuser:appuser alembic.ini ./
 COPY --chown=appuser:appuser alembic ./alembic
 COPY --chown=appuser:appuser app ./app
 
+COPY --chmod=0755 docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+
+# A named volume mounted here inherits this ownership, so the non-root user can
+# write the generated development key.
+RUN mkdir -p /var/lib/synapse && chown appuser:appuser /var/lib/synapse
+
 USER appuser
 EXPOSE 8000
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # No curl in the slim image; the interpreter is already here.
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
