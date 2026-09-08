@@ -15,7 +15,10 @@ x-app-environment: &app-environment
   DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-synapse}:${POSTGRES_PASSWORD:-synapse}@postgres:5432/${POSTGRES_DB:-synapse_canvas}
   ENVIRONMENT: ${ENVIRONMENT:-local}
   DEBUG: ${DEBUG:-false}
-  JWT_SECRET_KEY: ${JWT_SECRET_KEY:?run "cp .env.example .env" and set JWT_SECRET_KEY (32+ chars)}
+  # Left empty on purpose: the entrypoint generates and persists a key for
+  # local/test on first run, so the stack needs no setup. Any other
+  # ENVIRONMENT refuses to start without one.
+  JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
   PREVIOUS_JWT_SECRET_KEYS: ${PREVIOUS_JWT_SECRET_KEYS:-}
   ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
   REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
@@ -65,6 +68,7 @@ services:
     volumes:
       - ./alembic:/app/alembic:ro
       - ./app:/app/app:ro
+      - jwt_secret:/var/lib/synapse
     command: alembic upgrade head
     restart: "no"
 
@@ -87,7 +91,11 @@ services:
       # the image should be immutable.
       - ./app:/app/app:ro
       - ./alembic:/app/alembic:ro
+      - jwt_secret:/var/lib/synapse
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
   postgres_data:
+  # Holds the development signing key so it survives restarts and both
+  # services see the same one.
+  jwt_secret:

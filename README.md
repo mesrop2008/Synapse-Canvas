@@ -27,17 +27,7 @@ Planned for later parts: React + TypeScript, Tiptap, Redis, pgvector, Celery or 
 
 ## Running locally
 
-```bash
-cp .env.example .env
-```
-
-Set `JWT_SECRET_KEY` in `.env` (minimum 32 characters):
-
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(48))"
-```
-
-Then bring the whole stack up with one command:
+One command, no configuration:
 
 ```bash
 docker compose up -d --build
@@ -51,6 +41,14 @@ Migrations run in their own one-shot `migrate` service rather than in the API's 
 command, so they execute exactly once no matter how many API replicas there are.
 **`migrate` showing `Exited (0)` afterwards is the success case, not a crash** — and if a
 migration fails, the API is not started at all.
+
+On first run the entrypoint generates a JWT signing key and stores it in a Docker volume, so
+there is nothing to set up and the key survives restarts. That happens **only** when
+`ENVIRONMENT` is `local` or `test`; anywhere else a missing `JWT_SECRET_KEY` is a hard startup
+failure, because replicas each inventing their own key would reject one another's tokens.
+
+To pin your own values instead, `cp .env.example .env` and edit it — anything you set there
+takes precedence.
 
 ```bash
 docker compose logs -f api
