@@ -27,22 +27,18 @@ class RefreshToken(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Index("ix_refresh_tokens_expires_at", "expires_at"),  # purge expired
     )
 
-    # The token's jti claim; unique so a replay resolves to one row.
     jti: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), unique=True, nullable=False)
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    # Shared by every token descended from one login.
     family_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
 
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
-    # Null while live; set on rotation, logout, or family revocation.
     revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # The jti this was rotated into; an auditable chain.
     replaced_by_jti: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), nullable=True
     )

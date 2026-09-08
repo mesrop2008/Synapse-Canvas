@@ -84,9 +84,6 @@ async def delete_workspace(db: AsyncSession, workspace: Workspace) -> None:
     await db.commit()
 
 
-# --- Membership ------------------------------------------------------------
-
-
 async def list_members(
     db: AsyncSession, workspace_id: uuid.UUID
 ) -> list[WorkspaceMember]:

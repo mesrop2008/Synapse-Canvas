@@ -21,9 +21,6 @@ async def _failed_login(client: AsyncClient, email: str) -> int:
     return response.status_code
 
 
-# --- Per-IP throttling ------------------------------------------------------
-
-
 async def test_login_is_throttled_per_ip(client: AsyncClient, rate_limits) -> None:
     rate_limits(login_rate_limit_per_ip=3, login_rate_limit_per_ip_window_seconds=300)
     email = "nobody-%s@example.com" % uuid.uuid4().hex[:8]
@@ -84,9 +81,6 @@ async def test_registration_is_throttled_per_ip(
         },
     )
     assert blocked.status_code == 429
-
-
-# --- Spoofing resistance ----------------------------------------------------
 
 
 async def test_forwarded_header_cannot_be_used_to_evade_the_limit(
@@ -152,9 +146,6 @@ async def test_forwarded_header_is_honoured_when_explicitly_trusted(
         headers={"X-Forwarded-For": "198.51.100.8"},
     )
     assert other_client.status_code == 401, "a different client needs its own bucket"
-
-
-# --- Per-account throttling -------------------------------------------------
 
 
 async def test_login_is_throttled_per_account(
@@ -254,9 +245,6 @@ async def test_account_throttle_keyed_on_email_not_stored_in_the_clear(
     keys = (await db_session.execute(select(RateLimitBucket.bucket_key))).scalars().all()
     assert keys, "expected a bucket to have been recorded"
     assert all(owner.email not in key for key in keys)
-
-
-# --- Interaction with the rest of the API -----------------------------------
 
 
 async def test_throttling_does_not_apply_to_authenticated_routes(

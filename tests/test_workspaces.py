@@ -13,9 +13,6 @@ from app.models import WorkspaceMember
 from tests.conftest import TestUser, UserFactory
 
 
-# --- Creation ---------------------------------------------------------------
-
-
 async def test_create_workspace_makes_the_caller_owner(
     client: AsyncClient, owner: TestUser
 ) -> None:
@@ -67,9 +64,6 @@ async def test_create_workspace_rejects_a_blank_name(
     assert response.status_code == 422
 
 
-# --- Listing ----------------------------------------------------------------
-
-
 async def test_list_returns_only_workspaces_the_caller_belongs_to(
     client: AsyncClient, owner: TestUser, outsider: TestUser
 ) -> None:
@@ -107,9 +101,6 @@ async def test_list_requires_authentication(client: AsyncClient) -> None:
     assert (await client.get("/workspaces")).status_code == 401
 
 
-# --- Retrieval --------------------------------------------------------------
-
-
 async def test_get_workspace_returns_it_with_the_callers_role(
     client: AsyncClient, viewer: TestUser, shared_workspace: dict[str, Any]
 ) -> None:
@@ -136,9 +127,6 @@ async def test_get_malformed_workspace_id_returns_422(
 ) -> None:
     response = await client.get("/workspaces/not-a-uuid", headers=owner.headers)
     assert response.status_code == 422
-
-
-# --- Update -----------------------------------------------------------------
 
 
 async def test_owner_can_rename_a_workspace(
@@ -180,9 +168,6 @@ async def test_rename_rejects_a_blank_name(
         headers=owner.headers,
     )
     assert response.status_code == 422
-
-
-# --- Deletion ---------------------------------------------------------------
 
 
 async def test_owner_can_delete_a_workspace(

@@ -62,9 +62,6 @@ from app.models import Base  # noqa: E402
 DEFAULT_PASSWORD = "Sup3rSecret!pw"
 
 
-# --- Schema bootstrap -------------------------------------------------------
-
-
 async def _ensure_database_exists(url: str) -> None:
     """Create the test database if it does not exist yet.
 
@@ -111,9 +108,6 @@ def _database() -> None:
     asyncio.run(_reset_schema(_TEST_DATABASE_URL))
 
 
-# --- Per-test session and client -------------------------------------------
-
-
 @pytest_asyncio.fixture
 async def db_session() -> Any:
     # NullPool: a fresh connection per test, so nothing is held across loops.
@@ -149,9 +143,6 @@ async def client(db_session: AsyncSession) -> Any:
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield ac
     app.dependency_overrides.clear()
-
-
-# --- User factory -----------------------------------------------------------
 
 
 @dataclass
@@ -237,7 +228,6 @@ async def make_user(client: AsyncClient, db_session: AsyncSession) -> UserFactor
         )
         assert registered.status_code == 202, registered.text
 
-        # A verification token must have been issued regardless.
         assert await latest_verification_token_hash(db_session, email) is not None
 
         user = (
@@ -296,9 +286,6 @@ async def viewer(make_user: UserFactory) -> TestUser:
 async def outsider(make_user: UserFactory) -> TestUser:
     """A perfectly valid account that belongs to no workspace under test."""
     return await make_user(name="Outsider")
-
-
-# --- Convenience helpers ----------------------------------------------------
 
 
 @pytest_asyncio.fixture

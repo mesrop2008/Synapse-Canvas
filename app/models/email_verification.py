@@ -25,7 +25,6 @@ class EmailVerificationToken(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Index("ix_email_verification_tokens_expires_at", "expires_at"),  # purge expired
     )
 
-    # Hex SHA-256 of the emailed token; unique so redemption resolves to one row.
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
@@ -33,7 +32,6 @@ class EmailVerificationToken(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
-    # Non-null once redeemed, so a spent link cannot be reused.
     used_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

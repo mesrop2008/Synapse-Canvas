@@ -1,5 +1,3 @@
-"""Password hashing and JWT issuing / verification."""
-
 from __future__ import annotations
 
 import hashlib
@@ -51,24 +49,18 @@ async def verify_password(password: str, hashed_password: str) -> bool:
     return await to_thread.run_sync(_verify)
 
 
-# --- Opaque single-use tokens (verification links) -------------------------
-# 32 bytes of CSPRNG output, stored only as a SHA-256: high entropy means no
-# KDF is needed, and the database never holds a redeemable value.
-
-
 def generate_url_token() -> str:
     return secrets.token_urlsafe(32)
 
 
+# A plain hash, not a KDF: the input is 32 bytes of CSPRNG output, so there is
+# no dictionary to attack. What matters is that the DB holds nothing redeemable.
 def hash_url_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
 
-# --- JWTs ------------------------------------------------------------------
-
-
 def _key_id(secret: str) -> str:
-    """Non-reversible `kid` for a signing key: a truncated hash, not the key."""
+    """A `kid` that identifies a signing key without revealing it."""
     return hashlib.sha256(secret.encode("utf-8")).hexdigest()[:16]
 
 
@@ -126,7 +118,7 @@ def create_refresh_token(subject: uuid.UUID | str, jti: uuid.UUID) -> str:
 
 
 def decode_token(token: str, expected_type: TokenType) -> dict[str, Any]:
-    """Decode and fully validate a token, or raise `AuthenticationError`."""
+    """Decode a token, or raise `AuthenticationError`."""
     settings = get_settings()
     ring = _keyring()
 
@@ -154,9 +146,11 @@ def decode_token(token: str, expected_type: TokenType) -> dict[str, Any]:
             )
             break
         except jwt.ExpiredSignatureError as exc:
+            # Expiry is key-independent, so stop rather than report "invalid"
+            # after exhausting the ring.
             raise AuthenticationError("Token has expired") from exc
         except jwt.InvalidSignatureError:
-            continue  # wrong key on the ring; try the next
+            continue
         except jwt.PyJWTError as exc:
             raise AuthenticationError("Invalid token") from exc
 

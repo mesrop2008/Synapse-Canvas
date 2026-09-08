@@ -28,5 +28,4 @@ _ROLE_RANK: dict[WorkspaceRole, int] = {
     WorkspaceRole.OWNER: 3,
 }
 
-# Name of the backing PostgreSQL enum type; also referenced by the migration.
 WORKSPACE_ROLE_ENUM_NAME = "workspace_role"

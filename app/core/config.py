@@ -28,7 +28,6 @@ class Settings(BaseSettings):
     environment: Environment = "local"
     debug: bool = False
 
-    # Must use the asyncpg driver: the whole data layer is async.
     database_url: str
     # Separate database for the suite, which drops/creates tables in it.
     test_database_url: str | None = None
@@ -45,7 +44,6 @@ class Settings(BaseSettings):
         default="", alias="PREVIOUS_JWT_SECRET_KEYS"
     )
 
-    # Pinned into every token and checked on decode.
     jwt_issuer: str = "synapse-canvas"
     jwt_audience: str = "synapse-canvas-api"
     email_verification_expire_hours: int = 24

@@ -21,9 +21,6 @@ async def _refresh(client: AsyncClient, token: str):
     return await client.post("/auth/refresh", json={"refresh_token": token})
 
 
-# --- Rotation ---------------------------------------------------------------
-
-
 async def test_login_records_the_refresh_token(
     client: AsyncClient, owner: TestUser, db_session
 ) -> None:
@@ -46,7 +43,6 @@ async def test_refresh_rotates_the_token(
     rotated = response.json()["refresh_token"]
     assert rotated != owner.refresh_token
 
-    # The new one works...
     assert (await _refresh(client, rotated)).status_code == 200
 
 
@@ -71,12 +67,10 @@ async def test_reuse_revokes_the_whole_family(
     """
     rotated = (await _refresh(client, owner.refresh_token)).json()["refresh_token"]
 
-    # Replaying the superseded token trips the alarm.
     replayed = await _refresh(client, owner.refresh_token)
     assert replayed.status_code == 401
     assert "All sessions have been ended" in replayed.json()["detail"]
 
-    # ...and the token that was still legitimately live is now dead too.
     assert (await _refresh(client, rotated)).status_code == 401
 
 
@@ -96,9 +90,6 @@ async def test_rotation_preserves_the_family(
     superseded = [r for r in rows if r.revoked_at is not None]
     assert len(superseded) == 1
     assert superseded[0].replaced_by_jti is not None
-
-
-# --- Unknown and forged tokens ---------------------------------------------
 
 
 async def test_refresh_rejects_a_token_with_an_unknown_jti(
@@ -124,9 +115,6 @@ async def test_refresh_rejects_a_token_whose_row_has_expired(
 
     response = await _refresh(client, owner.refresh_token)
     assert response.status_code == 401
-
-
-# --- Logout -----------------------------------------------------------------
 
 
 async def test_logout_revokes_the_session(
@@ -193,9 +181,6 @@ async def test_logout_does_not_affect_other_users(
     assert (await _refresh(client, editor.refresh_token)).status_code == 200
 
 
-# --- Documented limit -------------------------------------------------------
-
-
 async def test_access_token_survives_logout_until_it_expires(
     client: AsyncClient, owner: TestUser
 ) -> None:
@@ -212,5 +197,4 @@ async def test_access_token_survives_logout_until_it_expires(
     still_valid = await client.get("/auth/me", headers=owner.headers)
     assert still_valid.status_code == 200
 
-    # But it cannot be renewed once it lapses.
     assert (await _refresh(client, owner.refresh_token)).status_code == 401

@@ -11,9 +11,6 @@ from app.core.security import ACCESS_TOKEN, REFRESH_TOKEN, create_token
 from tests.conftest import DEFAULT_PASSWORD, TestUser, UserFactory
 
 
-# --- Registration ----------------------------------------------------------
-
-
 async def test_register_accepts_and_reveals_nothing(
     client: AsyncClient, db_session
 ) -> None:
@@ -38,7 +35,6 @@ async def test_register_accepts_and_reveals_nothing(
     assert "hashed_password" not in response.text
     assert "ada@example.com" not in response.text  # not even the address echoed
 
-    # The account really was created, and starts unverified.
     user = (
         await db_session.execute(select(User).where(User.email == "ada@example.com"))
     ).scalar_one()
@@ -89,8 +85,6 @@ async def test_duplicate_registration_is_silent_and_creates_nothing(
     assert second.status_code == 202
     assert second.json() == first.json()  # byte-identical response
 
-    # Case-insensitively the same address: still exactly one account, and the
-    # duplicate did not overwrite the original name.
     count = (
         await db_session.execute(
             select(func.count()).select_from(User).where(User.email == "dup@example.com")
@@ -128,9 +122,6 @@ async def test_register_rejects_malformed_email(client: AsyncClient) -> None:
         json={"email": "not-an-email", "password": DEFAULT_PASSWORD, "name": "X"},
     )
     assert response.status_code == 422
-
-
-# --- Login -----------------------------------------------------------------
 
 
 async def test_login_returns_token_pair(
@@ -184,9 +175,6 @@ async def test_login_rejects_unknown_email(client: AsyncClient) -> None:
     assert response.json()["detail"] == "Incorrect email or password"
 
 
-# --- /auth/me and bearer handling ------------------------------------------
-
-
 async def test_me_returns_the_authenticated_user(
     client: AsyncClient, owner: TestUser
 ) -> None:
@@ -231,9 +219,6 @@ async def test_me_rejects_a_refresh_token(
     assert response.status_code == 401
 
 
-# --- Refresh ---------------------------------------------------------------
-
-
 async def test_refresh_issues_a_new_pair(
     client: AsyncClient, owner: TestUser
 ) -> None:
@@ -246,7 +231,6 @@ async def test_refresh_issues_a_new_pair(
     assert new_tokens["access_token"]
     assert new_tokens["refresh_token"]
 
-    # The freshly minted access token must actually authenticate.
     me = await client.get(
         "/auth/me",
         headers={"Authorization": "Bearer " + new_tokens["access_token"]},

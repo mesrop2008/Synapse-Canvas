@@ -16,9 +16,6 @@ from httpx import AsyncClient
 from tests.conftest import TestUser
 
 
-# --- A member with too little privilege gets 403 ----------------------------
-
-
 async def test_viewer_cannot_rename_a_workspace(
     client: AsyncClient, viewer: TestUser, shared_workspace: dict[str, Any]
 ) -> None:
@@ -114,9 +111,6 @@ async def test_members_of_any_role_can_read_the_workspace(
         assert response.json()["role"] == expected_role
 
 
-# --- A non-member gets 404, never 403 ---------------------------------------
-
-
 @pytest.mark.parametrize(
     ("method", "suffix", "body"),
     [
@@ -197,9 +191,6 @@ async def test_authentication_is_checked_before_membership(
     assert response.status_code == 401
 
 
-# --- The owner cannot be removed --------------------------------------------
-
-
 async def test_owner_cannot_be_removed_from_their_own_workspace(
     client: AsyncClient, owner: TestUser, shared_workspace: dict[str, Any]
 ) -> None:
@@ -212,7 +203,6 @@ async def test_owner_cannot_be_removed_from_their_own_workspace(
     assert response.status_code == 409
     assert "owner cannot be removed" in response.json()["detail"]
 
-    # And the membership genuinely survives.
     members = await client.get(
         "/workspaces/%s/members" % shared_workspace["id"], headers=owner.headers
     )
@@ -235,9 +225,6 @@ async def test_owner_still_governs_the_workspace_after_the_refused_removal(
         headers=owner.headers,
     )
     assert still_owner.status_code == 200
-
-
-# --- Adding members ---------------------------------------------------------
 
 
 async def test_owner_can_add_a_member_by_email(
@@ -305,9 +292,6 @@ async def test_adding_a_member_rejects_an_unknown_role(
         headers=owner.headers,
     )
     assert response.status_code == 422
-
-
-# --- Removing members -------------------------------------------------------
 
 
 async def test_owner_can_remove_an_ordinary_member(

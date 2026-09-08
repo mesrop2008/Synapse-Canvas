@@ -44,9 +44,6 @@ def _token_from_link(body: str) -> str:
     return body[start:end]
 
 
-# --- The happy path, end to end --------------------------------------------
-
-
 async def test_register_sends_a_link_that_verifies_the_account(
     client: AsyncClient, db_session, capture_email: _CapturingSender
 ) -> None:
@@ -58,23 +55,19 @@ async def test_register_sends_a_link_that_verifies_the_account(
     )
     assert reg.status_code == 202
 
-    # Exactly one verification email, to the right address.
     assert len(capture_email.sent) == 1
     assert capture_email.sent[0]["to"] == email
     raw_token = _token_from_link(capture_email.sent[0]["body"])
 
-    # Before redeeming, login is refused with the distinct 403.
     early = await client.post(
         "/auth/login", json={"email": email, "password": DEFAULT_PASSWORD}
     )
     assert early.status_code == 403
 
-    # Redeem the token.
     verified = await client.post("/auth/verify-email", json={"token": raw_token})
     assert verified.status_code == 200
     assert verified.json()["email_verified_at"] is not None
 
-    # Now login succeeds.
     ok = await client.post(
         "/auth/login", json={"email": email, "password": DEFAULT_PASSWORD}
     )
@@ -98,9 +91,6 @@ async def test_only_the_stored_hash_is_persisted(
     assert row.token_hash != raw_token
     assert row.token_hash == auth_service.hash_url_token(raw_token)
     assert len(row.token_hash) == 64  # hex sha-256
-
-
-# --- Redemption is single-use and expiring ---------------------------------
 
 
 async def test_token_cannot_be_used_twice(
@@ -157,19 +147,14 @@ async def test_requesting_a_new_link_retires_the_previous_one(
     second_token = _token_from_link(capture_email.sent[1]["body"])
     assert second_token != first_token
 
-    # The superseded token no longer works; the fresh one does.
     assert (await client.post("/auth/verify-email", json={"token": first_token})).status_code == 401
     assert (await client.post("/auth/verify-email", json={"token": second_token})).status_code == 200
-
-
-# --- Enumeration resistance ------------------------------------------------
 
 
 async def test_resend_is_silent_for_unknown_and_verified_addresses(
     client: AsyncClient, make_user: UserFactory, capture_email: _CapturingSender
 ) -> None:
     """Resend answers 202 whether or not it actually sent anything."""
-    # Unknown address: 202, nothing sent.
     unknown = await client.post(
         "/auth/resend-verification", json={"email": "ghost@example.com"}
     )
@@ -206,9 +191,6 @@ async def test_duplicate_registration_notifies_the_real_owner(
     assert len(capture_email.sent) == 1
     assert capture_email.sent[0]["to"] == email
     assert "already exists" in capture_email.sent[0]["body"].lower()
-
-
-# --- The workspace-membership gate -----------------------------------------
 
 
 async def test_unverified_user_cannot_be_added_to_a_workspace(

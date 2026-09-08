@@ -36,10 +36,8 @@ def _configure(connection: Connection) -> None:
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
-        # Detect column type changes, not just added/removed columns.
         compare_type=True,
         compare_server_default=True,
-        # Emit CREATE TYPE / DROP TYPE for native PostgreSQL enums.
         include_schemas=False,
     )
 

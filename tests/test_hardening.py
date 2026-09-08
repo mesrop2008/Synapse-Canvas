@@ -24,9 +24,6 @@ def settings_sandbox(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     get_settings.cache_clear()
 
 
-# --- Response headers ------------------------------------------------------
-
-
 async def test_api_responses_carry_security_headers(client: AsyncClient) -> None:
     headers = (await client.get("/health")).headers
 
@@ -65,9 +62,6 @@ async def test_error_responses_are_covered_too(client: AsyncClient) -> None:
     assert response.headers["x-content-type-options"] == "nosniff"
 
 
-# --- Request size ----------------------------------------------------------
-
-
 async def test_oversized_request_body_is_refused(client: AsyncClient) -> None:
     limit = get_settings().max_request_body_bytes
 
@@ -90,9 +84,6 @@ async def test_malformed_content_length_is_refused(client: AsyncClient) -> None:
     assert response.status_code == 400
 
 
-# --- Token claims ----------------------------------------------------------
-
-
 async def test_tokens_carry_kid_issuer_and_audience(owner) -> None:
     settings = get_settings()
 
@@ -100,7 +91,6 @@ async def test_tokens_carry_kid_issuer_and_audience(owner) -> None:
     claims = pyjwt.decode(owner.access_token, options={"verify_signature": False})
 
     assert "kid" in header
-    # The kid identifies the key without revealing it.
     assert header["kid"] != settings.jwt_secret_key
     assert settings.jwt_secret_key not in header["kid"]
     assert claims["iss"] == settings.jwt_issuer
@@ -151,9 +141,6 @@ async def test_forged_token_signed_with_the_wrong_key_is_rejected() -> None:
         security.decode_token(forged, security.ACCESS_TOKEN)
 
 
-# --- Key rotation ----------------------------------------------------------
-
-
 async def test_key_rotation_keeps_existing_tokens_valid(
     monkeypatch: pytest.MonkeyPatch, settings_sandbox: None
 ) -> None:
@@ -170,7 +157,6 @@ async def test_key_rotation_keeps_existing_tokens_valid(
     payload = security.decode_token(token, security.ACCESS_TOKEN)
     assert payload["sub"] == "22222222-2222-2222-2222-222222222222"
 
-    # New tokens are signed by the new key and say so.
     fresh = security.create_access_token("33333333-3333-3333-3333-333333333333")
     assert pyjwt.get_unverified_header(fresh)["kid"] != original_kid
 
@@ -187,9 +173,6 @@ async def test_dropping_a_retired_key_invalidates_its_tokens(
 
     with pytest.raises(Exception):
         security.decode_token(token, security.ACCESS_TOKEN)
-
-
-# --- CORS ------------------------------------------------------------------
 
 
 async def test_wildcard_cors_origin_is_refused_at_startup(

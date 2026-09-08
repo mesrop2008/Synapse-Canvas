@@ -79,7 +79,6 @@ async def get_workspace(ctx: RequireViewer) -> WorkspaceWithRole:
 async def update_workspace(
     payload: WorkspaceUpdate, ctx: RequireOwner, db: DbSession
 ) -> WorkspaceWithRole:
-    # exclude_unset: a field the client didn't send is left alone.
     updates = payload.model_dump(exclude_unset=True)
     workspace = await workspace_service.update_workspace(db, ctx.workspace, **updates)
     return workspace_with_role(workspace, ctx.role)
@@ -93,9 +92,6 @@ async def update_workspace(
 )
 async def delete_workspace(ctx: RequireOwner, db: DbSession) -> None:
     await workspace_service.delete_workspace(db, ctx.workspace)
-
-
-# --- Members ---------------------------------------------------------------
 
 
 @router.get(

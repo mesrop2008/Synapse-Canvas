@@ -96,13 +96,9 @@ class WorkspaceAccess:
         return WorkspaceContext(workspace=workspace, role=role, user=current_user)
 
 
-# Ready-made annotations so handlers read as `ctx: RequireOwner`.
 RequireViewer = Annotated[WorkspaceContext, Depends(WorkspaceAccess(WorkspaceRole.VIEWER))]
 RequireEditor = Annotated[WorkspaceContext, Depends(WorkspaceAccess(WorkspaceRole.EDITOR))]
 RequireOwner = Annotated[WorkspaceContext, Depends(WorkspaceAccess(WorkspaceRole.OWNER))]
-
-
-# --- Throttling -------------------------------------------------------------
 
 
 def client_ip(request: Request) -> str:
