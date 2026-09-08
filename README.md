@@ -42,27 +42,6 @@ That starts PostgreSQL, waits for its healthcheck, runs `alembic upgrade head` t
 and only then starts the API on <http://localhost:8000>. Postgres is published on host port
 **5433**, so it does not collide with a natively installed server on 5432.
 
-Migrations run in their own one-shot `migrate` service rather than in the API's start
-command, so they execute exactly once no matter how many API replicas there are.
-**`migrate` showing `Exited (0)` afterwards is the success case, not a crash** — and if a
-migration fails, the API is not started at all.
-
-The signing key is generated on first run and stored in a Docker volume, so it survives
-restarts. `.env.example` deliberately leaves `JWT_SECRET_KEY` blank rather than shipping a
-placeholder: a committed default would silently become the real key for everyone who copied
-the file. Set your own there to pin it — an explicit value always wins.
-
-Generation happens **only** when `ENVIRONMENT` is `local` or `test`. Anywhere else a missing
-`JWT_SECRET_KEY` is a hard startup failure, because replicas each inventing their own key
-would reject one another's tokens.
-
-```bash
-docker compose logs -f api
-```
-
-```bash
-docker compose down          # add -v to also delete the database volume
-```
 
 ### Running the API on the host instead
 
@@ -116,17 +95,6 @@ pytest --cov=app
 Tests run against a real PostgreSQL, each inside a transaction that is rolled back
 afterwards, so they are order-independent and leave no rows behind.
 
-If `docker compose` fails with `tls: server did not echo the legacy session ID`, something on
-the network path — a proxy, VPN, or antivirus HTTPS scanning — is terminating TLS to Docker
-Hub. Other registries usually still work, so point the build at an equivalent image by setting
-`PYTHON_IMAGE` in `.env`:
-
-```bash
-PYTHON_IMAGE=ghcr.io/astral-sh/uv:python3.13-bookworm-slim
-```
-
-That is the same Debian bookworm-slim base with Python 3.13, published on ghcr.io.
-`POSTGRES_IMAGE_TAG` exists for the same reason.
 
 ## Roadmap
 
