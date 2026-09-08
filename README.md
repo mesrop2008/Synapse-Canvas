@@ -114,7 +114,15 @@ afterwards, so they are order-independent and leave no rows behind.
 
 If `docker compose` fails with `tls: server did not echo the legacy session ID`, something on
 the network path — a proxy, VPN, or antivirus HTTPS scanning — is terminating TLS to Docker
-Hub.
+Hub. Other registries usually still work, so point the build at an equivalent image by setting
+`PYTHON_IMAGE` in `.env`:
+
+```bash
+PYTHON_IMAGE=ghcr.io/astral-sh/uv:python3.13-bookworm-slim
+```
+
+That is the same Debian bookworm-slim base with Python 3.13, published on ghcr.io.
+`POSTGRES_IMAGE_TAG` exists for the same reason.
 
 ## Roadmap
 

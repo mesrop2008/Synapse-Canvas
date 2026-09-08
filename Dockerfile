@@ -5,7 +5,11 @@
 # production. Requirements are copied before the source so that editing app
 # code does not invalidate the (slow) dependency layer.
 
-FROM python:3.13-slim AS base
+# Overridable so a network that cannot reach Docker Hub can point at an
+# equivalent image on another registry (see PYTHON_IMAGE in .env.example).
+ARG PYTHON_IMAGE=python:3.13-slim
+
+FROM ${PYTHON_IMAGE} AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

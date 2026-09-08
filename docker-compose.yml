@@ -26,6 +26,8 @@ x-app-environment: &app-environment
 x-app-build: &app-build
   context: .
   target: runtime
+  args:
+    PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.13-slim}
 
 services:
   postgres:
