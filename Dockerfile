@@ -5,9 +5,12 @@
 # production. Requirements are copied before the source so that editing app
 # code does not invalidate the (slow) dependency layer.
 
-# Overridable so a network that cannot reach Docker Hub can point at an
-# equivalent image on another registry (see PYTHON_IMAGE in .env.example).
-ARG PYTHON_IMAGE=python:3.13-slim
+# Google's pull-through cache of Docker Hub, serving the same official image.
+# Defaulted to it because registry-1.docker.io is unreachable from some
+# networks (TLS-intercepting proxies and antivirus), and a build that fails on
+# the first line is a poor first impression. Set PYTHON_IMAGE=python:3.13-slim
+# in .env to go direct.
+ARG PYTHON_IMAGE=mirror.gcr.io/library/python:3.13-slim
 
 FROM ${PYTHON_IMAGE} AS base
 

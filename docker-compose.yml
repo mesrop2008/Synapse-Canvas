@@ -34,9 +34,10 @@ x-app-build: &app-build
 
 services:
   postgres:
-    # Tag is overridable so this can track whatever major version the
-    # deployment target runs; nothing here depends on a newer server.
-    image: postgres:${POSTGRES_IMAGE_TAG:-15-alpine}
+    # Pulled through the same mirror as the API base image, for the same
+    # reason. Override POSTGRES_IMAGE to track a different major version or to
+    # pull direct from Docker Hub.
+    image: ${POSTGRES_IMAGE:-mirror.gcr.io/library/postgres:15-alpine}
     container_name: synapse_canvas_postgres
     restart: unless-stopped
     environment:
