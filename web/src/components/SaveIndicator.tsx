@@ -23,7 +23,7 @@ export function SaveIndicator({
     >
       <span className="dot" aria-hidden="true" />
       {LABELS[status]}
-      {status === 'saved' && <span className="subtle">· v{version}</span>}
+      {status === 'saved' && <span className="muted">v{version}</span>}
     </span>
   );
 }

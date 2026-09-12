@@ -4,6 +4,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { verifyEmail } from '../api/auth';
 import { errorMessage } from '../api/errors';
 import { Alert } from '../components/Alert';
+import { ThemeToggle } from '../components/ThemeToggle';
+import { Logo } from '../components/icons';
 
 type State = 'missing' | 'verifying' | 'verified' | 'failed';
 
@@ -34,31 +36,42 @@ export function VerifyEmailPage() {
   }, [token]);
 
   return (
-    <main className="auth-shell">
-      <div className="card auth-card">
-        <h1>Email verification</h1>
+    <main className="auth">
+      <div className="auth-theme">
+        <ThemeToggle />
+      </div>
+
+      <div className="auth-card">
+        <div className="auth-brand">
+          <Logo size={24} />
+          Synapse Canvas
+        </div>
+
+        <h1 className="auth-title">Email verification</h1>
 
         {state === 'missing' && (
-          <p>This link is missing its token. Use the link from the email as-is.</p>
+          <p className="auth-lede">
+            This link is missing its token. Use the link from the email as-is.
+          </p>
         )}
 
-        {state === 'verifying' && <p className="subtle">Checking the link…</p>}
+        {state === 'verifying' && <p className="auth-lede">Checking the link…</p>}
 
         {state === 'verified' && (
-          <p>Your address is confirmed. You can sign in now.</p>
+          <p className="auth-lede">Your address is confirmed. You can sign in now.</p>
         )}
 
         {state === 'failed' && (
           <>
             <Alert>{error}</Alert>
-            <p className="subtle">
-              Links expire and can only be used once. Registering again will send
-              a fresh one.
+            <p className="note">
+              Links expire and can only be used once. Registering again sends a
+              fresh one.
             </p>
           </>
         )}
 
-        <p className="subtle" style={{ marginBottom: 0 }}>
+        <p className="auth-foot">
           <Link to="/login">Go to sign in</Link>
         </p>
       </div>

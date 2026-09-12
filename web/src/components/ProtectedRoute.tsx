@@ -15,7 +15,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   const location = useLocation();
 
   if (status === 'loading') {
-    return <p className="page-placeholder">Restoring your session…</p>;
+    return <p className="placeholder">Restoring your session…</p>;
   }
 
   if (status === 'anonymous') {
