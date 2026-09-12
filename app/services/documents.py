@@ -84,7 +84,8 @@ async def list_documents(
             Document.updated_at,
         )
         .where(Document.workspace_id == workspace_id)
-        .order_by(Document.updated_at.desc())
+        # id breaks ties so the order is total, which pagination will need.
+        .order_by(Document.updated_at.desc(), Document.id.desc())
     )
     return [DocumentSummary(*row) for row in result.all()]
 

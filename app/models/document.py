@@ -32,6 +32,7 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "ix_documents_workspace_id_updated_at",
             "workspace_id",
             sa_text("updated_at DESC"),
+            sa_text("id DESC"),
         ),
     )
 
@@ -53,12 +54,14 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
-    # onupdate emits now() in the UPDATE, so the database clock sets this -- the
-    # same clock as created_at.
+    # clock_timestamp() on update, not now(): now() is the *transaction*
+    # timestamp, so two writes in one transaction would record the same instant
+    # and the list ordering below would be arbitrary between them. The server
+    # default stays now() so a new row's updated_at equals its created_at.
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
-        onupdate=func.now(),
+        onupdate=func.clock_timestamp(),
         nullable=False,
     )
 

@@ -316,6 +316,20 @@ async def shared_workspace(
     return workspace
 
 
+@pytest_asyncio.fixture
+async def document(
+    client: AsyncClient, owner: TestUser, shared_workspace: dict[str, Any]
+) -> dict[str, Any]:
+    """One document in `shared_workspace`, created by its owner."""
+    response = await client.post(
+        "/workspaces/%s/documents" % shared_workspace["id"],
+        json={"title": "Literature review"},
+        headers=owner.headers,
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
 @pytest.fixture
 def rate_limits() -> Any:
     """Temporarily switch throttling on for one test.

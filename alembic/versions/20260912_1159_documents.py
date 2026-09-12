@@ -37,7 +37,7 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id', name=op.f('pk_documents'))
     )
     op.create_index(op.f('ix_documents_created_by'), 'documents', ['created_by'], unique=False)
-    op.create_index('ix_documents_workspace_id_updated_at', 'documents', ['workspace_id', sa.literal_column('updated_at DESC')], unique=False)
+    op.create_index('ix_documents_workspace_id_updated_at', 'documents', ['workspace_id', sa.literal_column('updated_at DESC'), sa.literal_column('id DESC')], unique=False)
 
 
 def downgrade() -> None:
