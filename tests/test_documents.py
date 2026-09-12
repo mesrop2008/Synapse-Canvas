@@ -525,6 +525,7 @@ async def test_concurrent_patches_cannot_both_be_applied() -> None:
             workspace_id, document_id = workspace.id, created.id
 
         async def attempt(title: str) -> tuple[str, int]:
+            caught: document_service.StaleDocumentVersionError | None = None
             async with AsyncSession(engine, expire_on_commit=False) as session:
                 try:
                     updated = await document_service.update_document(
@@ -536,7 +537,14 @@ async def test_concurrent_patches_cannot_both_be_applied() -> None:
                     )
                     return "applied", updated.version
                 except document_service.StaleDocumentVersionError as exc:
-                    return "stale", exc.current.version
+                    caught = exc
+
+            # Read the payload only after the session has closed. In a request
+            # the 409 is serialised during unwinding, after the transaction has
+            # been rolled back -- an attached row would raise
+            # DetachedInstanceError right here.
+            assert caught.current.content is not None
+            return "stale", caught.current.version
 
         outcomes = await asyncio.gather(attempt("Writer A"), attempt("Writer B"))
 

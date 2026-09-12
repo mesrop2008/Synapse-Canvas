@@ -36,14 +36,40 @@ class DocumentSummary:
     updated_at: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class DocumentSnapshot(DocumentSummary):
+    """A document's full state, detached from any session."""
+
+    content: dict[str, Any]
+
+
+def snapshot(document: Document) -> DocumentSnapshot:
+    return DocumentSnapshot(
+        id=document.id,
+        workspace_id=document.workspace_id,
+        title=document.title,
+        version=document.version,
+        created_by=document.created_by,
+        created_at=document.created_at,
+        updated_at=document.updated_at,
+        content=document.content,
+    )
+
+
 class StaleDocumentVersionError(ConflictError):
     """The client's `version` is not the stored one, so its edit was computed
-    against content that no longer exists. Carries the current row so the
-    caller can hand the client something to re-sync against."""
+    against content that no longer exists. Carries the stored state so the
+    caller can hand the client something to re-sync against.
+
+    A plain snapshot rather than the ORM row: this exception outlives the
+    session. The request's transaction is rolled back as it unwinds, which
+    expires every object loaded in it, so an attached row would raise
+    DetachedInstanceError at the moment something tried to read it.
+    """
 
     detail = "Document has been modified since you loaded it"
 
-    def __init__(self, current: Document) -> None:
+    def __init__(self, current: DocumentSnapshot) -> None:
         self.current = current
         super().__init__(self.__class__.detail)
 
@@ -159,7 +185,7 @@ async def update_document(
         current = await find_document(db, workspace_id, document_id)
         if current is None:
             raise NotFoundError("Document not found")
-        raise StaleDocumentVersionError(current)
+        raise StaleDocumentVersionError(snapshot(current))
 
     await db.commit()
     return document
