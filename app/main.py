@@ -19,7 +19,9 @@ from app.core.middleware import (
     SecurityHeadersMiddleware,
 )
 from app.db.session import get_engine
-from app.routers import auth, workspaces
+from app.routers import auth, documents, workspaces
+from app.schemas.document import DocumentRead, DocumentVersionConflict
+from app.services.documents import StaleDocumentVersionError
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,17 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     )
 
 
+async def stale_document_version_handler(
+    request: Request, exc: StaleDocumentVersionError
+) -> JSONResponse:
+    """409 carrying the server's row, so the loser of a race can re-sync from
+    the response instead of issuing another GET."""
+    body = DocumentVersionConflict(
+        detail=exc.detail, current=DocumentRead.model_validate(exc.current)
+    )
+    return JSONResponse(status_code=exc.status_code, content=body.model_dump(mode="json"))
+
+
 async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
     # Never let a stack trace (table names, paths, versions) reach the client;
     # log it, return a fixed string.
@@ -58,11 +71,16 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.project_name,
         version="0.1.0",
-        summary="Part 1: accounts, authentication and workspace management.",
+        summary="Accounts, authentication, workspaces and documents.",
         debug=settings.debug,
         lifespan=lifespan,
     )
 
+    # Starlette walks the exception MRO, so the specific handler wins over
+    # the AppError one regardless of registration order.
+    app.add_exception_handler(  # type: ignore[arg-type]
+        StaleDocumentVersionError, stale_document_version_handler
+    )
     app.add_exception_handler(AppError, app_error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, unhandled_error_handler)  # type: ignore[arg-type]
 
@@ -89,6 +107,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(workspaces.router)
+    app.include_router(documents.router)
 
     @app.get("/health", tags=["meta"], summary="Liveness probe")
     async def health() -> dict[str, str]:

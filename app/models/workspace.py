@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
+    from app.models.document import Document
     from app.models.user import User
     from app.models.workspace_member import WorkspaceMember
 
@@ -23,6 +24,11 @@ class Workspace(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     owner: Mapped["User"] = relationship(back_populates="owned_workspaces")
     members: Mapped[list["WorkspaceMember"]] = relationship(
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    documents: Mapped[list["Document"]] = relationship(
         back_populates="workspace",
         cascade="all, delete-orphan",
         passive_deletes=True,

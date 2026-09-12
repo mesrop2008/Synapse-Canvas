@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
+    from app.models.document import Document
     from app.models.email_verification import EmailVerificationToken
     from app.models.refresh_token import RefreshToken
     from app.models.workspace import Workspace
@@ -51,6 +52,11 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    # No cascade: documents outlive their author (created_by is SET NULL).
+    created_documents: Mapped[list["Document"]] = relationship(
+        back_populates="author",
         passive_deletes=True,
     )
 
