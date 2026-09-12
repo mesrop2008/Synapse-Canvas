@@ -43,7 +43,7 @@ export function VerifyEmailPage() {
 
       <div className="auth-card">
         <div className="auth-brand">
-          <Logo size={24} />
+          <Logo size={26} />
           Synapse Canvas
         </div>
 

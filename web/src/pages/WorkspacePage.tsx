@@ -67,7 +67,7 @@ export function WorkspacePage() {
     <main className="container">
       <nav className="crumbs">
         <Link to="/workspaces">Workspaces</Link>
-        <ChevronRightIcon size={13} />
+        <ChevronRightIcon size={14} />
         <span>{workspace.data?.name ?? '…'}</span>
       </nav>
 
@@ -127,7 +127,7 @@ export function WorkspacePage() {
       {documents.data?.length === 0 && (
         <div className="empty">
           <div className="empty-icon">
-            <FileIcon size={20} />
+            <FileIcon size={22} />
           </div>
           <p className="empty-title">No documents yet</p>
           <p className="empty-text">
@@ -143,7 +143,7 @@ export function WorkspacePage() {
           {documents.data.map((document) => (
             <div key={document.id} className="panel-row">
               <span className="row-icon">
-                <FileIcon size={17} />
+                <FileIcon size={18} />
               </span>
               <div className="row-main">
                 <Link

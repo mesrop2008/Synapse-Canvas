@@ -47,7 +47,7 @@ export function RegisterPage() {
 
         <div className="auth-card">
           <div className="auth-brand">
-            <Logo size={24} />
+            <Logo size={26} />
             Synapse Canvas
           </div>
 
@@ -90,74 +90,72 @@ export function RegisterPage() {
         <ThemeToggle />
       </div>
 
-      <div>
-        <form className="auth-card" onSubmit={handleSubmit}>
-          <div className="auth-brand">
-            <Logo size={24} />
-            Synapse Canvas
-          </div>
+      <form className="auth-card" onSubmit={handleSubmit}>
+        <div className="auth-brand">
+          <Logo size={26} />
+          Synapse Canvas
+        </div>
 
-          <h1 className="auth-title">Create an account</h1>
-          <p className="auth-lede">Start writing with your team.</p>
+        <h1 className="auth-title">Create an account</h1>
+        <p className="auth-lede">Start writing with your team.</p>
 
-          {error && <Alert onDismiss={() => setError(null)}>{error}</Alert>}
+        {error && <Alert onDismiss={() => setError(null)}>{error}</Alert>}
 
-          <div className="field">
-            <label htmlFor="name">Name</label>
-            <input
-              id="name"
-              className="input"
-              type="text"
-              autoComplete="name"
-              placeholder="Ada Lovelace"
-              required
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </div>
+        <div className="field">
+          <label htmlFor="name">Name</label>
+          <input
+            id="name"
+            className="input"
+            type="text"
+            autoComplete="name"
+            placeholder="Ada Lovelace"
+            required
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </div>
 
-          <div className="field">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              className="input"
-              type="email"
-              autoComplete="username"
-              placeholder="you@example.com"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </div>
+        <div className="field">
+          <label htmlFor="email">Email</label>
+          <input
+            id="email"
+            className="input"
+            type="email"
+            autoComplete="username"
+            placeholder="you@example.com"
+            required
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+        </div>
 
-          <div className="field">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              className="input"
-              type="password"
-              autoComplete="new-password"
-              placeholder="At least 8 characters"
-              required
-              minLength={8}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </div>
+        <div className="field">
+          <label htmlFor="password">Password</label>
+          <input
+            id="password"
+            className="input"
+            type="password"
+            autoComplete="new-password"
+            placeholder="At least 8 characters"
+            required
+            minLength={8}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+        </div>
 
-          <button
-            type="submit"
-            className="btn btn-primary btn-block"
-            disabled={submitting}
-          >
-            {submitting ? 'Creating…' : 'Create account'}
-          </button>
+        <button
+          type="submit"
+          className="btn btn-primary btn-block"
+          disabled={submitting}
+        >
+          {submitting ? 'Creating…' : 'Create account'}
+        </button>
 
-          <p className="auth-foot">
-            Already registered? <Link to="/login">Sign in</Link>
-          </p>
-        </form>
-      </div>
+        <p className="auth-foot">
+          Already registered? <Link to="/login">Sign in</Link>
+        </p>
+      </form>
     </main>
   );
 }
