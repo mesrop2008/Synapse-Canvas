@@ -3,6 +3,8 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 import { errorMessage } from '../api/errors';
 import { Alert } from '../components/Alert';
+import { ThemeToggle } from '../components/ThemeToggle';
+import { Logo } from '../components/icons';
 import { useAuth } from '../hooks/useAuth';
 
 export function LoginPage() {
@@ -19,7 +21,7 @@ export function LoginPage() {
   const from = (location.state as { from?: string } | null)?.from ?? '/workspaces';
 
   if (status === 'loading') {
-    return <p className="page-placeholder">Restoring your session…</p>;
+    return <p className="placeholder">Restoring your session…</p>;
   }
   if (status === 'authenticated') {
     return <Navigate to={from} replace />;
@@ -40,47 +42,64 @@ export function LoginPage() {
   }
 
   return (
-    <main className="auth-shell">
-      <form className="card auth-card" onSubmit={handleSubmit}>
-        <h1>Sign in</h1>
-        <p className="subtle" style={{ marginTop: 0 }}>
-          Synapse Canvas
-        </p>
+    <main className="auth">
+      <div className="auth-theme">
+        <ThemeToggle />
+      </div>
 
-        {error && <Alert onDismiss={() => setError(null)}>{error}</Alert>}
+      <div>
+        <form className="auth-card" onSubmit={handleSubmit}>
+          <div className="auth-brand">
+            <Logo size={24} />
+            Synapse Canvas
+          </div>
 
-        <div className="field">
-          <label htmlFor="email">Email</label>
-          <input
-            id="email"
-            type="email"
-            autoComplete="username"
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </div>
+          <h1 className="auth-title">Welcome back</h1>
+          <p className="auth-lede">Sign in to your workspaces.</p>
 
-        <div className="field">
-          <label htmlFor="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </div>
+          {error && <Alert onDismiss={() => setError(null)}>{error}</Alert>}
 
-        <button type="submit" className="primary block" disabled={submitting}>
-          {submitting ? 'Signing in…' : 'Sign in'}
-        </button>
+          <div className="field">
+            <label htmlFor="email">Email</label>
+            <input
+              id="email"
+              className="input"
+              type="email"
+              autoComplete="username"
+              placeholder="you@example.com"
+              required
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </div>
 
-        <p className="subtle" style={{ marginBottom: 0 }}>
-          No account yet? <Link to="/register">Register</Link>
-        </p>
-      </form>
+          <div className="field">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              className="input"
+              type="password"
+              autoComplete="current-password"
+              placeholder="••••••••"
+              required
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="btn btn-primary btn-block"
+            disabled={submitting}
+          >
+            {submitting ? 'Signing in…' : 'Sign in'}
+          </button>
+
+          <p className="auth-foot">
+            No account yet? <Link to="/register">Create one</Link>
+          </p>
+        </form>
+      </div>
     </main>
   );
 }

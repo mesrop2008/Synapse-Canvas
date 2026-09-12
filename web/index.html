@@ -4,6 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Synapse Canvas</title>
+    <script>
+      // Runs before first paint, so a dark-theme user never sees a white flash
+      // while React boots. Mirrors the logic in src/hooks/useTheme.tsx; the
+      // storage key has to match.
+      (function () {
+        try {
+          var stored = localStorage.getItem('synapse.theme');
+          var dark =
+            stored === 'dark' ||
+            ((stored === null || stored === 'system') &&
+              matchMedia('(prefers-color-scheme: dark)').matches);
+          var theme = dark ? 'dark' : 'light';
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme;
+        } catch (error) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

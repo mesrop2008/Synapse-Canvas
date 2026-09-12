@@ -43,17 +43,17 @@ export function ConfirmDialog({
         if (event.target === event.currentTarget) onCancel();
       }}
     >
-      <div className="card modal" role="dialog" aria-modal="true" aria-label={title}>
-        <h2>{title}</h2>
-        <div className="subtle">{message}</div>
-        <div className="actions">
-          <button type="button" onClick={onCancel}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
+        <h2 className="modal-title">{title}</h2>
+        <div className="modal-text">{message}</div>
+        <div className="modal-actions">
+          <button type="button" className="btn btn-secondary" onClick={onCancel}>
             {cancelLabel}
           </button>
           <button
             ref={confirmButton}
             type="button"
-            className={destructive ? 'danger' : 'primary'}
+            className={`btn ${destructive ? 'btn-secondary btn-danger' : 'btn-primary'}`}
             onClick={onConfirm}
           >
             {confirmLabel}

@@ -8,6 +8,7 @@ import { errorMessage } from '../api/errors';
 import { Alert } from '../components/Alert';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { SaveIndicator } from '../components/SaveIndicator';
+import { ChevronRightIcon } from '../components/icons';
 import { useAutosave, type DocumentSnapshot } from '../hooks/useAutosave';
 import { useDocument } from '../hooks/useDocuments';
 import { useWorkspace } from '../hooks/useWorkspaces';
@@ -21,7 +22,7 @@ export function DocumentPage() {
 
   if (document.error) {
     return (
-      <main className="page">
+      <main className="container">
         <Alert>{errorMessage(document.error)}</Alert>
         <Link to={`/workspaces/${workspaceId}`}>Back to the workspace</Link>
       </main>
@@ -29,7 +30,7 @@ export function DocumentPage() {
   }
 
   if (!document.data || !workspace.data) {
-    return <p className="page-placeholder">Loading document…</p>;
+    return <p className="placeholder">Loading document…</p>;
   }
 
   // Mounting the editor only once content exists avoids loading into it after
@@ -146,11 +147,12 @@ function DocumentEditor({
   }
 
   return (
-    <main className="page page-wide">
-      <p className="breadcrumb">
-        <Link to="/workspaces">Workspaces</Link> /{' '}
+    <main className="container container-reading">
+      <nav className="crumbs">
+        <Link to="/workspaces">Workspaces</Link>
+        <ChevronRightIcon size={13} />
         <Link to={`/workspaces/${workspaceId}`}>{workspaceName}</Link>
-      </p>
+      </nav>
 
       {reloadedFromServer && (
         <Alert kind="warn" onDismiss={() => setReloadedFromServer(false)}>
@@ -163,31 +165,37 @@ function DocumentEditor({
       {autosave.error && (
         <Alert onDismiss={autosave.clearError}>
           {autosave.error}{' '}
-          <button type="button" className="link" onClick={() => void autosave.flush()}>
+          <button
+            type="button"
+            className="btn-link"
+            onClick={() => void autosave.flush()}
+          >
             Try again
           </button>
         </Alert>
       )}
 
-      <div className="editor-header">
+      <div className="doc-head">
         <input
-          className="title-input"
+          className="doc-title"
           aria-label="Document title"
           value={title}
           maxLength={255}
           readOnly={!writable}
           onChange={(event) => handleTitleChange(event.target.value)}
         />
-        {writable ? (
-          <SaveIndicator status={autosave.status} version={autosave.version} />
-        ) : (
-          <span className="badge">read-only</span>
-        )}
+        <div className="doc-status">
+          {writable ? (
+            <SaveIndicator status={autosave.status} version={autosave.version} />
+          ) : (
+            <span className="badge">read-only</span>
+          )}
+        </div>
       </div>
 
       {writable && editor && <Toolbar editor={editor} />}
 
-      <div className="editor-surface">
+      <div className="paper">
         <EditorContent editor={editor} />
       </div>
 
@@ -254,7 +262,7 @@ function Toolbar({ editor }: { editor: TiptapEditor }) {
   ];
 
   return (
-    <div className="editor-toolbar">
+    <div className="toolbar">
       {actions.map((action) => (
         <button
           key={action.label}

@@ -5,6 +5,12 @@ import { errorMessage } from '../api/errors';
 import { Alert } from '../components/Alert';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import {
+  ChevronRightIcon,
+  FileIcon,
+  PlusIcon,
+  TrashIcon,
+} from '../components/icons';
+import {
   useCreateDocument,
   useDeleteDocument,
   useDocuments,
@@ -14,7 +20,12 @@ import { canEdit } from '../types/api';
 import type { DocumentSummary } from '../types/api';
 
 function formatEdited(timestamp: string): string {
-  return new Date(timestamp).toLocaleString();
+  const edited = new Date(timestamp);
+  const minutesAgo = (Date.now() - edited.getTime()) / 60_000;
+  if (minutesAgo < 1) return 'just now';
+  if (minutesAgo < 60) return `${Math.floor(minutesAgo)} min ago`;
+  if (minutesAgo < 60 * 24) return `${Math.floor(minutesAgo / 60)} h ago`;
+  return edited.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
 export function WorkspacePage() {
@@ -45,7 +56,7 @@ export function WorkspacePage() {
 
   if (workspace.error) {
     return (
-      <main className="page">
+      <main className="container">
         <Alert>{errorMessage(workspace.error)}</Alert>
         <Link to="/workspaces">Back to your workspaces</Link>
       </main>
@@ -53,99 +64,113 @@ export function WorkspacePage() {
   }
 
   return (
-    <main className="page">
-      <p className="breadcrumb">
-        <Link to="/workspaces">Workspaces</Link> / {workspace.data?.name ?? '…'}
-      </p>
+    <main className="container">
+      <nav className="crumbs">
+        <Link to="/workspaces">Workspaces</Link>
+        <ChevronRightIcon size={13} />
+        <span>{workspace.data?.name ?? '…'}</span>
+      </nav>
 
-      <div className="row">
-        <h1>{workspace.data?.name ?? 'Loading…'}</h1>
-        {workspace.data && <span className="badge">{workspace.data.role}</span>}
+      <div className="page-head">
+        <div className="title-row">
+          <h1 className="page-title" style={{ marginBottom: 0 }}>
+            {workspace.data?.name ?? 'Loading…'}
+          </h1>
+          {workspace.data && (
+            <span className="badge badge-accent">{workspace.data.role}</span>
+          )}
+        </div>
+        {!writable && workspace.data && (
+          <p className="page-sub" style={{ marginTop: 6 }}>
+            You have viewer access here, so documents are read-only.
+          </p>
+        )}
       </div>
 
       {writable && (
-        <form className="card inline-form" onSubmit={handleCreate}>
+        <form className="composer" onSubmit={handleCreate}>
           <input
+            className="input"
             type="text"
             aria-label="New document title"
-            placeholder="New document title"
+            placeholder="Title a new document…"
             maxLength={255}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
           />
           <button
             type="submit"
-            className="primary"
+            className="btn btn-primary"
             disabled={create.isPending || !title.trim()}
           >
+            <PlusIcon />
             {create.isPending ? 'Creating…' : 'New document'}
           </button>
         </form>
       )}
 
-      {!writable && workspace.data && (
-        <p className="subtle">
-          You have viewer access here, so documents are read-only.
-        </p>
-      )}
-
       {(create.error || remove.error) && (
-        <div style={{ marginTop: '0.75rem' }}>
-          <Alert
-            onDismiss={() => {
-              create.reset();
-              remove.reset();
-            }}
-          >
-            {errorMessage(create.error ?? remove.error)}
-          </Alert>
-        </div>
+        <Alert
+          onDismiss={() => {
+            create.reset();
+            remove.reset();
+          }}
+        >
+          {errorMessage(create.error ?? remove.error)}
+        </Alert>
       )}
 
-      {documents.isPending && <p className="page-placeholder">Loading documents…</p>}
+      {documents.error && <Alert>{errorMessage(documents.error)}</Alert>}
 
-      {documents.error && (
-        <div style={{ marginTop: '0.75rem' }}>
-          <Alert>{errorMessage(documents.error)}</Alert>
-        </div>
-      )}
+      {documents.isPending && <p className="placeholder">Loading documents…</p>}
 
       {documents.data?.length === 0 && (
-        <p className="empty">
-          {writable
-            ? 'No documents yet. Create one above.'
-            : 'No documents in this workspace yet.'}
-        </p>
+        <div className="empty">
+          <div className="empty-icon">
+            <FileIcon size={20} />
+          </div>
+          <p className="empty-title">No documents yet</p>
+          <p className="empty-text">
+            {writable
+              ? 'Give one a title above and start writing.'
+              : 'Nothing has been written in this workspace yet.'}
+          </p>
+        </div>
       )}
 
       {documents.data && documents.data.length > 0 && (
-        <ul className="list">
+        <div className="panel">
           {documents.data.map((document) => (
-            <li key={document.id} className="list-item">
-              <div>
+            <div key={document.id} className="panel-row">
+              <span className="row-icon">
+                <FileIcon size={17} />
+              </span>
+              <div className="row-main">
                 <Link
-                  className="title"
+                  className="row-title"
                   to={`/workspaces/${workspaceId}/documents/${document.id}`}
                 >
                   {document.title}
                 </Link>
-                <div className="subtle">
+                <div className="meta">
                   Edited {formatEdited(document.updated_at)} · v{document.version}
                 </div>
               </div>
               {writable && (
                 <button
                   type="button"
-                  className="danger"
+                  className="btn btn-ghost btn-danger btn-icon row-action"
+                  title={`Delete ${document.title}`}
+                  aria-label={`Delete ${document.title}`}
                   onClick={() => setPendingDelete(document)}
                   disabled={remove.isPending}
                 >
-                  Delete
+                  <TrashIcon />
                 </button>
               )}
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
 
       {pendingDelete && (

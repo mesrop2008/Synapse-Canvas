@@ -1,6 +1,8 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../hooks/useAuth';
+import { ThemeToggle } from './ThemeToggle';
+import { LogOutIcon, Logo } from './icons';
 
 export function Layout() {
   const { user, signOut } = useAuth();
@@ -12,19 +14,40 @@ export function Layout() {
   }
 
   return (
-    <>
-      <header className="app-header">
-        <Link to="/workspaces" className="brand">
-          Synapse Canvas
-        </Link>
-        <div className="who">
-          {user && <span>{user.email}</span>}
-          <button type="button" onClick={handleSignOut}>
-            Sign out
-          </button>
+    <div className="app-shell">
+      <header className="topbar">
+        <div className="topbar-inner">
+          <Link to="/workspaces" className="brand">
+            <Logo />
+            Synapse Canvas
+          </Link>
+
+          <div className="topbar-actions">
+            <ThemeToggle />
+            {user && (
+              <div className="user-chip">
+                <span>{user.email}</span>
+                <span className="avatar" aria-hidden="true">
+                  {user.name.trim().charAt(0) || user.email.charAt(0)}
+                </span>
+              </div>
+            )}
+            <button
+              type="button"
+              className="btn btn-ghost btn-icon"
+              onClick={handleSignOut}
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <LogOutIcon />
+            </button>
+          </div>
         </div>
       </header>
-      <Outlet />
-    </>
+
+      <div className="content">
+        <Outlet />
+      </div>
+    </div>
   );
 }

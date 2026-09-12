@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 
 import { errorMessage } from '../api/errors';
 import { Alert } from '../components/Alert';
+import { FolderIcon, PlusIcon } from '../components/icons';
 import { useCreateWorkspace, useWorkspaces } from '../hooks/useWorkspaces';
 
 export function WorkspacesPage() {
@@ -23,62 +24,71 @@ export function WorkspacesPage() {
   }
 
   return (
-    <main className="page">
-      <h1>Workspaces</h1>
-      <p className="subtle">
-        Every document lives in a workspace, and your role there decides what you
-        can do with it.
-      </p>
+    <main className="container">
+      <div className="page-head">
+        <h1 className="page-title">Workspaces</h1>
+        <p className="page-sub">
+          Every document lives in a workspace, and your role there decides what you
+          can do with it.
+        </p>
+      </div>
 
-      <form className="card inline-form" onSubmit={handleCreate}>
+      <form className="composer" onSubmit={handleCreate}>
         <input
+          className="input"
           type="text"
           aria-label="New workspace name"
-          placeholder="New workspace name"
+          placeholder="Name a new workspace…"
           maxLength={255}
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
         <button
           type="submit"
-          className="primary"
+          className="btn btn-primary"
           disabled={create.isPending || !name.trim()}
         >
+          <PlusIcon />
           {create.isPending ? 'Creating…' : 'Create'}
         </button>
       </form>
 
       {create.error && (
-        <div style={{ marginTop: '0.75rem' }}>
-          <Alert onDismiss={() => create.reset()}>
-            {errorMessage(create.error, 'Could not create the workspace.')}
-          </Alert>
-        </div>
+        <Alert onDismiss={() => create.reset()}>
+          {errorMessage(create.error, 'Could not create the workspace.')}
+        </Alert>
       )}
 
-      {workspaces.isPending && <p className="page-placeholder">Loading…</p>}
+      {workspaces.error && <Alert>{errorMessage(workspaces.error)}</Alert>}
 
-      {workspaces.error && (
-        <div style={{ marginTop: '0.75rem' }}>
-          <Alert>{errorMessage(workspaces.error)}</Alert>
-        </div>
-      )}
+      {workspaces.isPending && <p className="placeholder">Loading…</p>}
 
       {workspaces.data?.length === 0 && (
-        <p className="empty">No workspaces yet. Create one above to get going.</p>
+        <div className="empty">
+          <div className="empty-icon">
+            <FolderIcon size={20} />
+          </div>
+          <p className="empty-title">No workspaces yet</p>
+          <p className="empty-text">Name one above to get going.</p>
+        </div>
       )}
 
       {workspaces.data && workspaces.data.length > 0 && (
-        <ul className="list">
+        <div className="panel">
           {workspaces.data.map((workspace) => (
-            <li key={workspace.id} className="list-item">
-              <Link className="title" to={`/workspaces/${workspace.id}`}>
-                {workspace.name}
-              </Link>
+            <div key={workspace.id} className="panel-row">
+              <span className="row-icon">
+                <FolderIcon size={17} />
+              </span>
+              <div className="row-main">
+                <Link className="row-title" to={`/workspaces/${workspace.id}`}>
+                  {workspace.name}
+                </Link>
+              </div>
               <span className="badge">{workspace.role}</span>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </main>
   );
