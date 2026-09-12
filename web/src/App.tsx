@@ -9,6 +9,7 @@ import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { VerifyEmailPage } from './pages/VerifyEmailPage';
+import { WorkspacePage } from './pages/WorkspacePage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
 
 const queryClient = new QueryClient({
@@ -41,6 +42,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/workspaces" replace /> },
       { path: 'workspaces', element: <WorkspacesPage /> },
+      { path: 'workspaces/:workspaceId', element: <WorkspacePage /> },
     ],
   },
   { path: '*', element: <NotFoundPage /> },
