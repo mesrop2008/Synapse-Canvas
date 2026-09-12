@@ -7,7 +7,7 @@ export function NotFoundPage() {
     <main className="auth">
       <div className="auth-card">
         <div className="auth-brand">
-          <Logo size={24} />
+          <Logo size={26} />
           Synapse Canvas
         </div>
         <h1 className="auth-title">Not found</h1>

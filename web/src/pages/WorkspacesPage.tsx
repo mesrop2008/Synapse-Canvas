@@ -66,7 +66,7 @@ export function WorkspacesPage() {
       {workspaces.data?.length === 0 && (
         <div className="empty">
           <div className="empty-icon">
-            <FolderIcon size={20} />
+            <FolderIcon size={22} />
           </div>
           <p className="empty-title">No workspaces yet</p>
           <p className="empty-text">Name one above to get going.</p>
@@ -78,7 +78,7 @@ export function WorkspacesPage() {
           {workspaces.data.map((workspace) => (
             <div key={workspace.id} className="panel-row">
               <span className="row-icon">
-                <FolderIcon size={17} />
+                <FolderIcon size={18} />
               </span>
               <div className="row-main">
                 <Link className="row-title" to={`/workspaces/${workspace.id}`}>

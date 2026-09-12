@@ -32,7 +32,7 @@ export function ThemeToggle() {
           className="theme-toggle-option"
           onClick={() => setPreference(value)}
         >
-          <Icon size={15} />
+          <Icon size={16} />
         </button>
       ))}
     </div>

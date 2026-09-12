@@ -62,9 +62,7 @@ single place in `api/main.py` maps to status codes.
 
 ## Running locally
 
-You need Docker (for PostgreSQL) and Node 20+.
-
-### 1. The backend
+You need Docker. Node is only needed if you want the client's dev server.
 
 ```bash
 cp .env.example .env
@@ -74,27 +72,46 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-That is the whole backend setup. `.env` ships with `JWT_SECRET_KEY` blank and the container
-generates one on first run, persisting it to a volume.
+That is the whole setup — open <http://localhost:5173>.
 
-Compose starts PostgreSQL, waits for its healthcheck, runs `alembic upgrade head` to
-completion, and only then starts the API on <http://localhost:8000>. Postgres is published on
-host port **5433** so it does not collide with a natively installed server on 5432.
+Compose starts PostgreSQL, waits for its healthcheck, runs `alembic upgrade head`
+to completion, starts the API, waits for *its* healthcheck, then starts the web
+container. Seeing `migrate` as `Exited (0)` afterwards is the success case, not a
+crash. `.env` ships with `JWT_SECRET_KEY` blank and the API container generates
+one on first run, persisting it to a volume.
 
-Seeing the `migrate` container as `Exited (0)` afterwards is the success case, not a crash.
+| Service | Where | What it is |
+|---|---|---|
+| `web` | <http://localhost:5173> | The built client behind nginx |
+| `api` | <http://localhost:8000/docs> | FastAPI, published for Swagger and direct calls |
+| `postgres` | `localhost:5433` | 5433 so it does not collide with a local 5432 |
 
-### 2. The web client
+The web container serves the compiled client and reverse-proxies `/api` to the
+API on its **own origin**, so the browser makes no cross-origin request and CORS
+is not involved at all in the container setup. It also keeps the API's address
+out of the bundle, which matters because Vite inlines `VITE_*` at build time —
+the built image would otherwise be pinned to whatever host and port it was built
+for.
+
+### Changing client code
+
+The web image contains compiled output, not source, so there is deliberately no
+bind mount and no hot reload. Rebuild just that service:
 
 ```bash
-cd web && cp .env.example .env && npm install
+docker compose up -d --build web
 ```
+
+For actual frontend work, run the dev server on the host against the same API —
+this is the path with HMR:
 
 ```bash
-npm run dev
+cd web && cp .env.example .env && npm install && npm run dev
 ```
 
-<http://localhost:5173>. The dev server's port is fixed, because it has to match an entry in
-the API's `CORS_ORIGINS` and the verification link base.
+`web/.env` points at `http://localhost:8000` (cross-origin, which is why
+`CORS_ORIGINS` lists port 5173). Stop the `web` container first, or change
+`WEB_PORT`, since both want 5173.
 
 ### Running the API on the host instead
 
@@ -170,15 +187,27 @@ Everything in `.env.example` is commented. The ones that matter for Part 2:
 | `MAX_REQUEST_BODY_BYTES` | `1048576` | Caps a document body too — a 1 MiB PATCH is refused before it is read |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | |
+| `WEB_PORT` | `5173` | Where you open the app. Must agree with `EMAIL_VERIFICATION_LINK_BASE` |
+| `VITE_API_BASE_URL` | `/api` | A **build** argument, not a runtime setting — Vite inlines it. Same-origin by default; change it and rebuild `web` |
+| `TRUST_PROXY_HEADERS` | `false` | See the note below |
+
+`TRUST_PROXY_HEADERS` stays off even though the bundled nginx *is* a proxy you
+control — it sets `X-Forwarded-For` to `$remote_addr` rather than appending, so
+it would be safe to trust. It is off because compose also publishes the API
+directly on `API_PORT`, and a client reaching that port could forge the header
+and mint a fresh rate-limit identity per request. Until the API is reachable
+only through the proxy, per-IP throttling keys on nginx for proxied requests.
 
 ### Client (`web/.env`)
 
-Vite only exposes variables prefixed with `VITE_`, and inlines them at build time — so these
-are public, and nothing secret belongs here.
+Only read when you run the dev server on the host; the container gets its value
+from the compose build argument instead. Vite only exposes variables prefixed
+with `VITE_`, and inlines them at build time — so these are public, and nothing
+secret belongs here.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `VITE_API_BASE_URL` | `http://localhost:8000` | No trailing slash |
+| `VITE_API_BASE_URL` | `http://localhost:8000` | No trailing slash. The container builds with `/api` instead |
 
 ## The documents API
 
@@ -308,6 +337,11 @@ treat `saving` as dirty.
 - **A client test suite.** The refresh single-flight, the debounce, and the conflict reload
   are the parts most likely to break silently, and they have no automated coverage — they were
   verified by hand against a running stack.
+- **Run nginx unprivileged, and stop publishing the API port.** The web image
+  uses the stock `nginx:alpine`, whose master process runs as root. Dropping the
+  direct `api` port mapping at the same time would let `TRUST_PROXY_HEADERS` be
+  turned on, which is what per-IP throttling needs to work correctly behind the
+  proxy.
 - **Retire the CSP exemption for `/docs`.** Swagger loads assets from a CDN. Fine locally;
   in production the docs should either be off or served with vendored assets.
 

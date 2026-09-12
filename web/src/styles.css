@@ -41,7 +41,7 @@
     'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 
-  --topbar-h: 57px;
+  --topbar-h: 64px;
 }
 
 [data-theme='dark'] {
@@ -92,8 +92,8 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -167,7 +167,7 @@ a:hover {
   gap: 9px;
   color: var(--text);
   font-weight: 620;
-  font-size: 14.5px;
+  font-size: 15.5px;
   letter-spacing: -0.017em;
 }
 
@@ -192,18 +192,18 @@ a:hover {
   gap: 8px;
   padding-right: 2px;
   color: var(--text-2);
-  font-size: 13px;
+  font-size: 13.5px;
 }
 
 .avatar {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 650;
   text-transform: uppercase;
   flex: none;
@@ -214,9 +214,9 @@ a:hover {
 }
 
 .container {
-  max-width: 800px;
+  max-width: 860px;
   margin: 0 auto;
-  padding: 40px 24px 96px;
+  padding: 48px 28px 112px;
 }
 
 .container-wide {
@@ -224,31 +224,31 @@ a:hover {
 }
 
 .container-reading {
-  max-width: 880px;
+  max-width: 920px;
 }
 
 /* --- page furniture ------------------------------------------------------- */
 
 .page-head {
-  margin-bottom: 26px;
+  margin-bottom: 30px;
 }
 
 .page-title {
-  font-size: 27px;
-  margin-bottom: 6px;
+  font-size: 32px;
+  margin-bottom: 7px;
 }
 
 .page-sub {
   color: var(--text-2);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .crumbs {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 18px;
-  font-size: 13px;
+  margin-bottom: 20px;
+  font-size: 13.5px;
   color: var(--text-3);
 }
 
@@ -279,15 +279,15 @@ a:hover {
 
 .meta {
   color: var(--text-3);
-  font-size: 12.5px;
+  font-size: 13px;
   margin-top: 2px;
 }
 
 .placeholder {
-  padding: 72px 24px;
+  padding: 80px 24px;
   text-align: center;
   color: var(--text-3);
-  font-size: 13.5px;
+  font-size: 14.5px;
 }
 
 /* --- controls ------------------------------------------------------------- */
@@ -296,15 +296,15 @@ a:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  height: 36px;
-  padding: 0 14px;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
   border: 1px solid transparent;
   border-radius: var(--r-sm);
   background: none;
   color: var(--text);
   font: inherit;
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 560;
   white-space: nowrap;
   cursor: pointer;
@@ -359,14 +359,14 @@ a:hover {
 }
 
 .btn-sm {
-  height: 30px;
-  padding: 0 10px;
-  font-size: 12.5px;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
 }
 
 .btn-icon {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   padding: 0;
 }
 
@@ -389,14 +389,14 @@ a:hover {
 
 .input {
   width: 100%;
-  height: 38px;
-  padding: 0 12px;
+  height: 44px;
+  padding: 0 14px;
   border: 1px solid var(--border-strong);
   border-radius: var(--r-sm);
   background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -412,18 +412,18 @@ a:hover {
 
 .field {
   display: grid;
-  gap: 6px;
-  margin-bottom: 16px;
+  gap: 7px;
+  margin-bottom: 18px;
 }
 
 .field label {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 560;
   color: var(--text-2);
 }
 
 .hint {
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: var(--text-3);
 }
 
@@ -434,7 +434,7 @@ a:hover {
 }
 
 .composer .btn {
-  height: 38px;
+  height: 44px;
 }
 
 .theme-toggle {
@@ -449,8 +449,8 @@ a:hover {
 .theme-toggle-option {
   display: grid;
   place-items: center;
-  width: 27px;
-  height: 25px;
+  width: 32px;
+  height: 28px;
   border: none;
   border-radius: 6px;
   background: none;
@@ -472,15 +472,15 @@ a:hover {
 .badge {
   display: inline-flex;
   align-items: center;
-  height: 21px;
-  padding: 0 8px;
+  height: 24px;
+  padding: 0 10px;
   border-radius: 999px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   color: var(--text-2);
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -503,8 +503,8 @@ a:hover {
 .panel-row {
   display: flex;
   align-items: center;
-  gap: 13px;
-  padding: 13px 16px;
+  gap: 14px;
+  padding: 16px 20px;
   border-top: 1px solid var(--border);
   transition: background-color 0.13s;
 }
@@ -522,9 +522,9 @@ a:hover {
 }
 
 .row-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
   display: grid;
   place-items: center;
   background: var(--accent-soft);
@@ -541,7 +541,7 @@ a:hover {
   display: block;
   color: var(--text);
   font-weight: 570;
-  font-size: 14px;
+  font-size: 15px;
   letter-spacing: -0.008em;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -583,17 +583,17 @@ a:hover {
 }
 
 .empty {
-  padding: 60px 24px;
+  padding: 72px 24px;
   text-align: center;
   border: 1px dashed var(--border-strong);
   border-radius: var(--r-lg);
 }
 
 .empty-icon {
-  width: 44px;
-  height: 44px;
-  margin: 0 auto 14px;
-  border-radius: 13px;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 16px;
+  border-radius: 15px;
   display: grid;
   place-items: center;
   background: var(--surface-2);
@@ -601,14 +601,14 @@ a:hover {
 }
 
 .empty-title {
-  font-size: 14.5px;
+  font-size: 16px;
   font-weight: 580;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
 .empty-text {
   color: var(--text-3);
-  font-size: 13.5px;
+  font-size: 14.5px;
 }
 
 /* --- auth ----------------------------------------------------------------- */
@@ -617,7 +617,13 @@ a:hover {
   position: relative;
   min-height: 100%;
   display: grid;
-  place-items: center;
+  /* A fixed-width track, not place-items: center. Centring the *item* makes it
+     shrink to its content, so the card's own max-width never applies and every
+     control inside it collapses to fit the longest word. Centring the track
+     instead lets the card fill it. */
+  grid-template-columns: minmax(0, 440px);
+  justify-content: center;
+  align-content: center;
   padding: 40px 20px;
   overflow: hidden;
 }
@@ -637,8 +643,8 @@ a:hover {
 .auth-card {
   position: relative;
   width: 100%;
-  max-width: 396px;
-  padding: 32px;
+  max-width: 440px;
+  padding: 40px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-xl);
@@ -650,10 +656,10 @@ a:hover {
   align-items: center;
   justify-content: center;
   gap: 9px;
-  margin-bottom: 24px;
+  margin-bottom: 26px;
   color: var(--text);
   font-weight: 620;
-  font-size: 15px;
+  font-size: 16px;
   letter-spacing: -0.017em;
 }
 
@@ -662,25 +668,25 @@ a:hover {
 }
 
 .auth-title {
-  font-size: 21px;
+  font-size: 26px;
   text-align: center;
-  margin-bottom: 6px;
+  margin-bottom: 7px;
 }
 
 .auth-lede {
   text-align: center;
   color: var(--text-2);
-  font-size: 13.5px;
-  margin-bottom: 24px;
+  font-size: 14.5px;
+  margin-bottom: 26px;
 }
 
 .auth-foot {
-  margin-top: 20px;
-  padding-top: 18px;
+  margin-top: 24px;
+  padding-top: 20px;
   border-top: 1px solid var(--border);
   text-align: center;
   color: var(--text-2);
-  font-size: 13.5px;
+  font-size: 14.5px;
 }
 
 .auth-aside {
@@ -698,11 +704,11 @@ a:hover {
 }
 
 .note {
-  padding: 11px 13px;
+  padding: 13px 15px;
   border-radius: var(--r-sm);
   background: var(--surface-2);
   color: var(--text-2);
-  font-size: 12.5px;
+  font-size: 13.5px;
   line-height: 1.6;
 }
 
@@ -719,11 +725,11 @@ a:hover {
 .alert {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 11px 13px;
-  margin-bottom: 16px;
+  gap: 12px;
+  padding: 13px 15px;
+  margin-bottom: 18px;
   border-radius: var(--r-sm);
-  font-size: 13.5px;
+  font-size: 14.5px;
   line-height: 1.55;
   border: 1px solid transparent;
 }
@@ -773,13 +779,13 @@ a:hover {
 .save-indicator {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  height: 26px;
-  padding: 0 10px 0 8px;
+  gap: 8px;
+  height: 30px;
+  padding: 0 12px 0 10px;
   border-radius: 999px;
   background: var(--surface-2);
   color: var(--text-2);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 540;
   white-space: nowrap;
 }
@@ -839,7 +845,7 @@ a:hover {
   background: none;
   color: var(--text);
   font: inherit;
-  font-size: 29px;
+  font-size: 34px;
   font-weight: 660;
   letter-spacing: -0.026em;
   line-height: 1.25;
@@ -857,7 +863,7 @@ a:hover {
 }
 
 .doc-status {
-  padding-top: 7px;
+  padding-top: 9px;
   flex: none;
 }
 
@@ -865,22 +871,22 @@ a:hover {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 2px;
-  margin: 16px 0 18px;
-  padding: 3px;
+  margin: 18px 0 20px;
+  padding: 4px;
   border-radius: var(--r-md);
   background: var(--surface-2);
   border: 1px solid var(--border);
 }
 
 .toolbar button {
-  height: 28px;
-  padding: 0 10px;
+  height: 32px;
+  padding: 0 12px;
   border: none;
   border-radius: 7px;
   background: none;
   color: var(--text-2);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 560;
   cursor: pointer;
   transition: background-color 0.13s, color 0.13s, box-shadow 0.13s;
@@ -897,7 +903,7 @@ a:hover {
 }
 
 .paper {
-  padding: 44px 52px 64px;
+  padding: 52px 60px 72px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
@@ -907,7 +913,7 @@ a:hover {
 .tiptap {
   min-height: 52vh;
   outline: none;
-  font-size: 16.5px;
+  font-size: 17px;
   line-height: 1.75;
   color: var(--text);
   letter-spacing: -0.003em;
@@ -1013,8 +1019,8 @@ a:hover {
 
 .modal {
   width: 100%;
-  max-width: 400px;
-  padding: 22px;
+  max-width: 440px;
+  padding: 26px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
@@ -1023,13 +1029,13 @@ a:hover {
 }
 
 .modal-title {
-  font-size: 16px;
-  margin-bottom: 7px;
+  font-size: 18px;
+  margin-bottom: 8px;
 }
 
 .modal-text {
   color: var(--text-2);
-  font-size: 13.5px;
+  font-size: 14.5px;
   line-height: 1.6;
 }
 
@@ -1067,7 +1073,7 @@ a:hover {
 
 @media (max-width: 620px) {
   .container {
-    padding: 28px 16px 72px;
+    padding: 32px 18px 80px;
   }
 
   .topbar-inner {
@@ -1079,11 +1085,11 @@ a:hover {
   }
 
   .paper {
-    padding: 26px 20px 44px;
+    padding: 28px 22px 48px;
   }
 
   .doc-title {
-    font-size: 24px;
+    font-size: 27px;
   }
 
   .composer {

@@ -150,7 +150,7 @@ function DocumentEditor({
     <main className="container container-reading">
       <nav className="crumbs">
         <Link to="/workspaces">Workspaces</Link>
-        <ChevronRightIcon size={13} />
+        <ChevronRightIcon size={14} />
         <Link to={`/workspaces/${workspaceId}`}>{workspaceName}</Link>
       </nav>
 

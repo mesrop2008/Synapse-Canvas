@@ -88,7 +88,7 @@ export const LogOutIcon = (props: IconProps) => (
 );
 
 /** The brand mark: overlapping nodes, drawn rather than lettered. */
-export function Logo({ size = 22 }: { size?: number }) {
+export function Logo({ size = 24 }: { size?: number }) {
   return (
     <svg
       width={size}

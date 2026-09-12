@@ -47,59 +47,57 @@ export function LoginPage() {
         <ThemeToggle />
       </div>
 
-      <div>
-        <form className="auth-card" onSubmit={handleSubmit}>
-          <div className="auth-brand">
-            <Logo size={24} />
-            Synapse Canvas
-          </div>
+      <form className="auth-card" onSubmit={handleSubmit}>
+        <div className="auth-brand">
+          <Logo size={26} />
+          Synapse Canvas
+        </div>
 
-          <h1 className="auth-title">Welcome back</h1>
-          <p className="auth-lede">Sign in to your workspaces.</p>
+        <h1 className="auth-title">Welcome back</h1>
+        <p className="auth-lede">Sign in to your workspaces.</p>
 
-          {error && <Alert onDismiss={() => setError(null)}>{error}</Alert>}
+        {error && <Alert onDismiss={() => setError(null)}>{error}</Alert>}
 
-          <div className="field">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              className="input"
-              type="email"
-              autoComplete="username"
-              placeholder="you@example.com"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </div>
+        <div className="field">
+          <label htmlFor="email">Email</label>
+          <input
+            id="email"
+            className="input"
+            type="email"
+            autoComplete="username"
+            placeholder="you@example.com"
+            required
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+        </div>
 
-          <div className="field">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              className="input"
-              type="password"
-              autoComplete="current-password"
-              placeholder="••••••••"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </div>
+        <div className="field">
+          <label htmlFor="password">Password</label>
+          <input
+            id="password"
+            className="input"
+            type="password"
+            autoComplete="current-password"
+            placeholder="••••••••"
+            required
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+        </div>
 
-          <button
-            type="submit"
-            className="btn btn-primary btn-block"
-            disabled={submitting}
-          >
-            {submitting ? 'Signing in…' : 'Sign in'}
-          </button>
+        <button
+          type="submit"
+          className="btn btn-primary btn-block"
+          disabled={submitting}
+        >
+          {submitting ? 'Signing in…' : 'Sign in'}
+        </button>
 
-          <p className="auth-foot">
-            No account yet? <Link to="/register">Create one</Link>
-          </p>
-        </form>
-      </div>
+        <p className="auth-foot">
+          No account yet? <Link to="/register">Create one</Link>
+        </p>
+      </form>
     </main>
   );
 }
