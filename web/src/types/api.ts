@@ -43,13 +43,24 @@ export interface Workspace {
 }
 
 /**
- * A ProseMirror document node. Left loose on purpose: Tiptap owns the schema,
- * and a hand-maintained node union here would be wrong the first time an
- * extension is added.
+ * A ProseMirror node tree. Deliberately structural rather than a union of the
+ * node types in use: Tiptap owns the schema, and a hand-maintained union here
+ * would be wrong the first time an extension is added. Shaped to stay
+ * assignable to Tiptap's own `JSONContent`, so content crosses that boundary
+ * without a cast.
  */
-export interface ProseMirrorDoc {
+export interface ProseMirrorNode {
+  type?: string;
+  attrs?: Record<string, unknown>;
+  content?: ProseMirrorNode[];
+  marks?: Array<{ type: string; attrs?: Record<string, unknown> }>;
+  text?: string;
+  [key: string]: unknown;
+}
+
+/** The root node. The backend rejects content whose `type` is not `doc`. */
+export interface ProseMirrorDoc extends ProseMirrorNode {
   type: 'doc';
-  content?: unknown[];
 }
 
 export interface DocumentSummary {

@@ -5,6 +5,7 @@ import { ApiError } from './api/client';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthProvider } from './hooks/useAuth';
+import { DocumentPage } from './pages/DocumentPage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -43,6 +44,10 @@ const router = createBrowserRouter([
       { index: true, element: <Navigate to="/workspaces" replace /> },
       { path: 'workspaces', element: <WorkspacesPage /> },
       { path: 'workspaces/:workspaceId', element: <WorkspacePage /> },
+      {
+        path: 'workspaces/:workspaceId/documents/:documentId',
+        element: <DocumentPage />,
+      },
     ],
   },
   { path: '*', element: <NotFoundPage /> },
