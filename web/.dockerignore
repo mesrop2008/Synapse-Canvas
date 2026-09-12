@@ -1,0 +1,12 @@
+node_modules
+dist
+*.tsbuildinfo
+
+# Vite reads .env at build time; a local one must not leak into the image and
+# override the VITE_API_BASE_URL build argument.
+.env
+.env.*
+!.env.example
+
+Dockerfile
+.dockerignore

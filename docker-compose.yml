@@ -1,7 +1,11 @@
-# Local development stack: PostgreSQL, a one-shot migration job, and the API.
+# Local stack: PostgreSQL, a one-shot migration job, the API, and the client.
 #
 # `docker compose up -d --build` brings the whole thing up in order:
-#   postgres (waits for its healthcheck) -> migrate (runs to completion) -> api
+#   postgres (healthcheck) -> migrate (to completion) -> api (healthcheck) -> web
+#
+# Open http://localhost:5173. The web container serves the built client and
+# proxies /api to the API on the same origin, so the browser never makes a
+# cross-origin request and the API's address is not baked into the bundle.
 #
 # Postgres is published on host port 5433 by default so it can run alongside a
 # natively installed server already holding 5432. Inside the compose network
@@ -94,6 +98,28 @@ services:
       - ./alembic:/app/alembic:ro
       - jwt_secret:/var/lib/synapse
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Static build behind nginx, not the Vite dev server: one command should give
+  # a working app, and HMR is better served by running `npm run dev` on the host
+  # against this same API. Rebuild with `docker compose up -d --build web` after
+  # changing client source -- there is no bind mount, on purpose, because the
+  # image contains compiled output rather than source.
+  web:
+    build:
+      context: ./web
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-mirror.gcr.io/library/node:22-alpine}
+        NGINX_IMAGE: ${NGINX_IMAGE:-mirror.gcr.io/library/nginx:1.27-alpine}
+        # Same-origin path handled by the container's own nginx.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    image: synapse-canvas-web:local
+    container_name: synapse_canvas_web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-5173}:80"
 
 volumes:
   postgres_data:
