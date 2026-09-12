@@ -9,9 +9,9 @@ import jwt as pyjwt
 import pytest
 from httpx import AsyncClient
 
-from app.core import security
-from app.core.config import get_settings
-from app.main import create_app
+from api.core import security
+from api.core.config import get_settings
+from api.main import create_app
 
 
 @pytest.fixture

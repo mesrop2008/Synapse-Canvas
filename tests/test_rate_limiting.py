@@ -234,7 +234,7 @@ async def test_account_throttle_keyed_on_email_not_stored_in_the_clear(
     """The bucket table must not become a list of every address ever tried."""
     from sqlalchemy import select
 
-    from app.models.rate_limit import RateLimitBucket
+    from api.models.rate_limit import RateLimitBucket
 
     rate_limits(
         login_rate_limit_per_account=5,

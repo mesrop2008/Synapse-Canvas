@@ -24,7 +24,7 @@ x-app-environment: &app-environment
   REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
   BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
   CORS_ORIGINS: ${CORS_ORIGINS:-}
-  EMAIL_VERIFICATION_LINK_BASE: ${EMAIL_VERIFICATION_LINK_BASE:-http://localhost:3000/verify-email}
+  EMAIL_VERIFICATION_LINK_BASE: ${EMAIL_VERIFICATION_LINK_BASE:-http://localhost:5173/verify-email}
 
 x-app-build: &app-build
   context: .
@@ -68,7 +68,7 @@ services:
     environment: *app-environment
     volumes:
       - ./alembic:/app/alembic:ro
-      - ./app:/app/app:ro
+      - ./api:/app/api:ro
       - jwt_secret:/var/lib/synapse
     command: alembic upgrade head
     restart: "no"
@@ -90,10 +90,10 @@ services:
       # Development convenience: edit on the host, uvicorn reloads in the
       # container. Drop both mounts and --reload for a real deployment, where
       # the image should be immutable.
-      - ./app:/app/app:ro
+      - ./api:/app/api:ro
       - ./alembic:/app/alembic:ro
       - jwt_secret:/var/lib/synapse
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
   postgres_data:

@@ -20,6 +20,9 @@ htmlcov
 
 # Dev-only; the suite runs on the host against the containerised database.
 tests
+
+# The web client is built and served separately.
+web
 requirements-dev.txt
 
 Dockerfile

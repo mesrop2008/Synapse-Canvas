@@ -12,8 +12,8 @@ from datetime import datetime, timedelta, timezone
 from httpx import AsyncClient
 from sqlalchemy import select
 
-from app.core.security import REFRESH_TOKEN, create_token
-from app.models.refresh_token import RefreshToken
+from api.core.security import REFRESH_TOKEN, create_token
+from api.models.refresh_token import RefreshToken
 from tests.conftest import TestUser, UserFactory
 
 

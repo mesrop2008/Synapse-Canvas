@@ -11,8 +11,8 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 
-from app.models import EmailVerificationToken, User
-from app.services import auth_service, email_service
+from api.models import EmailVerificationToken, User
+from api.services import auth_service, email_service
 from tests.conftest import DEFAULT_PASSWORD, UserFactory
 
 
