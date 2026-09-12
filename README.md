@@ -30,7 +30,8 @@ their text intact.
 | Routing | React Router (data router) |
 | Server state | TanStack Query |
 | Editor | Tiptap 3 (ProseMirror) |
-| Styling | Plain CSS, one stylesheet |
+| Styling | Plain CSS, one stylesheet of design tokens |
+| Theming | Light / dark / system, persisted per browser |
 
 Planned for later parts: Redis, pgvector, Celery or Arq.
 
@@ -263,6 +264,19 @@ mean distinguishing that write from a user edit; mounting with the content alrea
 avoids the question. The same reason drives `emitUpdate: false` on the conflict reload —
 without it, replacing the content would look like an edit and schedule a save of the server's
 own content straight back to it.
+
+**Both themes come from one token set.** `styles.css` defines surface, border,
+text and accent at three weights each, twice: once on `:root` and once under
+`[data-theme='dark']`. Components reference tokens only, so contrast is a
+property of the system rather than of whichever rule was written last. An inline
+script in `index.html` applies the stored choice before first paint — it
+duplicates the resolution logic in `useTheme.tsx` on purpose, because the
+alternative is a white flash on every load for dark-theme users.
+
+One token is not obvious: `--raised`. A pill selected inside a sunken track has
+to read as lifted, which in light means white on grey, but in dark means going
+*lighter* than the track. Reusing `--surface` there made the selected theme
+button and the active toolbar button look pressed-in instead of raised.
 
 **Autosave sends title and content together.** They share one version, so two requests would
 have the second racing the version the first just produced.
