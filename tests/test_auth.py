@@ -7,7 +7,7 @@ from datetime import timedelta
 
 from httpx import AsyncClient
 
-from app.core.security import ACCESS_TOKEN, REFRESH_TOKEN, create_token
+from api.core.security import ACCESS_TOKEN, REFRESH_TOKEN, create_token
 from tests.conftest import DEFAULT_PASSWORD, TestUser, UserFactory
 
 
@@ -18,7 +18,7 @@ async def test_register_accepts_and_reveals_nothing(
     account-specific in the response would be an enumeration oracle."""
     from sqlalchemy import select
 
-    from app.models import User
+    from api.models import User
 
     response = await client.post(
         "/auth/register",
@@ -47,7 +47,7 @@ async def test_register_normalizes_email_case(
 ) -> None:
     from sqlalchemy import select
 
-    from app.models import User
+    from api.models import User
 
     response = await client.post(
         "/auth/register",
@@ -72,7 +72,7 @@ async def test_duplicate_registration_is_silent_and_creates_nothing(
     body (and matched timing, since both paths hash), and no second row."""
     from sqlalchemy import func, select
 
-    from app.models import User
+    from api.models import User
 
     payload = {"email": "dup@example.com", "password": DEFAULT_PASSWORD, "name": "First"}
     first = await client.post("/auth/register", json=payload)

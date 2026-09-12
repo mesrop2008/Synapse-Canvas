@@ -55,9 +55,9 @@ from sqlalchemy.engine import make_url  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine  # noqa: E402
 from sqlalchemy.pool import NullPool  # noqa: E402
 
-from app.db.session import get_db  # noqa: E402
-from app.main import create_app  # noqa: E402
-from app.models import Base  # noqa: E402
+from api.db.session import get_db  # noqa: E402
+from api.main import create_app  # noqa: E402
+from api.models import Base  # noqa: E402
 
 DEFAULT_PASSWORD = "Sup3rSecret!pw"
 
@@ -176,7 +176,7 @@ async def latest_verification_token_hash(
     """
     from sqlalchemy import select
 
-    from app.models import EmailVerificationToken, User
+    from api.models import EmailVerificationToken, User
 
     user = (
         await db_session.execute(select(User).where(User.email == email))
@@ -212,7 +212,7 @@ async def make_user(client: AsyncClient, db_session: AsyncSession) -> UserFactor
 
     from sqlalchemy import select
 
-    from app.models import User
+    from api.models import User
 
     async def _make(
         email: str | None = None,
@@ -337,7 +337,7 @@ def rate_limits() -> Any:
     Settings are a cached singleton, so overrides are applied to the live
     object and restored afterwards rather than rebuilt from the environment.
     """
-    from app.core.config import get_settings
+    from api.core.config import get_settings
 
     settings = get_settings()
     saved: dict[str, Any] = {}

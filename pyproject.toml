@@ -13,7 +13,7 @@ addopts = "-q --strict-markers"
 filterwarnings = [
     "error",
     # passlib 1.7.4 probes bcrypt.__about__, removed in bcrypt >= 4.1. The
-    # probe failing is harmless; see app/core/config.py.
+    # probe failing is harmless; see api/core/config.py.
     "ignore::DeprecationWarning:passlib",
 ]
 

@@ -9,7 +9,7 @@ from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import WorkspaceMember
+from api.models import WorkspaceMember
 from tests.conftest import TestUser, UserFactory
 
 

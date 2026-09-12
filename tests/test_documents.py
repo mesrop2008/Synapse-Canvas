@@ -17,8 +17,8 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from app.models import User, Workspace
-from app.services import documents as document_service
+from api.models import User, Workspace
+from api.services import documents as document_service
 from tests.conftest import _TEST_DATABASE_URL, TestUser
 
 PARAGRAPH = {
