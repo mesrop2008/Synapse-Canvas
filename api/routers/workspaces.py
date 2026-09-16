@@ -1,6 +1,5 @@
-"""Workspace and membership endpoints. Every `/{workspace_id}` route gets its
-workspace from a WorkspaceAccess dependency, so no handler re-fetches it or
-re-checks permissions."""
+"""Every `/{workspace_id}` route gets its workspace from a WorkspaceAccess
+dependency, so no handler re-fetches it or re-checks permissions."""
 
 from __future__ import annotations
 
@@ -21,8 +20,7 @@ from api.services import workspace_service
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
-# The access dependency collapses "no such workspace" and "not a member" into
-# one 404.
+# The access dependency collapses "no such workspace" and "not a member".
 _MEMBERSHIP_RESPONSES = {
     401: {"description": "Missing or invalid access token"},
     404: {"description": "Workspace not found, or caller is not a member"},

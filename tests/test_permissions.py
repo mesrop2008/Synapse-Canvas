@@ -1,9 +1,5 @@
-"""Permission boundaries.
-
-These are the tests that matter most: they pin down who is refused, and with
-which status code. The 404-versus-403 split is a security property, not a
-cosmetic one, so it is asserted explicitly rather than inferred from "not 200".
-"""
+"""The 404-versus-403 split is a security property, not a cosmetic one, so it is
+asserted explicitly rather than inferred from "not 200"."""
 
 from __future__ import annotations
 

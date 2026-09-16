@@ -10,8 +10,7 @@ from api.schemas.common import NonEmptyName
 
 
 def _is_prosemirror_doc(value: dict[str, Any]) -> dict[str, Any]:
-    # The server otherwise treats content as opaque; this one check stops a
-    # write that would store a document no editor can open.
+    # Content is otherwise opaque; this stops a write no editor could open.
     if value.get("type") != "doc":
         raise ValueError('content must be a ProseMirror document node: {"type": "doc", ...}')
     return value
@@ -36,8 +35,8 @@ class DocumentUpdate(BaseModel):
 
     @model_validator(mode="after")
     def _require_a_change(self) -> "DocumentUpdate":
-        # Without this, a body of only `version` would bump the version and
-        # invalidate every other client's for no edit at all.
+        # Or a body of only `version` bumps it and invalidates every other
+        # client's for no edit at all.
         if self.title is None and self.content is None:
             raise ValueError("Provide title, content, or both")
         return self

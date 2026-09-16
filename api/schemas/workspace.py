@@ -15,11 +15,8 @@ class WorkspaceCreate(BaseModel):
 
 
 class WorkspaceUpdate(BaseModel):
-    """PATCH body. Every field optional; only fields actually sent are applied.
-
-    Handlers use `model_dump(exclude_unset=True)` so that an explicit `null`
-    and an omitted key stay distinguishable.
-    """
+    """Handlers use `model_dump(exclude_unset=True)`, so an explicit `null` and
+    an omitted key stay distinguishable."""
 
     name: NonEmptyName | None = None
 
@@ -34,11 +31,8 @@ class WorkspaceRead(BaseModel):
 
 
 class WorkspaceWithRole(WorkspaceRead):
-    """A workspace plus the *calling* user's role in it.
-
-    Returned from the endpoints that already resolved the caller's role, so a
-    client can render permissions without a second round trip per workspace.
-    """
+    """The caller's role is already resolved by the access dependency, so the
+    client can render permissions without a round trip per workspace."""
 
     role: WorkspaceRole
 
@@ -60,7 +54,6 @@ class MemberRead(BaseModel):
 
 
 def workspace_with_role(workspace: object, role: WorkspaceRole) -> WorkspaceWithRole:
-    """Build a `WorkspaceWithRole` from an ORM workspace plus a resolved role."""
     return WorkspaceWithRole(
         **WorkspaceRead.model_validate(workspace).model_dump(),
         role=role,

@@ -1,5 +1,5 @@
-"""Outbound email: a `Protocol` seam plus a console implementation. Swapping in
-SES/Postmark/SMTP is one class, with nothing in `auth_service` moving."""
+"""A `Protocol` seam plus a console implementation, so swapping in SES or
+Postmark is one class with nothing in `auth_service` moving."""
 
 from __future__ import annotations
 
@@ -17,8 +17,7 @@ class EmailSender(Protocol):
 
 
 class ConsoleEmailSender:
-    # Logs the message (link included) instead of sending. Fine locally, a leak
-    # in production -- which is why the sender is swappable.
+    # Fine locally, a leak in production -- hence the swappable seam.
     async def send(self, *, to: str, subject: str, body: str) -> None:
         logger.info(
             "[email:console] to=%s subject=%s\n%s", to, subject, body
@@ -50,8 +49,8 @@ async def send_verification_email(*, to: str, raw_token: str) -> None:
 
 
 async def send_duplicate_registration_notice(*, to: str) -> None:
-    # The only place a duplicate registration surfaces: to the address's real
-    # owner, since the HTTP response is identical either way.
+    # The only place a duplicate registration surfaces, since the HTTP response
+    # is identical either way.
     await get_email_sender().send(
         to=to,
         subject="Someone tried to register with your email address",

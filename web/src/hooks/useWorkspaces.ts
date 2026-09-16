@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { createWorkspace, getWorkspace, listWorkspaces } from '../api/workspaces';
 
-/** Query keys in one place, so an invalidation cannot miss a cache by typo. */
+/** In one place so an invalidation cannot miss a cache by typo. */
 export const workspaceKeys = {
   all: ['workspaces'] as const,
   detail: (workspaceId: string) => ['workspaces', workspaceId] as const,

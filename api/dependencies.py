@@ -1,9 +1,6 @@
-"""Shared FastAPI dependencies: DB session, current user, workspace access.
-
-`WorkspaceAccess` turns a role requirement into a type annotation, so handlers
-carry no permission code -- and since it is also the handler's only source of
-the workspace object, omitting the check fails loudly rather than silently.
-"""
+"""`WorkspaceAccess` turns a role requirement into a type annotation. It is also
+the handler's only source of the workspace object, so omitting the check fails
+loudly rather than silently."""
 
 from __future__ import annotations
 
@@ -30,8 +27,8 @@ from api.services import auth_service, rate_limit_service, workspace_service
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
-# auto_error=False so a missing header raises our own AuthenticationError and
-# produces the same body shape as every other failure in the API.
+# auto_error=False so a missing header raises our own AuthenticationError, and
+# the body shape matches every other failure.
 _bearer_scheme = HTTPBearer(auto_error=False, description="JWT access token")
 
 
@@ -47,7 +44,7 @@ async def get_current_user(
     payload = decode_token(credentials.credentials, ACCESS_TOKEN)
     user = await auth_service.get_user_by_id(db, subject_uuid(payload))
     if user is None:
-        # Valid signature but the account is gone; the token must stop working.
+        # Valid signature, deleted account: the token must stop working.
         raise AuthenticationError("User no longer exists")
     return user
 
@@ -65,11 +62,11 @@ class WorkspaceContext:
 
 
 class WorkspaceAccess:
-    """Dependency factory enforcing a minimum role on `{workspace_id}`.
+    """Enforces a minimum role on `{workspace_id}`.
 
-    Non-member or no such workspace -> 404 (both are one empty inner-join
-    result, so ids cannot be probed). A member below the required role -> 403,
-    since they already know it exists.
+    Non-member or no such workspace both give 404 -- one empty inner-join result,
+    so ids cannot be probed. A member below the required role gets 403, since
+    they already know it exists.
     """
 
     def __init__(self, minimum_role: WorkspaceRole) -> None:
@@ -102,12 +99,8 @@ RequireOwner = Annotated[WorkspaceContext, Depends(WorkspaceAccess(WorkspaceRole
 
 
 def client_ip(request: Request) -> str:
-    """Resolve the caller's address for rate limiting.
-
-    X-Forwarded-For is client-set, so it is honoured only when
-    trust_proxy_headers is on (else a client mints a new identity per request),
-    and then only the first hop.
-    """
+    """X-Forwarded-For is client-set, so it is honoured only behind a proxy we
+    trust -- otherwise a client mints a new rate-limit identity per request."""
     if get_settings().trust_proxy_headers:
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
@@ -118,8 +111,8 @@ def client_ip(request: Request) -> str:
 
 
 class IPRateLimit:
-    """Per-IP throttle for one endpoint family. Limits are read from settings
-    at call time (so tests/deployments can change them); <= 0 disables it."""
+    """Limits are read at call time so tests and deployments can change them;
+    <= 0 disables the throttle."""
 
     def __init__(self, prefix: str, limit_attr: str, window_attr: str) -> None:
         self.prefix = prefix

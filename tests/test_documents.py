@@ -1,9 +1,6 @@
-"""Document CRUD, the permission boundaries around it, and the 409 path.
-
-The 409 tests are the point of the file: a stale PATCH must be refused *and*
+"""The 409 tests are the point of the file: a stale PATCH must be refused *and*
 leave the row alone, and two simultaneous PATCHes against one version must not
-both be applied.
-"""
+both be applied."""
 
 from __future__ import annotations
 
@@ -224,8 +221,8 @@ async def test_a_document_is_not_reachable_through_another_workspace(
     shared_workspace: dict[str, Any],
     document: dict[str, Any],
 ) -> None:
-    """Both workspaces belong to the caller, so what is under test here is the
-    service's own workspace scoping, not the role dependency."""
+    """Both belong to the caller, so this tests the service's workspace scoping,
+    not the role dependency."""
     other = (
         await client.post("/workspaces", json={"name": "Other"}, headers=owner.headers)
     ).json()
@@ -364,8 +361,7 @@ async def test_non_member_gets_404_everywhere(
     document: dict[str, Any],
     method: str,
 ) -> None:
-    """404, never 403: neither the workspace's existence nor the document's may
-    leak to a stranger."""
+    """404, never 403: nothing may leak to a stranger."""
     url = (
         docs_url(shared_workspace)
         if method == "post"
@@ -498,13 +494,9 @@ async def test_a_version_ahead_of_the_server_is_also_409(
 
 
 async def test_concurrent_patches_cannot_both_be_applied() -> None:
-    """Two connections PATCHing the same version at the same moment.
-
-    This test owns its data rather than using the shared fixtures: those live in
-    an uncommitted transaction a second connection cannot see, and the race is
-    only real across connections. Rows are committed for real, hence the
-    unconditional cleanup.
-    """
+    """Owns its data rather than using the shared fixtures: those live in an
+    uncommitted transaction a second connection cannot see, and the race is only
+    real across connections. Rows are committed for real, hence the cleanup."""
     engine = create_async_engine(_TEST_DATABASE_URL, poolclass=NullPool)
     email = "race-%s@example.com" % uuid.uuid4().hex[:12]
 
@@ -539,10 +531,9 @@ async def test_concurrent_patches_cannot_both_be_applied() -> None:
                 except document_service.StaleDocumentVersionError as exc:
                     caught = exc
 
-            # Read the payload only after the session has closed. In a request
-            # the 409 is serialised during unwinding, after the transaction has
-            # been rolled back -- an attached row would raise
-            # DetachedInstanceError right here.
+            # After the session closes: in a request the 409 is serialised
+            # during unwinding, once the transaction is rolled back, and an
+            # attached row would raise DetachedInstanceError right here.
             assert caught.current.content is not None
             return "stale", caught.current.version
 

@@ -1,10 +1,7 @@
 /**
- * Hand-written mirrors of the FastAPI response schemas in `app/schemas/`.
- *
- * Deliberately not generated: the surface is small, and a generator would have
- * to be re-run (and its output reviewed) on every backend change. When the two
- * drift, the compiler is the only thing that notices -- so keep field names
- * byte-identical to the Python, snake_case included.
+ * Hand-written mirrors of the schemas in `api/schemas/`. Nothing checks these
+ * against the backend, so field names must stay byte-identical to the Python,
+ * snake_case included.
  */
 
 /** ISO 8601, as FastAPI serialises `datetime`. */
@@ -26,7 +23,6 @@ export interface TokenPair {
   expires_in: number;
 }
 
-/** Registration and resend both answer with this, whatever actually happened. */
 export interface AcceptedResponse {
   detail: string;
 }
@@ -43,10 +39,8 @@ export interface Workspace {
 }
 
 /**
- * A ProseMirror node tree. Deliberately structural rather than a union of the
- * node types in use: Tiptap owns the schema, and a hand-maintained union here
- * would be wrong the first time an extension is added. Shaped to stay
- * assignable to Tiptap's own `JSONContent`, so content crosses that boundary
+ * Structural rather than a union of node types: Tiptap owns the schema. Shaped
+ * to stay assignable to Tiptap's `JSONContent` so content crosses that boundary
  * without a cast.
  */
 export interface ProseMirrorNode {
@@ -58,7 +52,7 @@ export interface ProseMirrorNode {
   [key: string]: unknown;
 }
 
-/** The root node. The backend rejects content whose `type` is not `doc`. */
+/** The backend rejects content whose `type` is not `doc`. */
 export interface ProseMirrorDoc extends ProseMirrorNode {
   type: 'doc';
 }
@@ -79,13 +73,12 @@ export interface DocumentDetail extends DocumentSummary {
   content: ProseMirrorDoc;
 }
 
-/** The 409 body from PATCH, carrying the state the client has to re-sync to. */
+/** The 409 body from PATCH: the state the client has to re-sync to. */
 export interface DocumentVersionConflict {
   detail: string;
   current: DocumentDetail;
 }
 
-/** Every non-2xx response from the API, including FastAPI's own 422s. */
 export interface ErrorBody {
   detail: unknown;
 }

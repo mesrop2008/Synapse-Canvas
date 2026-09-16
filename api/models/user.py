@@ -19,13 +19,13 @@ if TYPE_CHECKING:
 class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "users"
 
-    # 320 = max addr-spec (RFC 5321); normalised lowercase in the service layer,
-    # so a plain unique index suffices.
+    # 320 = max addr-spec (RFC 5321). Lowercased in the service layer, so a
+    # plain unique index suffices.
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    # Null until proven; login and workspace invitations both require it.
+    # Login and workspace invitations both require this.
     email_verified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

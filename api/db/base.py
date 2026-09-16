@@ -8,8 +8,8 @@ from datetime import datetime
 from sqlalchemy import DateTime, MetaData, Uuid, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-# Deterministic constraint/index names, so a later ALTER/DROP in a migration
-# has a stable name to reference instead of a PostgreSQL-invented one.
+# Deterministic names, so a later ALTER/DROP has something stable to reference
+# instead of a PostgreSQL-invented one.
 NAMING_CONVENTION = {
     "ix": "ix_%(table_name)s_%(column_0_N_name)s",
     "uq": "uq_%(table_name)s_%(column_0_N_name)s",
@@ -24,8 +24,8 @@ class Base(DeclarativeBase):
 
 
 class UUIDPrimaryKeyMixin:
-    """Client-side UUID primary key (no RETURNING round trip). The default is
-    evaluated at flush, so a fresh instance has id is None until flushed."""
+    """Client-side UUID (no RETURNING round trip). Evaluated at flush, so a fresh
+    instance has `id is None` until then."""
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -33,8 +33,7 @@ class UUIDPrimaryKeyMixin:
 
 
 class TimestampMixin:
-    """created_at, defaulted server-side by now() so migration/psql writes also
-    get a value."""
+    """Defaulted server-side so migration and psql writes get a value too."""
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

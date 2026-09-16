@@ -1,5 +1,5 @@
-"""Document endpoints. Request/response translation only; the logic is in
-`api.services.documents`, which Part 3's WebSocket handlers share."""
+"""Translation only; the logic is in `api.services.documents`, which Part 3's
+WebSocket handlers share."""
 
 from __future__ import annotations
 
@@ -17,8 +17,7 @@ from api.schemas.document import (
 )
 from api.services import documents as document_service
 
-# {workspace_id} is spelled exactly that way because WorkspaceAccess resolves
-# the workspace from a path parameter of that name.
+# WorkspaceAccess resolves the workspace from a path param of this exact name.
 router = APIRouter(prefix="/workspaces/{workspace_id}/documents", tags=["documents"])
 
 _VIEWER_RESPONSES = {

@@ -12,11 +12,8 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
-/**
- * Shared by document deletion and the editor's leave-with-unsaved-changes
- * guard. Not window.confirm: that blocks the event loop, so an autosave that
- * was mid-flight when the dialog opened could not settle underneath it.
- */
+/** Not window.confirm: that blocks the event loop, so an autosave in flight
+ *  when the dialog opened could not settle underneath it. */
 export function ConfirmDialog({
   title,
   message,

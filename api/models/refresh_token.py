@@ -14,17 +14,14 @@ if TYPE_CHECKING:
 
 
 class RefreshToken(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """Server-side state that makes a refresh token revocable.
-
-    Stores only the jti (the signature already proves authenticity), so a
-    leaked DB yields no credentials. Tokens from one login share a family_id;
-    presenting an already-used one (replay or theft) revokes the whole family.
-    """
+    """Stores only the jti -- the signature already proves authenticity -- so a
+    leaked database yields no credentials. Tokens from one login share a
+    family_id, and presenting a used one revokes the whole family."""
 
     __tablename__ = "refresh_tokens"
     __table_args__ = (
-        Index("ix_refresh_tokens_family_id", "family_id"),  # revoke/list a family
-        Index("ix_refresh_tokens_expires_at", "expires_at"),  # purge expired
+        Index("ix_refresh_tokens_family_id", "family_id"),
+        Index("ix_refresh_tokens_expires_at", "expires_at"),
     )
 
     jti: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), unique=True, nullable=False)

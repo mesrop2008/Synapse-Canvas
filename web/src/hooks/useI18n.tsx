@@ -27,9 +27,8 @@ interface I18nContextValue {
   locale: Locale;
   locales: readonly Locale[];
   setLocale: (next: Locale) => void;
-  /** Translate to a string. */
   t: (key: MessageKey, params?: MessageParams) => string;
-  /** Translate to nodes, for the few strings that wrap a value in markup. */
+  /** For the few strings that wrap a value in markup. */
   tNode: (key: MessageKey, params: Record<string, ReactNode>) => ReactNode;
   /** "3 minutes ago" / "3 минуты назад" -- Intl owns the plural rules. */
   formatRelative: (timestamp: string) => string;
@@ -51,9 +50,8 @@ function readStoredLocale(): Locale {
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => {
     const initial = readStoredLocale();
-    // Published during the initialiser rather than in an effect, so a module
-    // calling translate() while the first render is still in flight does not
-    // get English by accident.
+    // Published here rather than in an effect, so a module calling translate()
+    // during the first render does not get English by accident.
     setActiveLocale(initial);
     return initial;
   });

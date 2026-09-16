@@ -13,9 +13,8 @@ class RegisterRequest(BaseModel):
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    # Deliberately not `Password`: login must not reveal the password policy,
-    # and an old password that predates a policy change must still be able to
-    # authenticate.
+    # Not `Password`: login must not reveal the policy, and a password that
+    # predates a policy change must still authenticate.
     password: str
 
 
@@ -39,10 +38,7 @@ class ResendVerificationRequest(BaseModel):
 
 
 class AcceptedResponse(BaseModel):
-    """Deliberately uninformative body.
-
-    Returned by registration and resend alike, whatever actually happened, so
-    the response cannot be used to test whether an address is registered.
-    """
+    """Returned by registration and resend alike, whatever happened, so it cannot
+    be used to test whether an address is registered."""
 
     detail: str

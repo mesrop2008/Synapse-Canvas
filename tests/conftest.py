@@ -1,11 +1,7 @@
-"""Test fixtures against a real PostgreSQL, with every test rolled back.
-
-Each test runs in an outer transaction that is never committed;
+"""Every test runs in an outer transaction that is never committed.
 join_transaction_mode="create_savepoint" turns the app's own commit() into a
-savepoint release, so the real commit path (including IntegrityError against a
-live unique index) runs while teardown discards everything in one ROLLBACK.
-The client shares that session via a dependency override.
-"""
+savepoint release, so the real commit path runs -- IntegrityError against a live
+unique index included -- while teardown discards everything in one ROLLBACK."""
 
 from __future__ import annotations
 
@@ -63,11 +59,7 @@ DEFAULT_PASSWORD = "Sup3rSecret!pw"
 
 
 async def _ensure_database_exists(url: str) -> None:
-    """Create the test database if it does not exist yet.
-
-    Connects to the maintenance database on the same server. CREATE DATABASE
-    cannot run inside a transaction block, hence AUTOCOMMIT.
-    """
+    """CREATE DATABASE cannot run inside a transaction block, hence AUTOCOMMIT."""
     target = make_url(url)
     admin_engine = create_async_engine(
         target.set(database="postgres"),
@@ -98,12 +90,8 @@ async def _reset_schema(url: str) -> None:
 
 @pytest.fixture(scope="session", autouse=True)
 def _database() -> None:
-    """Build the schema once per session.
-
-    Deliberately a synchronous fixture running its own asyncio.run: it finishes
-    before any test event loop starts, so no connection is ever shared across
-    loops.
-    """
+    """Synchronous on purpose: its own asyncio.run finishes before any test event
+    loop starts, so no connection is shared across loops."""
     asyncio.run(_ensure_database_exists(_TEST_DATABASE_URL))
     asyncio.run(_reset_schema(_TEST_DATABASE_URL))
 
@@ -134,8 +122,7 @@ async def client(db_session: AsyncSession) -> Any:
     app = create_app()
 
     async def _override_get_db() -> Any:
-        # Yield the session owned by db_session without closing it; that
-        # fixture still needs it in order to roll back.
+        # Not closed here: db_session still needs it to roll back.
         yield db_session
 
     app.dependency_overrides[get_db] = _override_get_db
@@ -167,13 +154,8 @@ UserFactory = Callable[..., Awaitable[TestUser]]
 async def latest_verification_token_hash(
     db_session: AsyncSession, email: str
 ) -> str | None:
-    """The token_hash of a user's newest live verification token, or None.
-
-    The raw token only ever exists in the (console) email, so a test cannot
-    know it. Instead it looks the account up and confirms a token was issued;
-    `verify_user_email` below redeems it directly through the service, which
-    is the same code path the endpoint drives.
-    """
+    """The raw token only exists in the (console) email, so a test cannot know it.
+    This confirms one was issued."""
     from sqlalchemy import select
 
     from api.models import EmailVerificationToken, User
@@ -197,16 +179,12 @@ async def latest_verification_token_hash(
 
 @pytest_asyncio.fixture
 async def make_user(client: AsyncClient, db_session: AsyncSession) -> UserFactory:
-    """Register, verify and log in a user through the real endpoints.
+    """Register, verify and log in through the real endpoints, so a break in
+    either fails every dependent test. Verification is mirrored rather than
+    redeemed (the raw token is unknowable here); the redemption path itself is
+    covered in test_email_verification.
 
-    Registration returns only 202 now and login refuses an unverified address,
-    so the fixture completes verification the way a real client would: it
-    marks the account verified (mirroring a redeemed token) and then logs in.
-    Going through the endpoints rather than inserting rows keeps the fixture
-    honest -- if registration or login breaks, every dependent test fails.
-
-    Pass `verified=False` to get an account that has registered but not yet
-    verified, for tests that exercise the gate itself.
+    Pass `verified=False` for an account that has registered but not verified.
     """
     from datetime import datetime, timezone
 
@@ -244,8 +222,7 @@ async def make_user(client: AsyncClient, db_session: AsyncSession) -> UserFactor
                 refresh_token="",
             )
 
-        # Stand in for the user clicking the emailed link. The redemption path
-        # itself is covered directly in test_email_verification.
+        # Stands in for the user clicking the emailed link.
         user.email_verified_at = datetime.now(timezone.utc)
         await db_session.commit()
 
@@ -284,7 +261,7 @@ async def viewer(make_user: UserFactory) -> TestUser:
 
 @pytest_asyncio.fixture
 async def outsider(make_user: UserFactory) -> TestUser:
-    """A perfectly valid account that belongs to no workspace under test."""
+    """A valid account that belongs to no workspace under test."""
     return await make_user(name="Outsider")
 
 
@@ -332,11 +309,8 @@ async def document(
 
 @pytest.fixture
 def rate_limits() -> Any:
-    """Temporarily switch throttling on for one test.
-
-    Settings are a cached singleton, so overrides are applied to the live
-    object and restored afterwards rather than rebuilt from the environment.
-    """
+    """Settings are a cached singleton, so overrides are applied to the live
+    object and restored afterwards rather than rebuilt from the environment."""
     from api.core.config import get_settings
 
     settings = get_settings()

@@ -1,5 +1,4 @@
-"""Authentication endpoints: request/response translation only; logic is in
-`api.services.auth_service`."""
+"""Translation only; the logic is in `api.services.auth_service`."""
 
 from __future__ import annotations
 

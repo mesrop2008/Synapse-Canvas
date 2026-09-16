@@ -26,8 +26,7 @@ export function Layout() {
           </Link>
 
           <div className="topbar-actions">
-            {/* Preferences and account are separate concerns; the divider stops
-                them reading as one long row of controls. */}
+            {/* The divider stops preferences and account reading as one row. */}
             <div className="topbar-group">
               <LanguageToggle />
               <ThemeToggle />

@@ -11,10 +11,8 @@ import { useI18n } from '../hooks/useI18n';
 
 type State = 'missing' | 'verifying' | 'verified' | 'failed';
 
-/**
- * Landing page for the emailed link. EMAIL_VERIFICATION_LINK_BASE on the
- * backend has to point here, or the token never reaches /auth/verify-email.
- */
+/** EMAIL_VERIFICATION_LINK_BASE has to point here, or the token never reaches
+ *  /auth/verify-email. */
 export function VerifyEmailPage() {
   const [params] = useSearchParams();
   const { t } = useI18n();
@@ -22,8 +20,7 @@ export function VerifyEmailPage() {
 
   const [state, setState] = useState<State>(token ? 'verifying' : 'missing');
   const [error, setError] = useState<string | null>(null);
-  // The token is single-use, so a second POST would fail even though the first
-  // succeeded -- and StrictMode runs this effect twice in development.
+  // The token is single-use and StrictMode runs this effect twice in dev.
   const attempted = useRef(false);
 
   useEffect(() => {

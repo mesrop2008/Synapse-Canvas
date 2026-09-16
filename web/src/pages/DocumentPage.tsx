@@ -38,9 +38,9 @@ export function DocumentPage() {
     return <p className="placeholder">{t('document.loading')}</p>;
   }
 
-  // Mounting the editor only once content exists avoids loading into it after
-  // the fact, which would mean distinguishing that write from a user edit.
-  // The key remounts cleanly when the route moves to another document.
+  // Mounting only once content exists avoids loading into a live editor, which
+  // would mean telling that write apart from a user edit. The key remounts it
+  // when the route moves to another document.
   return (
     <DocumentEditor
       key={document.data.id}
@@ -69,13 +69,11 @@ function DocumentEditor({
   const [title, setTitle] = useState(loaded.title);
   const [reloadedFromServer, setReloadedFromServer] = useState(false);
 
-  // onUpdate fires while the editor is being constructed, before `autosave`
-  // below exists, so it reaches the scheduler through a ref.
+  // onUpdate fires during construction, before `autosave` below exists.
   const scheduleRef = useRef<() => void>(() => {});
   const titleRef = useRef(title);
   titleRef.current = title;
-  // Read at save time, so switching language mid-edit does not save a title in
-  // the previous one.
+  // Read at save time, so a language switch mid-edit keeps the new one.
   const untitledRef = useRef(t('document.untitled'));
   untitledRef.current = t('document.untitled');
 
@@ -93,9 +91,8 @@ function DocumentEditor({
       },
       onUpdate: () => scheduleRef.current(),
     },
-    // Tiptap builds the schema once, so the placeholder has to be rebuilt for a
-    // language change to reach it. Content is preserved across the rebuild
-    // because `content` is read from the same loaded document.
+    // Tiptap builds the schema once, so a language change needs a rebuild to
+    // reach the placeholder.
     [locale],
   );
 
@@ -109,9 +106,8 @@ function DocumentEditor({
 
   const handleConflict = useCallback(
     (conflict: DocumentVersionConflict, replaced: DocumentSnapshot) => {
-      // Part 3 merges instead. Until then the server wins, so the text that
-      // lost goes somewhere recoverable rather than straight in the bin. This
-      // one stays in English: it is a developer-facing console message.
+      // Part 3 merges instead; until then the server wins, so the losing text
+      // goes somewhere recoverable. English on purpose -- it is for developers.
       console.warn(
         '[synapse] Document changed elsewhere; the following local state was replaced. ' +
           'Copy anything you need from here.',
@@ -123,8 +119,8 @@ function DocumentEditor({
         },
       );
 
-      // emitUpdate: false, or this write would look like an edit and schedule a
-      // save of the server's own content back to it.
+      // emitUpdate: false, or this looks like an edit and saves the server's
+      // own content back to it.
       editor?.commands.setContent(conflict.current.content, { emitUpdate: false });
       setTitle(conflict.current.title);
       setReloadedFromServer(true);
@@ -141,15 +137,13 @@ function DocumentEditor({
   });
   scheduleRef.current = autosave.schedule;
 
-  // In-app navigation. Needs the data router, which is why App.tsx uses
-  // createBrowserRouter.
+  // Needs the data router, which is why App.tsx uses createBrowserRouter.
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       autosave.isDirty && currentLocation.pathname !== nextLocation.pathname,
   );
 
-  // Closing the tab or reloading. The browser shows its own wording; nothing
-  // here can change it.
+  // Closing the tab. The browser picks the wording, not us.
   useEffect(() => {
     if (!autosave.isDirty) return;
     const warn = (event: BeforeUnloadEvent) => {
@@ -233,7 +227,7 @@ function DocumentEditor({
 
 type TiptapEditor = NonNullable<ReturnType<typeof useEditor>>;
 
-/** Minimal formatting controls, enough to exercise what StarterKit provides. */
+/** Enough to exercise what StarterKit provides. */
 function Toolbar({ editor }: { editor: TiptapEditor }) {
   const { t } = useI18n();
 

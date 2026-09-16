@@ -26,16 +26,15 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  // Starts as 'loading' only when there is a stored session worth restoring;
-  // otherwise the login page would flash a spinner on every first visit.
+  // 'loading' only when a session is worth restoring, or the login page
+  // flashes a spinner on every first visit.
   const [status, setStatus] = useState<AuthStatus>(() =>
     getRefreshToken() ? 'loading' : 'anonymous',
   );
   const queryClient = useQueryClient();
 
-  // Restore the session on reload. The access token lives in memory and is
-  // therefore gone, so this request goes out unauthenticated, comes back 401,
-  // and the client's refresh-and-retry turns it into a signed-in response.
+  // The access token is memory-only and therefore gone, so this goes out
+  // unauthenticated, 401s, and the client's refresh-and-retry signs it in.
   useEffect(() => {
     if (status !== 'loading') return;
     let cancelled = false;
@@ -60,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // A refresh that failed mid-session ends it from underneath the UI.
+  // A failed refresh ends the session from underneath the UI.
   useEffect(
     () =>
       onSessionEnd(() => {
@@ -84,8 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await authApi.logout();
     setUser(null);
     setStatus('anonymous');
-    // Without this, the next account to sign in on this tab would briefly read
-    // the previous one's cached workspaces and documents.
+    // Or the next account on this tab reads the previous one's cache.
     queryClient.clear();
   }, [queryClient]);
 

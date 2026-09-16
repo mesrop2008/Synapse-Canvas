@@ -1,10 +1,5 @@
-/**
- * The one place that talks to the API.
- *
- * Responsibilities: hold the session, attach the access token, and recover from
- * a single expired access token by refreshing once and replaying the request.
- * Everything else in `api/` is a thin typed wrapper over `request()`.
- */
+/** Holds the session, attaches the access token, and recovers from an expired
+ *  one by refreshing once and replaying. The rest of `api/` wraps `request()`. */
 
 import { translate } from '../../i18n';
 import type { ErrorBody, TokenPair } from '../types/api';
@@ -16,15 +11,12 @@ const API_BASE_URL = (
 const REFRESH_TOKEN_KEY = 'synapse.refresh_token';
 
 /**
- * The access token lives in a module variable, so it is gone on reload and
- * never readable from storage.
+ * In a module variable, so it is gone on reload and never readable from storage.
  *
- * The refresh token lives in localStorage, which IS readable by any script that
- * gets injected into this origin -- an XSS becomes a stolen long-lived session.
- * The production answer is an httpOnly, Secure, SameSite cookie set by the
- * backend, which JavaScript cannot read at all (and a CSRF token to go with
- * it). This is a deliberate simplification to keep Part 2 to one origin and no
- * cookie plumbing; Part 6 is where it changes.
+ * The refresh token, by contrast, is in localStorage, which any injected script
+ * can read -- an XSS becomes a stolen long-lived session. The production answer
+ * is an httpOnly, Secure, SameSite cookie plus a CSRF token. Deliberate
+ * simplification for Part 2; Part 6 changes it.
  */
 let accessToken: string | null = null;
 
@@ -32,8 +24,8 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly detail: string,
-    /** Parsed response body, for endpoints that return more than `detail` --
-     *  PATCH /documents returns the server's row alongside its 409. */
+    /** Parsed body, for endpoints returning more than `detail` -- PATCH
+     *  /documents returns the server's row alongside its 409. */
     readonly body: unknown,
   ) {
     super(detail);
@@ -45,7 +37,7 @@ export function getRefreshToken(): string | null {
   try {
     return window.localStorage.getItem(REFRESH_TOKEN_KEY);
   } catch {
-    // Storage can throw outright when cookies/site data are blocked.
+    // Throws outright when site data is blocked, not just returns null.
     return null;
   }
 }
@@ -55,15 +47,14 @@ export function setSession(tokens: TokenPair): void {
   try {
     window.localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
   } catch {
-    // Session still works for this tab; it just will not survive a reload.
+    // Session still works for this tab, just not across a reload.
   }
 }
 
 type SessionEndListener = () => void;
 const sessionEndListeners = new Set<SessionEndListener>();
 
-/** Fires when the session is dropped from underneath the UI -- a refresh that
- *  failed, not a user-initiated logout. The auth provider uses it to redirect. */
+/** Fires when a failed refresh drops the session, not on explicit logout. */
 export function onSessionEnd(listener: SessionEndListener): () => void {
   sessionEndListeners.add(listener);
   return () => sessionEndListeners.delete(listener);
@@ -84,7 +75,7 @@ export function clearSession(options: { notify?: boolean } = {}): void {
 interface RequestOptions {
   /** False for the endpoints that establish a session in the first place. */
   authenticated?: boolean;
-  /** False to stop a 401 from triggering a refresh -- used by refresh itself. */
+  /** False to stop a 401 triggering a refresh -- used by refresh itself. */
   refreshOnUnauthorized?: boolean;
 }
 
@@ -107,10 +98,8 @@ async function send(
   });
 }
 
-/**
- * Flattens FastAPI's two error shapes into one string: `{detail: "..."}` from
- * the app's own handlers, and `{detail: [{loc, msg}, ...]}` from validation.
- */
+/** FastAPI returns `{detail: "..."}` from handlers and `{detail: [{loc, msg}]}`
+ *  from validation; flatten both to one string. */
 function describe(status: number, body: unknown): string {
   const detail = (body as ErrorBody | null)?.detail;
   if (typeof detail === 'string') return detail;
@@ -137,13 +126,10 @@ async function readBody(response: Response): Promise<unknown> {
 let inFlightRefresh: Promise<string> | null = null;
 
 /**
- * Refreshes the access token, collapsing concurrent callers onto one request.
- *
- * Several queries failing with 401 at the same moment is the normal case, and
- * firing one refresh each would mean several token pairs issued and several
- * writes to localStorage racing each other. The first caller stores its promise
- * and the rest await it; the slot is cleared once it settles, so the next real
- * expiry refreshes again.
+ * Collapses concurrent callers onto one request. Several queries 401-ing at once
+ * is the normal case, and one refresh each would mint several token pairs racing
+ * to write localStorage. The slot clears once settled, so a later expiry
+ * refreshes again.
  */
 function refreshAccessToken(): Promise<string> {
   inFlightRefresh ??= performRefresh().finally(() => {
@@ -186,11 +172,10 @@ export async function request<T>(
   ) {
     try {
       const fresh = await refreshAccessToken();
-      // Exactly one retry. A second 401 means the new token is not the problem,
-      // and retrying again would loop.
+      // Once only: a second 401 means the token was not the problem.
       response = await send(method, path, body, fresh);
     } catch {
-      // The refresh token is spent or revoked; nothing here can recover it.
+      // Spent or revoked; nothing here can recover it.
       clearSession({ notify: true });
       throw new ApiError(401, translate('errors.sessionExpired'), null);
     }

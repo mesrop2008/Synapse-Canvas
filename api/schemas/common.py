@@ -10,9 +10,8 @@ from api.core.security import BCRYPT_MAX_BYTES
 
 
 def _within_bcrypt_limit(value: str) -> str:
-    # bcrypt hashes at most 72 bytes and silently discards the rest. Rejecting
-    # longer passwords outright is better than accepting one whose tail never
-    # contributes to the hash -- the user would believe it stronger than it is.
+    # bcrypt silently discards everything past 72 bytes, so a longer password
+    # would look stronger than it is.
     if len(value.encode("utf-8")) > BCRYPT_MAX_BYTES:
         raise ValueError(
             f"Password must be at most {BCRYPT_MAX_BYTES} bytes when UTF-8 encoded"
@@ -26,9 +25,8 @@ Password = Annotated[
     AfterValidator(_within_bcrypt_limit),
 ]
 
-# StringConstraints, not Field: `strip_whitespace` is not a Field argument in
-# Pydantic v2 and is silently ignored there, which would let a name of "   "
-# through the min_length check. Stripping happens before length validation.
+# StringConstraints, not Field: Pydantic v2 silently ignores strip_whitespace
+# on Field, which would let a name of "   " through min_length.
 NonEmptyName = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
 ]

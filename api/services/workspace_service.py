@@ -23,8 +23,7 @@ async def create_workspace(
     """Create a workspace and its owner membership in one transaction."""
     workspace = Workspace(name=name, owner_id=owner.id)
     db.add(workspace)
-    # The UUID default is evaluated at flush, not construction, so flush to
-    # populate workspace.id before the membership row references it.
+    # The UUID default lands at flush, and the membership row needs the id.
     await db.flush()
 
     db.add(
@@ -42,11 +41,8 @@ async def create_workspace(
 async def get_workspace_with_role(
     db: AsyncSession, workspace_id: uuid.UUID, user_id: uuid.UUID
 ) -> tuple[Workspace, WorkspaceRole] | None:
-    """Fetch a workspace with `user_id`'s role in it.
-
-    The inner join makes a nonexistent workspace and a non-member both return
-    no row, so callers cannot tell them apart and leak existence.
-    """
+    """The inner join makes a nonexistent workspace and a non-member both return
+    no row, so callers cannot tell them apart."""
     result = await db.execute(
         select(Workspace, WorkspaceMember.role)
         .join(WorkspaceMember, WorkspaceMember.workspace_id == Workspace.id)
@@ -79,7 +75,7 @@ async def update_workspace(
 
 
 async def delete_workspace(db: AsyncSession, workspace: Workspace) -> None:
-    # Membership rows go with it via ON DELETE CASCADE at the database level.
+    # Membership rows go with it via ON DELETE CASCADE.
     await db.delete(workspace)
     await db.commit()
 
@@ -105,8 +101,8 @@ async def add_member(
         raise NotFoundError("No user with that email address")
 
     if not user.is_email_verified:
-        # Membership is by email address, so an unverified account would let a
-        # squatter inherit an invitation meant for the address's real owner.
+        # Membership is by address, so an unverified account lets a squatter
+        # inherit an invitation meant for its real owner.
         raise ConflictError(
             "That user has not verified their email address yet"
         )
@@ -125,8 +121,8 @@ async def add_member(
         user_id=user.id,
         role=role,
     )
-    # Set the relationship from the loaded user: the response serialises
-    # member.user, and a lazy load after commit raises MissingGreenlet.
+    # The response serialises member.user, and a lazy load after commit raises
+    # MissingGreenlet.
     member.user = user
     db.add(member)
 
@@ -144,7 +140,7 @@ async def remove_member(
     db: AsyncSession, workspace: Workspace, user_id: uuid.UUID
 ) -> None:
     if user_id == workspace.owner_id:
-        # An ownerless workspace would be unadministrable; transfer is separate.
+        # An ownerless workspace is unadministrable; transfer is separate.
         raise ConflictError(
             "The workspace owner cannot be removed. Transfer ownership first."
         )

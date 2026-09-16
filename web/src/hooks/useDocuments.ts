@@ -25,8 +25,7 @@ export function useDocument(workspaceId: string, documentId: string) {
   return useQuery({
     queryKey: documentKeys.detail(workspaceId, documentId),
     queryFn: () => getDocument(workspaceId, documentId),
-    // The editor holds the loaded content as its own state, so a background
-    // refetch would be thrown away at best and would fight the user at worst.
+    // The editor owns the content once loaded; a refetch would fight the user.
     staleTime: Infinity,
     refetchOnMount: false,
   });

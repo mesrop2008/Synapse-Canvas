@@ -20,11 +20,8 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-/**
- * Null until the user picks one. The control only ever offers light and dark;
- * "follow the system" is the starting state rather than a third button, so
- * there is nothing to choose to get the behaviour most people want.
- */
+/** Null until the user picks. "Follow the system" is the starting state, not a
+ *  third button. */
 function readStoredTheme(): Theme | null {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -32,7 +29,7 @@ function readStoredTheme(): Theme | null {
   } catch {
     /* storage blocked; treat as no choice made */
   }
-  // Anything else -- including the 'system' this used to store -- means unset.
+  // Anything else, including the 'system' this used to store, means unset.
   return null;
 }
 
@@ -42,8 +39,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [chosen, setChosen] = useState<Theme | null>(readStoredTheme);
   const [systemIsDark, setSystemIsDark] = useState(() => systemQuery().matches);
 
-  // Only meaningful while nothing has been chosen, but the listener is cheap
-  // and unconditional avoids a subscribe/unsubscribe dance on every choice.
+  // Only matters while nothing is chosen; unconditional avoids resubscribing.
   useEffect(() => {
     const query = systemQuery();
     const onChange = (event: MediaQueryListEvent) => setSystemIsDark(event.matches);
@@ -56,7 +52,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const root = window.document.documentElement;
     root.dataset.theme = theme;
-    // Tells the browser which way to paint form controls and scrollbars.
+    // Paints native controls and scrollbars to match.
     root.style.colorScheme = theme;
   }, [theme]);
 

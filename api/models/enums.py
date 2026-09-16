@@ -6,9 +6,8 @@ from enum import StrEnum
 
 
 class WorkspaceRole(StrEnum):
-    """A member's capability level, totally ordered owner > editor > viewer so
-    the permission dependency can require "at least editor". StrEnum keeps the
-    lowercase values as the wire/DB/f-string form."""
+    """Totally ordered owner > editor > viewer, so the permission dependency can
+    require "at least editor"."""
 
     OWNER = "owner"
     EDITOR = "editor"

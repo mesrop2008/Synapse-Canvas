@@ -9,19 +9,16 @@ from api.db.base import Base, UUIDPrimaryKeyMixin
 
 
 class RateLimitBucket(UUIDPrimaryKeyMixin, Base):
-    """One fixed window of request counts for one rate-limit key.
-
-    In PostgreSQL, not process memory: an in-memory counter is per-worker (N
-    workers = N x allowance) and clears on restart. Redis is the usual choice
-    at high volume; this is fine for low-rate auth endpoints.
-    """
+    """In PostgreSQL, not process memory: an in-memory counter is per-worker
+    (N workers = N x allowance) and clears on restart. Redis is the usual choice
+    at volume; this is fine for low-rate auth endpoints."""
 
     __tablename__ = "rate_limit_buckets"
     __table_args__ = (
         UniqueConstraint(
             "bucket_key", "window_start", name="uq_rate_limit_buckets_key_window"
         ),
-        Index("ix_rate_limit_buckets_window_start", "window_start"),  # purge rolled-over
+        Index("ix_rate_limit_buckets_window_start", "window_start"),
     )
 
     # Caller-composed, e.g. "login:ip:203.0.113.4" or "login:account:<sha256>".

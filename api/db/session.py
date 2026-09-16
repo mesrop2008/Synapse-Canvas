@@ -30,16 +30,15 @@ def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
     return async_sessionmaker(
         bind=get_engine(),
         class_=AsyncSession,
-        # Objects are serialised after the request's commit; expiring would
-        # make attribute access reload against a closed session.
+        # Objects are serialised after the commit; expiring would reload them
+        # against a closed session.
         expire_on_commit=False,
         autoflush=False,
     )
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Per-request session. Not committed here -- services own their own
-    transaction boundaries."""
+    """Not committed here -- services own their transaction boundaries."""
     async with get_sessionmaker()() as session:
         try:
             yield session

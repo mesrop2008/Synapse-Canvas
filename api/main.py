@@ -1,5 +1,5 @@
-"""Application factory. `create_app()` is a factory, not a singleton, so tests
-build isolated instances with their own overrides."""
+"""A factory, not a singleton, so tests build isolated instances with their own
+overrides."""
 
 from __future__ import annotations
 
@@ -47,8 +47,8 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
 async def stale_document_version_handler(
     request: Request, exc: StaleDocumentVersionError
 ) -> JSONResponse:
-    """409 carrying the server's row, so the loser of a race can re-sync from
-    the response instead of issuing another GET."""
+    """Carries the server's row so the loser of a race can re-sync from the
+    response rather than issuing another GET."""
     body = DocumentVersionConflict(
         detail=exc.detail, current=DocumentRead.model_validate(exc.current)
     )
@@ -56,8 +56,7 @@ async def stale_document_version_handler(
 
 
 async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    # Never let a stack trace (table names, paths, versions) reach the client;
-    # log it, return a fixed string.
+    # A stack trace leaks table names, paths and versions.
     logger.exception("Unhandled error on %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500, content={"detail": "Internal server error"}
@@ -76,8 +75,8 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Starlette walks the exception MRO, so the specific handler wins over
-    # the AppError one regardless of registration order.
+    # Starlette walks the exception MRO, so the specific handler wins whatever
+    # the registration order.
     app.add_exception_handler(  # type: ignore[arg-type]
         StaleDocumentVersionError, stale_document_version_handler
     )
@@ -92,7 +91,7 @@ def create_app() -> FastAPI:
     if settings.cors_origins:
         if "*" in settings.cors_origins:
             # Starlette pairs a wildcard with credentials by echoing the
-            # caller's origin, granting any site access. Refuse to boot.
+            # caller's origin, which grants any site access.
             raise RuntimeError(
                 "CORS_ORIGINS may not contain '*' while credentials are allowed. "
                 "List the exact origins that need access."

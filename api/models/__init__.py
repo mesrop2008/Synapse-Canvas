@@ -1,6 +1,5 @@
-"""SQLAlchemy models. Import every model here so it is registered on
-Base.metadata before Alembic inspects it -- a missed one vanishes from
-migrations."""
+"""Import every model here so it is registered on Base.metadata before Alembic
+inspects it; a missed one vanishes from migrations."""
 
 from api.db.base import Base
 from api.models.document import Document

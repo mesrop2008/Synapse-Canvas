@@ -1,8 +1,5 @@
-"""Application settings, resolved once via cached `get_settings()`.
-
-Depend on `get_settings()` rather than a module-level singleton so tests can
-override the environment before first access.
-"""
+"""Depend on `get_settings()` rather than a module-level singleton, so tests can
+override the environment before first access."""
 
 from __future__ import annotations
 
@@ -29,7 +26,7 @@ class Settings(BaseSettings):
     debug: bool = False
 
     database_url: str
-    # Separate database for the suite, which drops/creates tables in it.
+    # Separate database: the suite drops and recreates every table in it.
     test_database_url: str | None = None
 
     jwt_secret_key: str = Field(min_length=32)
@@ -37,9 +34,8 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
 
-    # Retired signing keys (comma-separated): tokens they signed still verify,
-    # so the active key rotates without logging everyone out. Drop a key once
-    # its tokens have all expired.
+    # Retired keys, comma-separated: their tokens still verify, so the active
+    # key rotates without logging everyone out.
     previous_jwt_secret_keys_raw: str = Field(
         default="", alias="PREVIOUS_JWT_SECRET_KEYS"
     )
@@ -50,11 +46,11 @@ class Settings(BaseSettings):
     # Frontend route that reads the token and POSTs it to /auth/verify-email.
     email_verification_link_base: str = "http://localhost:5173/verify-email"
 
-    # 12 is a sane default; the suite lowers it to 4 so tests aren't KDF-bound.
+    # The suite lowers this to 4 so tests are not KDF-bound.
     bcrypt_rounds: int = 12
 
     # Throttling, not lockout: a lockout keyed on an account lets anyone lock
-    # its owner out. Applied per IP and per account.
+    # its owner out.
     login_rate_limit_per_ip: int = 10
     login_rate_limit_per_ip_window_seconds: int = 300
     login_rate_limit_per_account: int = 5
@@ -64,12 +60,11 @@ class Settings(BaseSettings):
     refresh_rate_limit_per_ip: int = 30
     refresh_rate_limit_per_ip_window_seconds: int = 300
 
-    # X-Forwarded-For is client-spoofable; only trust it behind a proxy you
-    # control, or a client can mint a fresh rate-limit identity per request.
+    # Only behind a proxy you control; the header is client-spoofable.
     trust_proxy_headers: bool = False
 
-    # Plain str, not list[str]: pydantic-settings JSON-decodes complex types
-    # before validators run, which makes CSV env vars awkward.
+    # str, not list[str]: pydantic-settings JSON-decodes complex types before
+    # validators run, which makes CSV env vars awkward.
     cors_origins_raw: str = Field(default="", alias="CORS_ORIGINS")
 
     @field_validator("database_url", "test_database_url")
@@ -109,6 +104,6 @@ def get_settings() -> Settings:
 
 
 def _configure_third_party_logging() -> None:
-    # passlib 1.7.4 probes bcrypt.__about__ (removed in 4.1) and logs a
-    # traceback on first use; hashing is unaffected, so silence the noise.
+    # passlib probes bcrypt.__about__, removed in 4.1, and logs a traceback on
+    # first use. Hashing is unaffected.
     logging.getLogger("passlib.handlers.bcrypt").setLevel(logging.CRITICAL)

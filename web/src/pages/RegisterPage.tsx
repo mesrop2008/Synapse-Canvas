@@ -38,9 +38,8 @@ export function RegisterPage() {
     }
   }
 
-  // The backend answers 202 whether or not the address was already taken, and
-  // refuses login until the address is verified, so there is nothing to sign
-  // the user into here -- only somewhere to send them.
+  // The backend answers 202 either way and refuses login until verified, so
+  // there is nobody to sign in here -- only somewhere to send them.
   if (submitted) {
     return (
       <main className="auth">

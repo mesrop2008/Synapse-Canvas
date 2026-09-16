@@ -1,8 +1,5 @@
-"""Domain-level exceptions.
-
-Services raise these instead of HTTP errors; a single handler in `api.main`
-maps them to responses, so the service layer stays FastAPI-free and reusable.
-"""
+"""Services raise these instead of HTTP errors; one handler in `api.main` maps
+them to responses, which keeps the service layer FastAPI-free."""
 
 from __future__ import annotations
 
@@ -54,6 +51,7 @@ class RateLimitExceededError(AppError):
 
 
 class EmailNotVerifiedError(AppError):
-    # Raised only after the password verifies, so it is not an enumeration signal.
+    # Raised only after the password verifies, so it is not an enumeration
+    # signal.
     status_code = 403
     detail = "Email address has not been verified"

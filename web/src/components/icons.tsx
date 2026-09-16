@@ -1,8 +1,4 @@
-/**
- * Inline stroke icons at 1.5px on a 24px grid, sized by `em` and coloured by
- * `currentColor`, so they inherit from whatever they sit inside. Inline rather
- * than an icon package: this is the whole set the app needs.
- */
+/** Inline rather than an icon package: this is the whole set the app needs. */
 
 type IconProps = { size?: number; className?: string };
 
@@ -80,7 +76,6 @@ export const LogOutIcon = (props: IconProps) => (
   </Svg>
 );
 
-/** The brand mark: overlapping nodes, drawn rather than lettered. */
 export function Logo({ size = 24 }: { size?: number }) {
   return (
     <svg

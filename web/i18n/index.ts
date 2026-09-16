@@ -1,12 +1,10 @@
 /**
- * Language packs and the lookup around them.
- *
  * One folder per language, one JSON file per section of the site. The folder is
- * `rus`, but the locale *code* stays `ru`: that is the BCP-47 tag, and it is
- * what `<html lang>` and Intl's plural rules expect.
+ * `rus`, but the locale code is `ru` -- the BCP-47 tag, which is what
+ * `<html lang>` and Intl's plural rules expect.
  *
- * No React here on purpose -- the fetch client and the error formatter need
- * translations too, and neither can call a hook.
+ * No React here: the fetch client and the error formatter need translations and
+ * neither can call a hook.
  */
 
 import enCommon from './en/common.json';
@@ -48,13 +46,10 @@ const english = {
   errors: enErrors,
 };
 
-/** English is the reference shape; every other pack is checked against it. */
+/** The reference shape; every other pack is typed against it, so a missing key
+ *  is a compile error rather than a blank label found in production. */
 export type Messages = typeof english;
 
-/**
- * Typing the record against `Messages` is what makes a half-translated pack a
- * compile error rather than a blank label someone notices in production.
- */
 export const MESSAGES: Record<Locale, Messages> = {
   en: english,
   ru: {
@@ -91,8 +86,8 @@ export function template(locale: Locale, key: MessageKey): string {
     if (typeof node !== 'object' || node === null) break;
     node = (node as Record<string, unknown>)[segment];
   }
-  // Falling back to the key rather than throwing: a missing string should look
-  // wrong, not take the page down. `MessageKey` keeps that hypothetical.
+  // Falls back to the key so a gap looks wrong rather than taking the page
+  // down; `MessageKey` keeps that hypothetical.
   return typeof node === 'string' ? node : key;
 }
 
@@ -105,8 +100,7 @@ export function interpolate(source: string, params?: MessageParams): string {
   );
 }
 
-// Module state so non-React callers get the language the user actually picked.
-// The provider keeps it in step; it is not a second source of truth.
+// The provider keeps this in step; it is not a second source of truth.
 let activeLocale: Locale = 'en';
 
 export function setActiveLocale(locale: Locale): void {
@@ -117,8 +111,8 @@ export function getActiveLocale(): Locale {
   return activeLocale;
 }
 
-/** For code outside the component tree. Components use `useI18n`, which
- *  re-renders them when the language changes. */
+/** For code outside the component tree; components use `useI18n`, which
+ *  re-renders on a language change. */
 export function translate(key: MessageKey, params?: MessageParams): string {
   return interpolate(template(activeLocale, key), params);
 }

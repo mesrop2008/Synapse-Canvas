@@ -1,10 +1,6 @@
-"""Fixed-window request throttling, backed by PostgreSQL.
-
-Throttling, not lockout, so knowing an address can't be used to lock its owner
-out; limits apply per IP and per account. The DB (not an in-process counter,
-which every worker would multiply) is the shared state, and INSERT ... ON
-CONFLICT DO UPDATE keeps concurrent increments from losing counts.
-"""
+"""Fixed-window throttling in PostgreSQL rather than an in-process counter,
+which every worker would multiply. INSERT ... ON CONFLICT DO UPDATE keeps
+concurrent increments from losing counts."""
 
 from __future__ import annotations
 
@@ -21,7 +17,7 @@ from api.models.rate_limit import RateLimitBucket
 
 
 def account_key(prefix: str, email: str) -> str:
-    # Hashed, so the table isn't a readable list of every address anyone tried.
+    # Hashed: the table should not be a list of every address anyone tried.
     digest = hashlib.sha256(email.strip().lower().encode("utf-8")).hexdigest()
     return f"{prefix}:account:{digest}"
 
@@ -46,14 +42,12 @@ async def enforce(
 ) -> int:
     """Count one request against `key`, raising if it exceeds `limit`.
 
-    Commits on its own: the increment must outlive the request that triggered
-    it (a failed login raises, and get_db would otherwise roll the count back).
-    Returns the request's position in the current window.
+    Commits on its own: the increment must outlive the request that triggered it,
+    and a failed login raises, which would roll the count back.
     """
     window_start, retry_after = _window_bounds(window_seconds)
 
-    # The mixin's UUID default is an ORM-flush hook, so a Core insert needs it
-    # supplied explicitly.
+    # The mixin's UUID default is an ORM-flush hook; a Core insert needs it.
     statement = (
         pg_insert(RateLimitBucket)
         .values(
@@ -70,8 +64,7 @@ async def enforce(
     )
     count = await db.scalar(statement)
 
-    # Drop this key's rolled-over windows while we're here; a global sweep is
-    # purge_expired_buckets.
+    # This key's old windows; purge_expired_buckets does the global sweep.
     await db.execute(
         delete(RateLimitBucket).where(
             RateLimitBucket.bucket_key == key,
@@ -89,10 +82,8 @@ async def enforce(
 async def ensure_under_limit(
     db: AsyncSession, key: str, limit: int, window_seconds: int
 ) -> None:
-    """Raise if `key` is already over its limit, without counting a request.
-
-    Lets an endpoint reject a caller before spending bcrypt on a password.
-    """
+    """Raise if `key` is over its limit without counting a request, so an
+    endpoint can reject a caller before spending bcrypt on a password."""
     window_start, retry_after = _window_bounds(window_seconds)
 
     count = await db.scalar(
@@ -106,14 +97,13 @@ async def ensure_under_limit(
 
 
 async def reset(db: AsyncSession, key: str) -> None:
-    # After a successful login, so failures-then-success doesn't stay throttled.
+    # After a success, so failures-then-success does not stay throttled.
     await db.execute(delete(RateLimitBucket).where(RateLimitBucket.bucket_key == key))
     await db.commit()
 
 
 async def purge_expired_buckets(db: AsyncSession, older_than: datetime) -> int:
-    """Delete windows closed before `older_than`. Keys are unbounded (one per
-    IP), so run this periodically."""
+    """Keys are unbounded (one per IP), so run this periodically."""
     result = await db.execute(
         delete(RateLimitBucket).where(RateLimitBucket.window_start < older_than)
     )

@@ -8,8 +8,7 @@ from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-# Swagger/ReDoc load assets from a CDN that default-src 'none' would block;
-# the API's own JSON responses need no resources, so only these are exempt.
+# Swagger/ReDoc load CDN assets that default-src 'none' would block.
 _CSP_EXEMPT_PATHS = frozenset({"/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect"})
 
 _STATIC_HEADERS = {
@@ -41,11 +40,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 class BodySizeLimitMiddleware(BaseHTTPMiddleware):
-    """Reject oversized requests on Content-Length before the body is buffered.
-
-    A chunked request without that header slips past; counting streamed bytes
-    belongs in the reverse proxy. This is the backstop when there is none.
-    """
+    """Rejects on Content-Length before the body is buffered. A chunked request
+    without that header slips past -- counting streamed bytes belongs in the
+    reverse proxy; this is the backstop when there is none."""
 
     def __init__(self, app: object, max_bytes: int) -> None:
         super().__init__(app)  # type: ignore[arg-type]

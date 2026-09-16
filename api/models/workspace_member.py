@@ -16,8 +16,8 @@ if TYPE_CHECKING:
 
 
 class WorkspaceMember(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """User-workspace join row carrying the role. The owner gets a row too
-    (role=owner), so the permission check is one lookup with no special case."""
+    """The owner gets a row too, so the permission check is one lookup with no
+    special case."""
 
     __tablename__ = "workspace_members"
     __table_args__ = (
@@ -35,7 +35,7 @@ class WorkspaceMember(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
     )
     role: Mapped[WorkspaceRole] = mapped_column(
-        # values_callable persists the values ("owner"), not the names ("OWNER").
+        # Persists the values ("owner"), not the names ("OWNER").
         SAEnum(
             WorkspaceRole,
             name=WORKSPACE_ROLE_ENUM_NAME,

@@ -17,17 +17,13 @@ if TYPE_CHECKING:
 
 
 class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """A rich-text document, stored as ProseMirror/Tiptap JSON rather than HTML.
-
-    Part 3 applies edits at the node level and Part 5 walks the tree to chunk
-    it; neither is tractable against a serialised HTML string. JSONB so those
-    parts can query into it server-side.
-    """
+    """ProseMirror/Tiptap JSON rather than HTML: Part 3 applies edits at the node
+    level and Part 5 walks the tree to chunk it, neither of which is tractable
+    against a serialised string. JSONB so they can query into it server-side."""
 
     __tablename__ = "documents"
     __table_args__ = (
-        # Serves both the filter and the sort of the list query; its leftmost
-        # prefix still covers plain workspace_id lookups.
+        # Serves the filter and the sort of the list query at once.
         Index(
             "ix_documents_workspace_id_updated_at",
             "workspace_id",
@@ -42,22 +38,21 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
-    # Optimistic concurrency token, not a revision count -- Part 3's change log
-    # owns history.
+    # Concurrency token, not a revision count; Part 3's change log owns history.
     version: Mapped[int] = mapped_column(
         Integer, nullable=False, default=1, server_default="1"
     )
 
-    # SET NULL (hence nullable): deleting an account must not delete documents
-    # it contributed to a workspace that outlives it.
+    # SET NULL, hence nullable: deleting an account must not delete documents it
+    # contributed to a workspace that outlives it.
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
-    # clock_timestamp() on update, not now(): now() is the *transaction*
-    # timestamp, so two writes in one transaction would record the same instant
-    # and the list ordering below would be arbitrary between them. The server
-    # default stays now() so a new row's updated_at equals its created_at.
+    # clock_timestamp() on update because now() is the *transaction* timestamp:
+    # two writes in one transaction would record the same instant and leave the
+    # list order arbitrary. The default stays now() so a new row matches
+    # created_at.
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

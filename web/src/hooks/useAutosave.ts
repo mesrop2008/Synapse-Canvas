@@ -16,9 +16,8 @@ interface UseAutosaveOptions {
   documentId: string;
   /** Version the document was loaded at. The hook owns it from then on. */
   initialVersion: number;
-  /** Read the current editor state. Called at save time, never earlier, so the
-   *  request always carries the newest text rather than whatever existed when
-   *  the timer was armed. */
+  /** Called at save time, not when the timer is armed, so the request carries
+   *  the newest text. */
   getSnapshot: () => DocumentSnapshot;
   /** The server moved on. `replaced` is what the user had locally. */
   onConflict: (conflict: DocumentVersionConflict, replaced: DocumentSnapshot) => void;
@@ -28,7 +27,6 @@ interface UseAutosaveOptions {
 export interface Autosave {
   status: SaveStatus;
   error: string | null;
-  /** Current server version, for display. */
   version: number;
   /** Restart the idle timer; call on every edit. */
   schedule: () => void;
@@ -40,11 +38,9 @@ export interface Autosave {
 }
 
 /**
- * Debounced save-on-idle for one document.
- *
- * Sends title and content together on every save. They share a single version,
- * so splitting them into two PATCHes would mean the second one racing the
- * version the first just produced -- one request is both simpler and correct.
+ * Debounced save-on-idle. Title and content go in one request because they share
+ * a version: two PATCHes would have the second racing the version the first
+ * produced.
  */
 export function useAutosave({
   workspaceId,
@@ -64,7 +60,7 @@ export function useAutosave({
   /** An edit arrived while a request was on the wire. */
   const queued = useRef(false);
 
-  // Kept in refs so `runSave` stays stable while still seeing fresh callbacks.
+  // Refs so `runSave` stays stable while still seeing fresh callbacks.
   const snapshotRef = useRef(getSnapshot);
   snapshotRef.current = getSnapshot;
   const conflictRef = useRef(onConflict);
@@ -78,8 +74,8 @@ export function useAutosave({
     inFlight.current = true;
 
     try {
-      // Loops rather than returning, so edits made during a request are saved
-      // straight after it instead of waiting out another idle period.
+      // Loops so edits made mid-request are saved straight after it, rather
+      // than waiting out another idle period.
       for (;;) {
         queued.current = false;
         setStatus('saving');
@@ -97,14 +93,12 @@ export function useAutosave({
         } catch (caught) {
           const conflict = asVersionConflict(caught);
           if (!conflict) {
-            // Keep the version: the write never landed, so it is still current
-            // and a retry has a real chance of succeeding.
+            // Keep the version: the write never landed, so it is still current.
             setError(errorMessage(caught, 'document.save.failed'));
             setStatus('error');
             return;
           }
-          // The editor is about to be reloaded from the server, so anything
-          // queued was computed against content that no longer exists.
+          // Anything queued was computed against content about to be replaced.
           queued.current = false;
           versionRef.current = conflict.current.version;
           setVersion(conflict.current.version);

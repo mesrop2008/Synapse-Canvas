@@ -14,15 +14,13 @@ if TYPE_CHECKING:
 
 
 class EmailVerificationToken(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """Single-use proof that someone can read a given mailbox.
-
-    Stores only the SHA-256, so a leaked DB yields nothing redeemable (a plain
-    hash suffices: the token is 32 CSPRNG bytes, no dictionary to attack).
-    """
+    """Stores only the SHA-256, so a leaked database yields nothing redeemable.
+    A plain hash suffices: the token is 32 CSPRNG bytes, with no dictionary to
+    attack."""
 
     __tablename__ = "email_verification_tokens"
     __table_args__ = (
-        Index("ix_email_verification_tokens_expires_at", "expires_at"),  # purge expired
+        Index("ix_email_verification_tokens_expires_at", "expires_at"),
     )
 
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)

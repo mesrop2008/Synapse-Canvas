@@ -1,9 +1,6 @@
-"""Attach a handler to the `app` logger namespace.
-
-Uvicorn configures only its own loggers, so the app's records would otherwise
-propagate to a handler-less root and vanish -- including the dev email link and
-the catch-all's tracebacks. Only `app` is touched, so there are no duplicates.
-"""
+"""Uvicorn configures only its own loggers, so app records would propagate to a
+handler-less root and vanish -- including the dev email link and the catch-all's
+tracebacks."""
 
 from __future__ import annotations
 
@@ -13,15 +10,14 @@ _CONFIGURED = False
 
 
 def configure_logging(level: int | str = logging.INFO) -> None:
-    # Idempotent: create_app() runs many times in the suite, and a fresh
-    # handler each time would multiply every line.
+    # create_app() runs per test; a handler each time multiplies every line.
     global _CONFIGURED
     if _CONFIGURED:
         return
 
     app_logger = logging.getLogger("app")
     app_logger.setLevel(level)
-    app_logger.propagate = False  # this handler is the only sink for app records
+    app_logger.propagate = False
 
     handler = logging.StreamHandler()
     handler.setFormatter(

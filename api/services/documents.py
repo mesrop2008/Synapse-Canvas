@@ -1,9 +1,6 @@
-"""Document business logic.
-
-Deliberately free of FastAPI imports: Part 3's WebSocket handlers will call
-these same functions, and a handler cannot raise an HTTPException usefully.
-Failures are the domain exceptions from `api.core.exceptions`.
-"""
+"""No FastAPI imports: Part 3's WebSocket handlers call these same functions,
+and a handler cannot raise an HTTPException usefully. Failures are the domain
+exceptions from `api.core.exceptions`."""
 
 from __future__ import annotations
 
@@ -18,8 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.core.exceptions import ConflictError, NotFoundError
 from api.models.document import Document
 
-# What a brand-new document holds: the smallest valid ProseMirror doc node.
-# Tiptap refuses to load anything else, and NOT NULL refuses nothing at all.
+# The smallest valid ProseMirror doc node; Tiptap refuses anything else.
 EMPTY_DOCUMENT: Final[dict[str, Any]] = {"type": "doc", "content": []}
 
 
@@ -57,14 +53,11 @@ def snapshot(document: Document) -> DocumentSnapshot:
 
 
 class StaleDocumentVersionError(ConflictError):
-    """The client's `version` is not the stored one, so its edit was computed
-    against content that no longer exists. Carries the stored state so the
-    caller can hand the client something to re-sync against.
+    """Carries the stored state so the caller can re-sync the client.
 
-    A plain snapshot rather than the ORM row: this exception outlives the
-    session. The request's transaction is rolled back as it unwinds, which
-    expires every object loaded in it, so an attached row would raise
-    DetachedInstanceError at the moment something tried to read it.
+    A snapshot rather than the ORM row because this exception outlives the
+    session: the transaction is rolled back as it unwinds, expiring every object
+    loaded in it, and an attached row would then raise DetachedInstanceError.
     """
 
     detail = "Document has been modified since you loaded it"
@@ -97,8 +90,7 @@ async def create_document(
 async def list_documents(
     db: AsyncSession, workspace_id: uuid.UUID
 ) -> list[DocumentSummary]:
-    """Newest-edited first, without content: a workspace's bodies together can
-    be megabytes, and a list view renders none of them."""
+    """Newest-edited first, without content -- a list view renders none of it."""
     result = await db.execute(
         select(
             Document.id,
@@ -119,12 +111,12 @@ async def list_documents(
 async def find_document(
     db: AsyncSession, workspace_id: uuid.UUID, document_id: uuid.UUID
 ) -> Document | None:
-    """Scoped by workspace as well as id, so a document id from one workspace
-    cannot be read through another the caller happens to belong to."""
+    """Scoped by workspace as well as id, so an id from one workspace cannot be
+    read through another the caller belongs to."""
     result = await db.execute(
         select(Document)
         .where(Document.id == document_id, Document.workspace_id == workspace_id)
-        # A caller may have loaded this row before a concurrent write landed.
+        # The caller may hold this row from before a concurrent write.
         .execution_options(populate_existing=True)
     )
     return result.scalar_one_or_none()
@@ -149,16 +141,15 @@ async def update_document(
     content: dict[str, Any] | None = None,
 ) -> Document:
     """Apply an edit if `expected_version` is still current, else raise
-    `StaleDocumentVersionError` carrying the stored row.
+    `StaleDocumentVersionError`.
 
-    The version check lives in the UPDATE's WHERE clause rather than in a
-    preceding SELECT, so there is no window between them. Two concurrent calls
-    holding the same version serialise on the row lock; the loser re-evaluates
-    the predicate against the winner's committed row, matches nothing, and is
-    told it is stale. A SELECT-then-UPDATE would let both write.
+    The check is in the UPDATE's WHERE clause, not a preceding SELECT, so there
+    is no window between them: two concurrent calls holding the same version
+    serialise on the row lock, and the loser re-evaluates the predicate against
+    the winner's committed row and matches nothing. SELECT-then-UPDATE would let
+    both write.
 
-    `None` means "leave alone" rather than "set to null" -- neither column is
-    nullable, so nothing is lost by collapsing the two.
+    `None` means "leave alone"; neither column is nullable, so nothing is lost.
     """
     values: dict[str, Any] = {}
     if title is not None:

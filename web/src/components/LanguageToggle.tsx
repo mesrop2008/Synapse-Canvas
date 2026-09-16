@@ -17,7 +17,7 @@ export function LanguageToggle() {
           type="button"
           role="radio"
           aria-checked={locale === candidate}
-          // The button reads "EN"; a screen reader should hear "English".
+          // Reads EN; a screen reader should hear English.
           aria-label={t(LABELS[candidate].full)}
           title={t(LABELS[candidate].full)}
           className="segmented-option segmented-text"
