@@ -81,22 +81,27 @@ export function WorkspacesPage() {
       )}
 
       {workspaces.data && workspaces.data.length > 0 && (
-        <div className="panel">
+        <div className="card-grid">
           {workspaces.data.map((workspace) => (
-            <div key={workspace.id} className="panel-row">
-              <span className="row-icon">
-                <FolderIcon size={18} />
-              </span>
+            <div key={workspace.id} className="tile">
+              <div className="tile-head">
+                <span className="row-icon">
+                  <FolderIcon size={18} />
+                </span>
+              </div>
               <div className="row-main">
                 <Link className="row-title" to={`/workspaces/${workspace.id}`}>
                   {workspace.name}
                 </Link>
               </div>
-              <span className="badge">{t(ROLE_LABELS[workspace.role])}</span>
+              <div className="tile-foot">
+                <span className="badge">{t(ROLE_LABELS[workspace.role])}</span>
+              </div>
             </div>
           ))}
         </div>
       )}
+
     </main>
   );
 }

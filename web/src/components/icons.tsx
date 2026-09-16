@@ -43,13 +43,6 @@ export const MoonIcon = (props: IconProps) => (
   </Svg>
 );
 
-export const MonitorIcon = (props: IconProps) => (
-  <Svg {...props}>
-    <rect x="2" y="3" width="20" height="14" rx="2" />
-    <path d="M8 21h8M12 17v4" />
-  </Svg>
-);
-
 export const PlusIcon = (props: IconProps) => (
   <Svg {...props}>
     <path d="M12 5v14M5 12h14" />

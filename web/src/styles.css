@@ -42,6 +42,7 @@
   --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 
   --topbar-h: 64px;
+  --page-max: 1200px;
 }
 
 [data-theme='dark'] {
@@ -152,9 +153,9 @@ a:hover {
 
 .topbar-inner {
   width: 100%;
-  max-width: 1120px;
+  max-width: var(--page-max);
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -183,14 +184,26 @@ a:hover {
 .topbar-actions {
   display: flex;
   align-items: center;
+  gap: 18px;
+}
+
+.topbar-group {
+  display: flex;
+  align-items: center;
   gap: 10px;
+}
+
+.topbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border-strong);
+  flex: none;
 }
 
 .user-chip {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding-right: 2px;
+  gap: 10px;
   color: var(--text-2);
   font-size: 13.5px;
 }
@@ -214,13 +227,13 @@ a:hover {
 }
 
 .container {
-  max-width: 860px;
+  max-width: var(--page-max);
   margin: 0 auto;
-  padding: 48px 28px 112px;
+  padding: 36px 28px 72px;
 }
 
 .container-wide {
-  max-width: 1120px;
+  max-width: var(--page-max);
 }
 
 .container-reading {
@@ -239,6 +252,7 @@ a:hover {
 }
 
 .page-sub {
+  max-width: 68ch;
   color: var(--text-2);
   font-size: 15px;
 }
@@ -430,7 +444,8 @@ a:hover {
 .composer {
   display: flex;
   gap: 10px;
-  margin-bottom: 22px;
+  max-width: 560px;
+  margin-bottom: 26px;
 }
 
 .composer .btn {
@@ -502,33 +517,51 @@ a:hover {
 
 /* --- panels and lists ----------------------------------------------------- */
 
-.panel {
+/* A grid of tiles rather than full-width rows: at 1200px a row leaves its badge
+   stranded against the right edge with nothing between, which is most of what
+   made these pages look empty. */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 132px;
+  padding: 18px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-sm);
-  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.panel-row {
+.tile:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.tile:hover .row-action {
+  opacity: 1;
+}
+
+.tile-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tile-foot {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 16px 20px;
-  border-top: 1px solid var(--border);
-  transition: background-color 0.13s;
-}
-
-.panel-row:first-child {
-  border-top: none;
-}
-
-.panel-row:hover {
-  background: var(--surface-2);
-}
-
-.panel-row:hover .row-action {
-  opacity: 1;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
 }
 
 .row-icon {
@@ -551,7 +584,7 @@ a:hover {
   display: block;
   color: var(--text);
   font-weight: 570;
-  font-size: 15px;
+  font-size: 15.5px;
   letter-spacing: -0.008em;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -559,15 +592,12 @@ a:hover {
 }
 
 .row-title::after {
-  /* Stretches the link over the whole row without nesting it around the
+  /* Stretches the link over the whole tile without nesting it around the
      trailing button, which would make the delete control part of the link. */
   content: '';
   position: absolute;
   inset: 0;
-}
-
-.panel-row {
-  position: relative;
+  border-radius: var(--r-lg);
 }
 
 .row-title:hover {
