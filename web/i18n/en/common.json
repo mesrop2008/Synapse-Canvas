@@ -15,7 +15,6 @@
   "theme": {
     "label": "Colour theme",
     "light": "Light",
-    "system": "Match system",
     "dark": "Dark"
   },
   "language": {

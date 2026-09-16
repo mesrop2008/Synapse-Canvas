@@ -8,38 +8,42 @@ import {
   type ReactNode,
 } from 'react';
 
-export type ThemePreference = 'light' | 'dark' | 'system';
-export type ResolvedTheme = 'light' | 'dark';
+export type Theme = 'light' | 'dark';
 
 /** Shared with the bootstrap script in index.html; changing it changes both. */
 const STORAGE_KEY = 'synapse.theme';
 
 interface ThemeContextValue {
-  preference: ThemePreference;
-  resolved: ResolvedTheme;
-  setPreference: (next: ThemePreference) => void;
+  theme: Theme;
+  setTheme: (next: Theme) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-function readStoredPreference(): ThemePreference {
+/**
+ * Null until the user picks one. The control only ever offers light and dark;
+ * "follow the system" is the starting state rather than a third button, so
+ * there is nothing to choose to get the behaviour most people want.
+ */
+function readStoredTheme(): Theme | null {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
+    if (stored === 'light' || stored === 'dark') return stored;
   } catch {
-    /* storage blocked; fall through to the default */
+    /* storage blocked; treat as no choice made */
   }
-  return 'system';
+  // Anything else -- including the 'system' this used to store -- means unset.
+  return null;
 }
 
 const systemQuery = () => window.matchMedia('(prefers-color-scheme: dark)');
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [preference, setPreferenceState] =
-    useState<ThemePreference>(readStoredPreference);
+  const [chosen, setChosen] = useState<Theme | null>(readStoredTheme);
   const [systemIsDark, setSystemIsDark] = useState(() => systemQuery().matches);
 
-  // Follow the OS live while the preference is 'system'.
+  // Only meaningful while nothing has been chosen, but the listener is cheap
+  // and unconditional avoids a subscribe/unsubscribe dance on every choice.
   useEffect(() => {
     const query = systemQuery();
     const onChange = (event: MediaQueryListEvent) => setSystemIsDark(event.matches);
@@ -47,18 +51,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return () => query.removeEventListener('change', onChange);
   }, []);
 
-  const resolved: ResolvedTheme =
-    preference === 'system' ? (systemIsDark ? 'dark' : 'light') : preference;
+  const theme: Theme = chosen ?? (systemIsDark ? 'dark' : 'light');
 
   useEffect(() => {
     const root = window.document.documentElement;
-    root.dataset.theme = resolved;
+    root.dataset.theme = theme;
     // Tells the browser which way to paint form controls and scrollbars.
-    root.style.colorScheme = resolved;
-  }, [resolved]);
+    root.style.colorScheme = theme;
+  }, [theme]);
 
-  const setPreference = useCallback((next: ThemePreference) => {
-    setPreferenceState(next);
+  const setTheme = useCallback((next: Theme) => {
+    setChosen(next);
     try {
       window.localStorage.setItem(STORAGE_KEY, next);
     } catch {
@@ -66,10 +69,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const value = useMemo(
-    () => ({ preference, resolved, setPreference }),
-    [preference, resolved, setPreference],
-  );
+  const value = useMemo(() => ({ theme, setTheme }), [theme, setTheme]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

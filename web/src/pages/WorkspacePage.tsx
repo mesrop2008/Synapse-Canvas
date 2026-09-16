@@ -143,12 +143,29 @@ export function WorkspacePage() {
       )}
 
       {documents.data && documents.data.length > 0 && (
-        <div className="panel">
+        <div className="card-grid">
           {documents.data.map((document) => (
-            <div key={document.id} className="panel-row">
-              <span className="row-icon">
-                <FileIcon size={18} />
-              </span>
+            <div key={document.id} className="tile">
+              <div className="tile-head">
+                <span className="row-icon">
+                  <FileIcon size={18} />
+                </span>
+                {writable && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-danger btn-icon row-action"
+                    title={t('workspace.deleteDocument', { title: document.title })}
+                    aria-label={t('workspace.deleteDocument', {
+                      title: document.title,
+                    })}
+                    onClick={() => setPendingDelete(document)}
+                    disabled={remove.isPending}
+                  >
+                    <TrashIcon />
+                  </button>
+                )}
+              </div>
+
               <div className="row-main">
                 <Link
                   className="row-title"
@@ -156,27 +173,16 @@ export function WorkspacePage() {
                 >
                   {document.title}
                 </Link>
-                <div className="meta">
+              </div>
+
+              <div className="tile-foot">
+                <span className="meta">
                   {t('workspace.documentMeta', {
                     when: formatRelative(document.updated_at),
                     version: document.version,
                   })}
-                </div>
+                </span>
               </div>
-              {writable && (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-danger btn-icon row-action"
-                  title={t('workspace.deleteDocument', { title: document.title })}
-                  aria-label={t('workspace.deleteDocument', {
-                    title: document.title,
-                  })}
-                  onClick={() => setPendingDelete(document)}
-                  disabled={remove.isPending}
-                >
-                  <TrashIcon />
-                </button>
-              )}
             </div>
           ))}
         </div>

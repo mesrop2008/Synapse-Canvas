@@ -23,7 +23,7 @@
           var stored = localStorage.getItem('synapse.theme');
           var dark =
             stored === 'dark' ||
-            ((stored === null || stored === 'system') &&
+            (stored !== 'light' &&
               matchMedia('(prefers-color-scheme: dark)').matches);
           var theme = dark ? 'dark' : 'light';
           document.documentElement.dataset.theme = theme;
