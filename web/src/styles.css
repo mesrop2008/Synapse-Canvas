@@ -737,10 +737,16 @@ a:hover {
   color: var(--text-3);
 }
 
+/* Flex, not a bare block: two inline-flex controls side by side align on their
+   text baselines, and the icon-only theme toggle has none, so it sat a couple
+   of pixels off the EN/RU one -- and they touched. Matches .topbar-group. */
 .auth-theme {
   position: absolute;
   top: 20px;
   right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .note {
