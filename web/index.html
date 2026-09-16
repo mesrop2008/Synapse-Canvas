@@ -7,10 +7,19 @@
     <title>Synapse Canvas</title>
     <script>
       // Runs before first paint, so a dark-theme user never sees a white flash
-      // while React boots. Mirrors the logic in src/hooks/useTheme.tsx; the
-      // storage key has to match.
+      // while React boots, and so `lang` is right before any assistive tech or
+      // translate prompt reads it. Mirrors src/hooks/useTheme.tsx and
+      // src/hooks/useI18n.tsx; the storage keys have to match.
       (function () {
         try {
+          var locale = localStorage.getItem('synapse.locale');
+          if (locale !== 'en' && locale !== 'ru') {
+            locale = (navigator.language || '').toLowerCase().indexOf('ru') === 0
+              ? 'ru'
+              : 'en';
+          }
+          document.documentElement.lang = locale;
+
           var stored = localStorage.getItem('synapse.theme');
           var dark =
             stored === 'dark' ||

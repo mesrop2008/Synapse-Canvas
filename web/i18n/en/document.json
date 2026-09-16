@@ -1,0 +1,32 @@
+{
+  "loading": "Loading document…",
+  "titleLabel": "Document title",
+  "bodyLabel": "Document body",
+  "placeholder": "Start writing…",
+  "untitled": "Untitled",
+  "readOnly": "read-only",
+  "conflict": "This document was changed elsewhere and has been reloaded. Your unsaved text was replaced — it is in the browser console, logged as a warning, so you can copy it back.",
+  "leaveTitle": "Leave with unsaved changes?",
+  "leaveMessage": "This document has edits that have not reached the server yet. Leaving now loses them.",
+  "leaveConfirm": "Leave anyway",
+  "leaveCancel": "Keep editing",
+  "backToWorkspace": "Back to the workspace",
+  "toolbar": {
+    "bold": "Bold",
+    "italic": "Italic",
+    "h1": "H1",
+    "h2": "H2",
+    "bullets": "Bullets",
+    "numbered": "Numbered",
+    "quote": "Quote",
+    "code": "Code"
+  },
+  "save": {
+    "saved": "Saved",
+    "saving": "Saving…",
+    "unsaved": "Unsaved changes",
+    "error": "Not saved",
+    "version": "v{version}",
+    "failed": "Could not save."
+  }
+}

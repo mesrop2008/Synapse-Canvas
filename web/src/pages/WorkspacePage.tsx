@@ -15,21 +15,21 @@ import {
   useDeleteDocument,
   useDocuments,
 } from '../hooks/useDocuments';
+import { useI18n } from '../hooks/useI18n';
 import { useWorkspace } from '../hooks/useWorkspaces';
 import { canEdit } from '../types/api';
-import type { DocumentSummary } from '../types/api';
+import type { MessageKey } from '../../i18n';
+import type { DocumentSummary, WorkspaceRole } from '../types/api';
 
-function formatEdited(timestamp: string): string {
-  const edited = new Date(timestamp);
-  const minutesAgo = (Date.now() - edited.getTime()) / 60_000;
-  if (minutesAgo < 1) return 'just now';
-  if (minutesAgo < 60) return `${Math.floor(minutesAgo)} min ago`;
-  if (minutesAgo < 60 * 24) return `${Math.floor(minutesAgo / 60)} h ago`;
-  return edited.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-}
+const ROLE_LABELS: Record<WorkspaceRole, MessageKey> = {
+  owner: 'common.roles.owner',
+  editor: 'common.roles.editor',
+  viewer: 'common.roles.viewer',
+};
 
 export function WorkspacePage() {
   const { workspaceId = '' } = useParams();
+  const { t, tNode, formatRelative } = useI18n();
   const workspace = useWorkspace(workspaceId);
   const documents = useDocuments(workspaceId);
   const create = useCreateDocument(workspaceId);
@@ -58,7 +58,7 @@ export function WorkspacePage() {
     return (
       <main className="container">
         <Alert>{errorMessage(workspace.error)}</Alert>
-        <Link to="/workspaces">Back to your workspaces</Link>
+        <Link to="/workspaces">{t('workspace.backToWorkspaces')}</Link>
       </main>
     );
   }
@@ -66,7 +66,7 @@ export function WorkspacePage() {
   return (
     <main className="container">
       <nav className="crumbs">
-        <Link to="/workspaces">Workspaces</Link>
+        <Link to="/workspaces">{t('layout.workspaces')}</Link>
         <ChevronRightIcon size={14} />
         <span>{workspace.data?.name ?? '…'}</span>
       </nav>
@@ -74,15 +74,17 @@ export function WorkspacePage() {
       <div className="page-head">
         <div className="title-row">
           <h1 className="page-title" style={{ marginBottom: 0 }}>
-            {workspace.data?.name ?? 'Loading…'}
+            {workspace.data?.name ?? t('common.loading')}
           </h1>
           {workspace.data && (
-            <span className="badge badge-accent">{workspace.data.role}</span>
+            <span className="badge badge-accent">
+              {t(ROLE_LABELS[workspace.data.role])}
+            </span>
           )}
         </div>
         {!writable && workspace.data && (
           <p className="page-sub" style={{ marginTop: 6 }}>
-            You have viewer access here, so documents are read-only.
+            {t('workspace.viewerNotice')}
           </p>
         )}
       </div>
@@ -92,8 +94,8 @@ export function WorkspacePage() {
           <input
             className="input"
             type="text"
-            aria-label="New document title"
-            placeholder="Title a new document…"
+            aria-label={t('workspace.newDocumentLabel')}
+            placeholder={t('workspace.newDocumentPlaceholder')}
             maxLength={255}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
@@ -104,7 +106,7 @@ export function WorkspacePage() {
             disabled={create.isPending || !title.trim()}
           >
             <PlusIcon />
-            {create.isPending ? 'Creating…' : 'New document'}
+            {create.isPending ? t('workspace.creating') : t('workspace.newDocument')}
           </button>
         </form>
       )}
@@ -122,18 +124,20 @@ export function WorkspacePage() {
 
       {documents.error && <Alert>{errorMessage(documents.error)}</Alert>}
 
-      {documents.isPending && <p className="placeholder">Loading documents…</p>}
+      {documents.isPending && (
+        <p className="placeholder">{t('workspace.loadingDocuments')}</p>
+      )}
 
       {documents.data?.length === 0 && (
         <div className="empty">
           <div className="empty-icon">
             <FileIcon size={22} />
           </div>
-          <p className="empty-title">No documents yet</p>
+          <p className="empty-title">{t('workspace.emptyTitle')}</p>
           <p className="empty-text">
             {writable
-              ? 'Give one a title above and start writing.'
-              : 'Nothing has been written in this workspace yet.'}
+              ? t('workspace.emptyWritable')
+              : t('workspace.emptyReadOnly')}
           </p>
         </div>
       )}
@@ -153,15 +157,20 @@ export function WorkspacePage() {
                   {document.title}
                 </Link>
                 <div className="meta">
-                  Edited {formatEdited(document.updated_at)} · v{document.version}
+                  {t('workspace.documentMeta', {
+                    when: formatRelative(document.updated_at),
+                    version: document.version,
+                  })}
                 </div>
               </div>
               {writable && (
                 <button
                   type="button"
                   className="btn btn-ghost btn-danger btn-icon row-action"
-                  title={`Delete ${document.title}`}
-                  aria-label={`Delete ${document.title}`}
+                  title={t('workspace.deleteDocument', { title: document.title })}
+                  aria-label={t('workspace.deleteDocument', {
+                    title: document.title,
+                  })}
                   onClick={() => setPendingDelete(document)}
                   disabled={remove.isPending}
                 >
@@ -175,14 +184,11 @@ export function WorkspacePage() {
 
       {pendingDelete && (
         <ConfirmDialog
-          title="Delete this document?"
-          message={
-            <>
-              <strong>{pendingDelete.title}</strong> and its contents will be
-              removed. This cannot be undone.
-            </>
-          }
-          confirmLabel="Delete"
+          title={t('workspace.deleteTitle')}
+          message={tNode('workspace.deleteMessage', {
+            title: <strong>{pendingDelete.title}</strong>,
+          })}
+          confirmLabel={t('common.delete')}
           destructive
           onCancel={() => setPendingDelete(null)}
           onConfirm={() => {

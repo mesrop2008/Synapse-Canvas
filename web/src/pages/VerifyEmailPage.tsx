@@ -4,8 +4,10 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { verifyEmail } from '../api/auth';
 import { errorMessage } from '../api/errors';
 import { Alert } from '../components/Alert';
+import { LanguageToggle } from '../components/LanguageToggle';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { Logo } from '../components/icons';
+import { useI18n } from '../hooks/useI18n';
 
 type State = 'missing' | 'verifying' | 'verified' | 'failed';
 
@@ -15,6 +17,7 @@ type State = 'missing' | 'verifying' | 'verified' | 'failed';
  */
 export function VerifyEmailPage() {
   const [params] = useSearchParams();
+  const { t } = useI18n();
   const token = params.get('token');
 
   const [state, setState] = useState<State>(token ? 'verifying' : 'missing');
@@ -30,7 +33,7 @@ export function VerifyEmailPage() {
     verifyEmail(token)
       .then(() => setState('verified'))
       .catch((caught: unknown) => {
-        setError(errorMessage(caught, 'That link could not be used.'));
+        setError(errorMessage(caught, 'verifyEmail.failed'));
         setState('failed');
       });
   }, [token]);
@@ -38,41 +41,39 @@ export function VerifyEmailPage() {
   return (
     <main className="auth">
       <div className="auth-theme">
+        <LanguageToggle />
         <ThemeToggle />
       </div>
 
       <div className="auth-card">
         <div className="auth-brand">
           <Logo size={26} />
-          Synapse Canvas
+          {t('common.appName')}
         </div>
 
-        <h1 className="auth-title">Email verification</h1>
+        <h1 className="auth-title">{t('verifyEmail.title')}</h1>
 
         {state === 'missing' && (
-          <p className="auth-lede">
-            This link is missing its token. Use the link from the email as-is.
-          </p>
+          <p className="auth-lede">{t('verifyEmail.missing')}</p>
         )}
 
-        {state === 'verifying' && <p className="auth-lede">Checking the link…</p>}
+        {state === 'verifying' && (
+          <p className="auth-lede">{t('verifyEmail.checking')}</p>
+        )}
 
         {state === 'verified' && (
-          <p className="auth-lede">Your address is confirmed. You can sign in now.</p>
+          <p className="auth-lede">{t('verifyEmail.verified')}</p>
         )}
 
         {state === 'failed' && (
           <>
             <Alert>{error}</Alert>
-            <p className="note">
-              Links expire and can only be used once. Registering again sends a
-              fresh one.
-            </p>
+            <p className="note">{t('verifyEmail.expiredNote')}</p>
           </>
         )}
 
         <p className="auth-foot">
-          <Link to="/login">Go to sign in</Link>
+          <Link to="/login">{t('verifyEmail.goToSignIn')}</Link>
         </p>
       </div>
     </main>

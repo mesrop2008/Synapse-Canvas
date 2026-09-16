@@ -1,14 +1,16 @@
 import { MonitorIcon, MoonIcon, SunIcon } from './icons';
 import { useTheme, type ThemePreference } from '../hooks/useTheme';
+import { useI18n } from '../hooks/useI18n';
+import type { MessageKey } from '../../i18n';
 
 const OPTIONS: Array<{
   value: ThemePreference;
-  label: string;
+  label: MessageKey;
   Icon: typeof SunIcon;
 }> = [
-  { value: 'light', label: 'Light', Icon: SunIcon },
-  { value: 'system', label: 'Match system', Icon: MonitorIcon },
-  { value: 'dark', label: 'Dark', Icon: MoonIcon },
+  { value: 'light', label: 'common.theme.light', Icon: SunIcon },
+  { value: 'system', label: 'common.theme.system', Icon: MonitorIcon },
+  { value: 'dark', label: 'common.theme.dark', Icon: MoonIcon },
 ];
 
 /**
@@ -18,18 +20,19 @@ const OPTIONS: Array<{
  */
 export function ThemeToggle() {
   const { preference, setPreference } = useTheme();
+  const { t } = useI18n();
 
   return (
-    <div className="theme-toggle" role="radiogroup" aria-label="Colour theme">
+    <div className="segmented" role="radiogroup" aria-label={t('common.theme.label')}>
       {OPTIONS.map(({ value, label, Icon }) => (
         <button
           key={value}
           type="button"
           role="radio"
           aria-checked={preference === value}
-          aria-label={label}
-          title={label}
-          className="theme-toggle-option"
+          aria-label={t(label)}
+          title={t(label)}
+          className="segmented-option"
           onClick={() => setPreference(value)}
         >
           <Icon size={16} />

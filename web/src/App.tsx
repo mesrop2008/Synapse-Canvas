@@ -5,6 +5,7 @@ import { ApiError } from './api/client';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthProvider } from './hooks/useAuth';
+import { I18nProvider } from './hooks/useI18n';
 import { ThemeProvider } from './hooks/useTheme';
 import { DocumentPage } from './pages/DocumentPage';
 import { LoginPage } from './pages/LoginPage';
@@ -56,14 +57,18 @@ const router = createBrowserRouter([
 
 export function App() {
   return (
+    // I18nProvider is outermost: error messages built in the fetch client are
+    // translated, so the language has to be settled before anything can fail.
     // AuthProvider sits inside QueryClientProvider because it clears the cache
     // on sign-out, and outside the router because the route guard reads it.
-    <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <RouterProvider router={router} />
-        </AuthProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <I18nProvider>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <RouterProvider router={router} />
+          </AuthProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    </I18nProvider>
   );
 }

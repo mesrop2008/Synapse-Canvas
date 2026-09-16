@@ -1,0 +1,16 @@
+{
+  "viewerNotice": "Здесь у вас доступ только на чтение, поэтому документы редактировать нельзя.",
+  "newDocumentLabel": "Название нового документа",
+  "newDocumentPlaceholder": "Название нового документа…",
+  "newDocument": "Новый документ",
+  "creating": "Создаём…",
+  "loadingDocuments": "Загружаем документы…",
+  "emptyTitle": "Пока нет документов",
+  "emptyWritable": "Введите название выше и начните писать.",
+  "emptyReadOnly": "В этом рабочем пространстве пока ничего не написано.",
+  "documentMeta": "Изменён {when} · v{version}",
+  "deleteDocument": "Удалить «{title}»",
+  "deleteTitle": "Удалить документ?",
+  "deleteMessage": "Документ «{title}» и его содержимое будут удалены. Отменить это нельзя.",
+  "backToWorkspaces": "Назад к рабочим пространствам"
+}

@@ -1,0 +1,9 @@
+{
+  "title": "Email verification",
+  "missing": "This link is missing its token. Use the link from the email as-is.",
+  "checking": "Checking the link…",
+  "verified": "Your address is confirmed. You can sign in now.",
+  "failed": "That link could not be used.",
+  "expiredNote": "Links expire and can only be used once. Registering again sends a fresh one.",
+  "goToSignIn": "Go to sign in"
+}

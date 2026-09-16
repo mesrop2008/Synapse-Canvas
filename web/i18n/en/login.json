@@ -1,0 +1,13 @@
+{
+  "title": "Welcome back",
+  "lede": "Sign in to your workspaces.",
+  "email": "Email",
+  "emailPlaceholder": "you@example.com",
+  "password": "Password",
+  "passwordPlaceholder": "••••••••",
+  "submit": "Sign in",
+  "submitting": "Signing in…",
+  "noAccount": "No account yet?",
+  "createOne": "Create one",
+  "failed": "Could not sign in."
+}

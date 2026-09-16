@@ -4,12 +4,15 @@ import { Link, Navigate } from 'react-router-dom';
 import { register, resendVerification } from '../api/auth';
 import { errorMessage } from '../api/errors';
 import { Alert } from '../components/Alert';
+import { LanguageToggle } from '../components/LanguageToggle';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { Logo } from '../components/icons';
 import { useAuth } from '../hooks/useAuth';
+import { useI18n } from '../hooks/useI18n';
 
 export function RegisterPage() {
   const { status } = useAuth();
+  const { t, tNode } = useI18n();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -29,7 +32,7 @@ export function RegisterPage() {
       await register(email, password, name);
       setSubmitted(true);
     } catch (caught) {
-      setError(errorMessage(caught, 'Could not register.'));
+      setError(errorMessage(caught, 'register.failed'));
     } finally {
       setSubmitting(false);
     }
@@ -42,24 +45,25 @@ export function RegisterPage() {
     return (
       <main className="auth">
         <div className="auth-theme">
+          <LanguageToggle />
           <ThemeToggle />
         </div>
 
         <div className="auth-card">
           <div className="auth-brand">
             <Logo size={26} />
-            Synapse Canvas
+            {t('common.appName')}
           </div>
 
-          <h1 className="auth-title">Check your email</h1>
+          <h1 className="auth-title">{t('register.sentTitle')}</h1>
           <p className="auth-lede">
-            If <strong>{email}</strong> can receive mail, a verification link is on
-            its way. You can sign in once you have followed it.
+            {tNode('register.sentLede', { email: <strong>{email}</strong> })}
           </p>
 
           <p className="note">
-            Running locally, the backend logs the link instead of sending it — look
-            for <code>[email:console]</code> in the API output.
+            {tNode('register.sentDevNote', {
+              marker: <code>[email:console]</code>,
+            })}
           </p>
 
           <div style={{ marginTop: 18 }}>
@@ -72,12 +76,12 @@ export function RegisterPage() {
                 setResent(true);
               }}
             >
-              {resent ? 'Link re-sent' : 'Send it again'}
+              {resent ? t('register.resent') : t('register.resend')}
             </button>
           </div>
 
           <p className="auth-foot">
-            <Link to="/login">Back to sign in</Link>
+            <Link to="/login">{t('register.backToSignIn')}</Link>
           </p>
         </div>
       </main>
@@ -87,28 +91,29 @@ export function RegisterPage() {
   return (
     <main className="auth">
       <div className="auth-theme">
+        <LanguageToggle />
         <ThemeToggle />
       </div>
 
       <form className="auth-card" onSubmit={handleSubmit}>
         <div className="auth-brand">
           <Logo size={26} />
-          Synapse Canvas
+          {t('common.appName')}
         </div>
 
-        <h1 className="auth-title">Create an account</h1>
-        <p className="auth-lede">Start writing with your team.</p>
+        <h1 className="auth-title">{t('register.title')}</h1>
+        <p className="auth-lede">{t('register.lede')}</p>
 
         {error && <Alert onDismiss={() => setError(null)}>{error}</Alert>}
 
         <div className="field">
-          <label htmlFor="name">Name</label>
+          <label htmlFor="name">{t('register.name')}</label>
           <input
             id="name"
             className="input"
             type="text"
             autoComplete="name"
-            placeholder="Ada Lovelace"
+            placeholder={t('register.namePlaceholder')}
             required
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -116,13 +121,13 @@ export function RegisterPage() {
         </div>
 
         <div className="field">
-          <label htmlFor="email">Email</label>
+          <label htmlFor="email">{t('register.email')}</label>
           <input
             id="email"
             className="input"
             type="email"
             autoComplete="username"
-            placeholder="you@example.com"
+            placeholder={t('register.emailPlaceholder')}
             required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
@@ -130,13 +135,13 @@ export function RegisterPage() {
         </div>
 
         <div className="field">
-          <label htmlFor="password">Password</label>
+          <label htmlFor="password">{t('register.password')}</label>
           <input
             id="password"
             className="input"
             type="password"
             autoComplete="new-password"
-            placeholder="At least 8 characters"
+            placeholder={t('register.passwordPlaceholder')}
             required
             minLength={8}
             value={password}
@@ -149,11 +154,11 @@ export function RegisterPage() {
           className="btn btn-primary btn-block"
           disabled={submitting}
         >
-          {submitting ? 'Creating…' : 'Create account'}
+          {submitting ? t('register.submitting') : t('register.submit')}
         </button>
 
         <p className="auth-foot">
-          Already registered? <Link to="/login">Sign in</Link>
+          {t('register.haveAccount')} <Link to="/login">{t('register.signIn')}</Link>
         </p>
       </form>
     </main>

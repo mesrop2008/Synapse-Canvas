@@ -1,5 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 
+import { useI18n } from '../hooks/useI18n';
+
 interface ConfirmDialogProps {
   title: string;
   message: ReactNode;
@@ -18,12 +20,13 @@ interface ConfirmDialogProps {
 export function ConfirmDialog({
   title,
   message,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   destructive = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const { t } = useI18n();
   const confirmButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -48,7 +51,7 @@ export function ConfirmDialog({
         <div className="modal-text">{message}</div>
         <div className="modal-actions">
           <button type="button" className="btn btn-secondary" onClick={onCancel}>
-            {cancelLabel}
+            {cancelLabel ?? t('common.cancel')}
           </button>
           <button
             ref={confirmButton}
@@ -56,7 +59,7 @@ export function ConfirmDialog({
             className={`btn ${destructive ? 'btn-secondary btn-danger' : 'btn-primary'}`}
             onClick={onConfirm}
           >
-            {confirmLabel}
+            {confirmLabel ?? t('common.confirm')}
           </button>
         </div>
       </div>

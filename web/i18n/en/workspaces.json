@@ -1,0 +1,11 @@
+{
+  "title": "Workspaces",
+  "lede": "Every document lives in a workspace, and your role there decides what you can do with it.",
+  "newLabel": "New workspace name",
+  "newPlaceholder": "Name a new workspace…",
+  "create": "Create",
+  "creating": "Creating…",
+  "createFailed": "Could not create the workspace.",
+  "emptyTitle": "No workspaces yet",
+  "emptyText": "Name one above to get going."
+}
