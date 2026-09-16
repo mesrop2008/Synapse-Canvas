@@ -1,0 +1,7 @@
+{
+  "generic": "Something went wrong.",
+  "unreachable": "Could not reach the API. Check that the backend is running.",
+  "sessionExpired": "Your session has expired. Please sign in again.",
+  "notSignedIn": "Not signed in",
+  "status": "Request failed with status {status}"
+}

@@ -1,0 +1,13 @@
+{
+  "title": "С возвращением",
+  "lede": "Войдите, чтобы открыть свои рабочие пространства.",
+  "email": "Электронная почта",
+  "emailPlaceholder": "you@example.com",
+  "password": "Пароль",
+  "passwordPlaceholder": "••••••••",
+  "submit": "Войти",
+  "submitting": "Входим…",
+  "noAccount": "Ещё нет аккаунта?",
+  "createOne": "Создать",
+  "failed": "Не удалось войти."
+}

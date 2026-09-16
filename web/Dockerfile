@@ -15,6 +15,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY tsconfig.json vite.config.ts index.html ./
+COPY public ./public
+COPY i18n ./i18n
 COPY src ./src
 
 # Vite inlines VITE_* at build time, so this is baked into the bundle and the

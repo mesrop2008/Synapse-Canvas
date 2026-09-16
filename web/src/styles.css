@@ -437,7 +437,7 @@ a:hover {
   height: 44px;
 }
 
-.theme-toggle {
+.segmented {
   display: inline-flex;
   gap: 2px;
   padding: 3px;
@@ -446,7 +446,7 @@ a:hover {
   border: 1px solid var(--border);
 }
 
-.theme-toggle-option {
+.segmented-option {
   display: grid;
   place-items: center;
   width: 32px;
@@ -459,14 +459,24 @@ a:hover {
   transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
 }
 
-.theme-toggle-option:hover {
+.segmented-option:hover {
   color: var(--text);
 }
 
-.theme-toggle-option[aria-checked='true'] {
+.segmented-option[aria-checked='true'] {
   background: var(--raised);
   color: var(--accent);
   box-shadow: var(--shadow-sm);
+}
+
+/* Letters need more room than a 16px icon. */
+.segmented-text {
+  width: auto;
+  padding: 0 9px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 620;
+  letter-spacing: 0.03em;
 }
 
 .badge {

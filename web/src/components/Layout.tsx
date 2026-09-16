@@ -1,11 +1,14 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../hooks/useAuth';
+import { useI18n } from '../hooks/useI18n';
+import { LanguageToggle } from './LanguageToggle';
 import { ThemeToggle } from './ThemeToggle';
 import { LogOutIcon, Logo } from './icons';
 
 export function Layout() {
   const { user, signOut } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
 
   async function handleSignOut() {
@@ -19,10 +22,11 @@ export function Layout() {
         <div className="topbar-inner">
           <Link to="/workspaces" className="brand">
             <Logo />
-            Synapse Canvas
+            {t('common.appName')}
           </Link>
 
           <div className="topbar-actions">
+            <LanguageToggle />
             <ThemeToggle />
             {user && (
               <div className="user-chip">
@@ -36,8 +40,8 @@ export function Layout() {
               type="button"
               className="btn btn-ghost btn-icon"
               onClick={handleSignOut}
-              title="Sign out"
-              aria-label="Sign out"
+              title={t('layout.signOut')}
+              aria-label={t('layout.signOut')}
             >
               <LogOutIcon />
             </button>

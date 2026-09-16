@@ -1,0 +1,16 @@
+{
+  "viewerNotice": "You have viewer access here, so documents are read-only.",
+  "newDocumentLabel": "New document title",
+  "newDocumentPlaceholder": "Title a new document…",
+  "newDocument": "New document",
+  "creating": "Creating…",
+  "loadingDocuments": "Loading documents…",
+  "emptyTitle": "No documents yet",
+  "emptyWritable": "Give one a title above and start writing.",
+  "emptyReadOnly": "Nothing has been written in this workspace yet.",
+  "documentMeta": "Edited {when} · v{version}",
+  "deleteDocument": "Delete {title}",
+  "deleteTitle": "Delete this document?",
+  "deleteMessage": "{title} and its contents will be removed. This cannot be undone.",
+  "backToWorkspaces": "Back to your workspaces"
+}

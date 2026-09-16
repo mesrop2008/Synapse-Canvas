@@ -3,12 +3,15 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 import { errorMessage } from '../api/errors';
 import { Alert } from '../components/Alert';
+import { LanguageToggle } from '../components/LanguageToggle';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { Logo } from '../components/icons';
 import { useAuth } from '../hooks/useAuth';
+import { useI18n } from '../hooks/useI18n';
 
 export function LoginPage() {
   const { status, signIn } = useAuth();
+  const { t } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -21,7 +24,7 @@ export function LoginPage() {
   const from = (location.state as { from?: string } | null)?.from ?? '/workspaces';
 
   if (status === 'loading') {
-    return <p className="placeholder">Restoring your session…</p>;
+    return <p className="placeholder">{t('layout.restoringSession')}</p>;
   }
   if (status === 'authenticated') {
     return <Navigate to={from} replace />;
@@ -35,7 +38,7 @@ export function LoginPage() {
       await signIn(email, password);
       navigate(from, { replace: true });
     } catch (caught) {
-      setError(errorMessage(caught, 'Could not sign in.'));
+      setError(errorMessage(caught, 'login.failed'));
     } finally {
       setSubmitting(false);
     }
@@ -44,28 +47,29 @@ export function LoginPage() {
   return (
     <main className="auth">
       <div className="auth-theme">
+        <LanguageToggle />
         <ThemeToggle />
       </div>
 
       <form className="auth-card" onSubmit={handleSubmit}>
         <div className="auth-brand">
           <Logo size={26} />
-          Synapse Canvas
+          {t('common.appName')}
         </div>
 
-        <h1 className="auth-title">Welcome back</h1>
-        <p className="auth-lede">Sign in to your workspaces.</p>
+        <h1 className="auth-title">{t('login.title')}</h1>
+        <p className="auth-lede">{t('login.lede')}</p>
 
         {error && <Alert onDismiss={() => setError(null)}>{error}</Alert>}
 
         <div className="field">
-          <label htmlFor="email">Email</label>
+          <label htmlFor="email">{t('login.email')}</label>
           <input
             id="email"
             className="input"
             type="email"
             autoComplete="username"
-            placeholder="you@example.com"
+            placeholder={t('login.emailPlaceholder')}
             required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
@@ -73,13 +77,13 @@ export function LoginPage() {
         </div>
 
         <div className="field">
-          <label htmlFor="password">Password</label>
+          <label htmlFor="password">{t('login.password')}</label>
           <input
             id="password"
             className="input"
             type="password"
             autoComplete="current-password"
-            placeholder="••••••••"
+            placeholder={t('login.passwordPlaceholder')}
             required
             value={password}
             onChange={(event) => setPassword(event.target.value)}
@@ -91,11 +95,11 @@ export function LoginPage() {
           className="btn btn-primary btn-block"
           disabled={submitting}
         >
-          {submitting ? 'Signing in…' : 'Sign in'}
+          {submitting ? t('login.submitting') : t('login.submit')}
         </button>
 
         <p className="auth-foot">
-          No account yet? <Link to="/register">Create one</Link>
+          {t('login.noAccount')} <Link to="/register">{t('login.createOne')}</Link>
         </p>
       </form>
     </main>

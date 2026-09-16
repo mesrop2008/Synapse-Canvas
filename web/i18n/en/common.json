@@ -1,0 +1,28 @@
+{
+  "appName": "Synapse Canvas",
+  "cancel": "Cancel",
+  "confirm": "Confirm",
+  "dismiss": "Dismiss",
+  "delete": "Delete",
+  "tryAgain": "Try again",
+  "loading": "Loading…",
+  "justNow": "just now",
+  "roles": {
+    "owner": "Owner",
+    "editor": "Editor",
+    "viewer": "Viewer"
+  },
+  "theme": {
+    "label": "Colour theme",
+    "light": "Light",
+    "system": "Match system",
+    "dark": "Dark"
+  },
+  "language": {
+    "label": "Language",
+    "en": "English",
+    "ru": "Russian",
+    "enShort": "EN",
+    "ruShort": "RU"
+  }
+}

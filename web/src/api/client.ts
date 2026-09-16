@@ -6,6 +6,7 @@
  * Everything else in `api/` is a thin typed wrapper over `request()`.
  */
 
+import { translate } from '../../i18n';
 import type { ErrorBody, TokenPair } from '../types/api';
 
 const API_BASE_URL = (
@@ -119,7 +120,7 @@ function describe(status: number, body: unknown): string {
       .filter((msg): msg is string => Boolean(msg));
     if (messages.length) return messages.join('; ');
   }
-  return `Request failed with status ${status}`;
+  return translate('errors.status', { status });
 }
 
 async function readBody(response: Response): Promise<unknown> {
@@ -153,7 +154,7 @@ function refreshAccessToken(): Promise<string> {
 
 async function performRefresh(): Promise<string> {
   const refreshToken = getRefreshToken();
-  if (!refreshToken) throw new ApiError(401, 'Not signed in', null);
+  if (!refreshToken) throw new ApiError(401, translate('errors.notSignedIn'), null);
 
   const tokens = await request<TokenPair>('POST', '/auth/refresh', {
     body: { refresh_token: refreshToken },
@@ -191,7 +192,7 @@ export async function request<T>(
     } catch {
       // The refresh token is spent or revoked; nothing here can recover it.
       clearSession({ notify: true });
-      throw new ApiError(401, 'Your session has expired. Please sign in again.', null);
+      throw new ApiError(401, translate('errors.sessionExpired'), null);
     }
   }
 

@@ -1,0 +1,28 @@
+{
+  "appName": "Synapse Canvas",
+  "cancel": "Отмена",
+  "confirm": "Подтвердить",
+  "dismiss": "Скрыть",
+  "delete": "Удалить",
+  "tryAgain": "Повторить",
+  "loading": "Загрузка…",
+  "justNow": "только что",
+  "roles": {
+    "owner": "Владелец",
+    "editor": "Редактор",
+    "viewer": "Читатель"
+  },
+  "theme": {
+    "label": "Цветовая тема",
+    "light": "Светлая",
+    "system": "Как в системе",
+    "dark": "Тёмная"
+  },
+  "language": {
+    "label": "Язык",
+    "en": "English",
+    "ru": "Русский",
+    "enShort": "EN",
+    "ruShort": "RU"
+  }
+}

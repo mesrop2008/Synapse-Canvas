@@ -99,7 +99,7 @@ export function useAutosave({
           if (!conflict) {
             // Keep the version: the write never landed, so it is still current
             // and a retry has a real chance of succeeding.
-            setError(errorMessage(caught, 'Could not save.'));
+            setError(errorMessage(caught, 'document.save.failed'));
             setStatus('error');
             return;
           }

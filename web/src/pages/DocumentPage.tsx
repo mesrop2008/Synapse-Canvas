@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useBlocker, useParams } from 'react-router-dom';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -11,12 +11,15 @@ import { SaveIndicator } from '../components/SaveIndicator';
 import { ChevronRightIcon } from '../components/icons';
 import { useAutosave, type DocumentSnapshot } from '../hooks/useAutosave';
 import { useDocument } from '../hooks/useDocuments';
+import { useI18n } from '../hooks/useI18n';
 import { useWorkspace } from '../hooks/useWorkspaces';
 import { canEdit } from '../types/api';
+import type { MessageKey } from '../../i18n';
 import type { DocumentDetail, DocumentVersionConflict, ProseMirrorDoc } from '../types/api';
 
 export function DocumentPage() {
   const { workspaceId = '', documentId = '' } = useParams();
+  const { t } = useI18n();
   const workspace = useWorkspace(workspaceId);
   const document = useDocument(workspaceId, documentId);
 
@@ -24,13 +27,15 @@ export function DocumentPage() {
     return (
       <main className="container">
         <Alert>{errorMessage(document.error)}</Alert>
-        <Link to={`/workspaces/${workspaceId}`}>Back to the workspace</Link>
+        <Link to={`/workspaces/${workspaceId}`}>
+          {t('document.backToWorkspace')}
+        </Link>
       </main>
     );
   }
 
   if (!document.data || !workspace.data) {
-    return <p className="placeholder">Loading document…</p>;
+    return <p className="placeholder">{t('document.loading')}</p>;
   }
 
   // Mounting the editor only once content exists avoids loading into it after
@@ -60,6 +65,7 @@ function DocumentEditor({
   writable,
   workspaceName,
 }: DocumentEditorProps) {
+  const { t, locale } = useI18n();
   const [title, setTitle] = useState(loaded.title);
   const [reloadedFromServer, setReloadedFromServer] = useState(false);
 
@@ -68,22 +74,34 @@ function DocumentEditor({
   const scheduleRef = useRef<() => void>(() => {});
   const titleRef = useRef(title);
   titleRef.current = title;
+  // Read at save time, so switching language mid-edit does not save a title in
+  // the previous one.
+  const untitledRef = useRef(t('document.untitled'));
+  untitledRef.current = t('document.untitled');
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Placeholder.configure({ placeholder: 'Start writing…' }),
-    ],
-    content: loaded.content,
-    editable: writable,
-    immediatelyRender: true,
-    editorProps: { attributes: { class: 'tiptap', 'aria-label': 'Document body' } },
-    onUpdate: () => scheduleRef.current(),
-  });
+  const editor = useEditor(
+    {
+      extensions: [
+        StarterKit,
+        Placeholder.configure({ placeholder: t('document.placeholder') }),
+      ],
+      content: loaded.content,
+      editable: writable,
+      immediatelyRender: true,
+      editorProps: {
+        attributes: { class: 'tiptap', 'aria-label': t('document.bodyLabel') },
+      },
+      onUpdate: () => scheduleRef.current(),
+    },
+    // Tiptap builds the schema once, so the placeholder has to be rebuilt for a
+    // language change to reach it. Content is preserved across the rebuild
+    // because `content` is read from the same loaded document.
+    [locale],
+  );
 
   const getSnapshot = useCallback(
     (): DocumentSnapshot => ({
-      title: titleRef.current.trim() || 'Untitled',
+      title: titleRef.current.trim() || untitledRef.current,
       content: (editor?.getJSON() ?? loaded.content) as ProseMirrorDoc,
     }),
     [editor, loaded.content],
@@ -92,7 +110,8 @@ function DocumentEditor({
   const handleConflict = useCallback(
     (conflict: DocumentVersionConflict, replaced: DocumentSnapshot) => {
       // Part 3 merges instead. Until then the server wins, so the text that
-      // lost goes somewhere recoverable rather than straight in the bin.
+      // lost goes somewhere recoverable rather than straight in the bin. This
+      // one stays in English: it is a developer-facing console message.
       console.warn(
         '[synapse] Document changed elsewhere; the following local state was replaced. ' +
           'Copy anything you need from here.',
@@ -149,16 +168,14 @@ function DocumentEditor({
   return (
     <main className="container container-reading">
       <nav className="crumbs">
-        <Link to="/workspaces">Workspaces</Link>
+        <Link to="/workspaces">{t('layout.workspaces')}</Link>
         <ChevronRightIcon size={14} />
         <Link to={`/workspaces/${workspaceId}`}>{workspaceName}</Link>
       </nav>
 
       {reloadedFromServer && (
         <Alert kind="warn" onDismiss={() => setReloadedFromServer(false)}>
-          This document was changed elsewhere and has been reloaded. Your
-          unsaved text was replaced — it is in the browser console, logged as a
-          warning, so you can copy it back.
+          {t('document.conflict')}
         </Alert>
       )}
 
@@ -170,7 +187,7 @@ function DocumentEditor({
             className="btn-link"
             onClick={() => void autosave.flush()}
           >
-            Try again
+            {t('common.tryAgain')}
           </button>
         </Alert>
       )}
@@ -178,7 +195,7 @@ function DocumentEditor({
       <div className="doc-head">
         <input
           className="doc-title"
-          aria-label="Document title"
+          aria-label={t('document.titleLabel')}
           value={title}
           maxLength={255}
           readOnly={!writable}
@@ -188,7 +205,7 @@ function DocumentEditor({
           {writable ? (
             <SaveIndicator status={autosave.status} version={autosave.version} />
           ) : (
-            <span className="badge">read-only</span>
+            <span className="badge">{t('document.readOnly')}</span>
           )}
         </div>
       </div>
@@ -201,10 +218,10 @@ function DocumentEditor({
 
       {blocker.state === 'blocked' && (
         <ConfirmDialog
-          title="Leave with unsaved changes?"
-          message="This document has edits that have not reached the server yet. Leaving now loses them."
-          confirmLabel="Leave anyway"
-          cancelLabel="Keep editing"
+          title={t('document.leaveTitle')}
+          message={t('document.leaveMessage')}
+          confirmLabel={t('document.leaveConfirm')}
+          cancelLabel={t('document.leaveCancel')}
           destructive
           onConfirm={() => blocker.proceed()}
           onCancel={() => blocker.reset()}
@@ -218,59 +235,73 @@ type TiptapEditor = NonNullable<ReturnType<typeof useEditor>>;
 
 /** Minimal formatting controls, enough to exercise what StarterKit provides. */
 function Toolbar({ editor }: { editor: TiptapEditor }) {
-  const actions: Array<{ label: string; isActive: boolean; run: () => void }> = [
-    {
-      label: 'Bold',
-      isActive: editor.isActive('bold'),
-      run: () => editor.chain().focus().toggleBold().run(),
-    },
-    {
-      label: 'Italic',
-      isActive: editor.isActive('italic'),
-      run: () => editor.chain().focus().toggleItalic().run(),
-    },
-    {
-      label: 'H1',
-      isActive: editor.isActive('heading', { level: 1 }),
-      run: () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
-    },
-    {
-      label: 'H2',
-      isActive: editor.isActive('heading', { level: 2 }),
-      run: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-    },
-    {
-      label: 'Bullets',
-      isActive: editor.isActive('bulletList'),
-      run: () => editor.chain().focus().toggleBulletList().run(),
-    },
-    {
-      label: 'Numbered',
-      isActive: editor.isActive('orderedList'),
-      run: () => editor.chain().focus().toggleOrderedList().run(),
-    },
-    {
-      label: 'Quote',
-      isActive: editor.isActive('blockquote'),
-      run: () => editor.chain().focus().toggleBlockquote().run(),
-    },
-    {
-      label: 'Code',
-      isActive: editor.isActive('codeBlock'),
-      run: () => editor.chain().focus().toggleCodeBlock().run(),
-    },
-  ];
+  const { t } = useI18n();
+
+  const actions: Array<{ key: string; label: MessageKey; isActive: boolean; run: () => void }> =
+    useMemo(
+      () => [
+        {
+          key: 'bold',
+          label: 'document.toolbar.bold',
+          isActive: editor.isActive('bold'),
+          run: () => editor.chain().focus().toggleBold().run(),
+        },
+        {
+          key: 'italic',
+          label: 'document.toolbar.italic',
+          isActive: editor.isActive('italic'),
+          run: () => editor.chain().focus().toggleItalic().run(),
+        },
+        {
+          key: 'h1',
+          label: 'document.toolbar.h1',
+          isActive: editor.isActive('heading', { level: 1 }),
+          run: () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
+        },
+        {
+          key: 'h2',
+          label: 'document.toolbar.h2',
+          isActive: editor.isActive('heading', { level: 2 }),
+          run: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+        },
+        {
+          key: 'bullets',
+          label: 'document.toolbar.bullets',
+          isActive: editor.isActive('bulletList'),
+          run: () => editor.chain().focus().toggleBulletList().run(),
+        },
+        {
+          key: 'numbered',
+          label: 'document.toolbar.numbered',
+          isActive: editor.isActive('orderedList'),
+          run: () => editor.chain().focus().toggleOrderedList().run(),
+        },
+        {
+          key: 'quote',
+          label: 'document.toolbar.quote',
+          isActive: editor.isActive('blockquote'),
+          run: () => editor.chain().focus().toggleBlockquote().run(),
+        },
+        {
+          key: 'code',
+          label: 'document.toolbar.code',
+          isActive: editor.isActive('codeBlock'),
+          run: () => editor.chain().focus().toggleCodeBlock().run(),
+        },
+      ],
+      [editor],
+    );
 
   return (
     <div className="toolbar">
       {actions.map((action) => (
         <button
-          key={action.label}
+          key={action.key}
           type="button"
           aria-pressed={action.isActive}
           onClick={action.run}
         >
-          {action.label}
+          {t(action.label)}
         </button>
       ))}
     </div>
