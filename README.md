@@ -31,6 +31,7 @@ their text intact.
 | Server state | TanStack Query |
 | Editor | Tiptap 3 (ProseMirror) |
 | Styling | Plain CSS, one stylesheet of design tokens |
+| Languages | English and Russian, JSON packs, no library |
 | Theming | Light / dark / system, persisted per browser |
 
 Planned for later parts: Redis, pgvector, Celery or Arq.
@@ -48,6 +49,7 @@ api/            FastAPI application
 alembic/        migrations
 tests/          pytest suite, runs against a real PostgreSQL
 web/            React client
+  i18n/         language packs: one folder per language, one JSON per section
   src/api/      typed fetch client, one module per resource
   src/hooks/    auth context, TanStack Query hooks, autosave
   src/pages/    one component per route
@@ -209,6 +211,56 @@ secret belongs here.
 |---|---|---|
 | `VITE_API_BASE_URL` | `http://localhost:8000` | No trailing slash. The container builds with `/api` instead |
 
+## Languages
+
+English and Russian, switchable from the EN/RU control next to the theme toggle.
+The choice persists per browser and is applied before first paint, alongside the
+theme, so `<html lang>` is right before anything reads it. With no stored choice
+the browser's own preference decides.
+
+```
+web/i18n/
+  index.ts          locale registry, lookup, interpolation
+  en/               common.json  layout.json  login.json  register.json
+  rus/              verify-email.json  not-found.json  workspaces.json
+                    workspace.json  document.json  errors.json
+```
+
+One folder per language, one JSON file per section of the site. The folder is
+`rus`, but the locale *code* is `ru` — that is the BCP-47 tag, and it is what
+`<html lang>` and `Intl` expect.
+
+No i18n library. The needs here are a lookup and `{placeholder}` substitution,
+which is about forty lines; a runtime would be more to configure than to write.
+
+### Adding a string
+
+Add it to `en/<section>.json` first. `Messages` is derived from the English pack
+and every other pack is typed against it, so a key missing from Russian is a
+**compile error**, not a blank label someone finds in production. Reference it as
+`t('section.path.to.key')`; the key type is generated from the JSON, so a typo
+does not compile either.
+
+### Adding a language
+
+1. Copy `en/` to the new folder and translate the values.
+2. Add the locale to `LOCALES` and the imports to `MESSAGES` in `i18n/index.ts`.
+3. Add its labels to the `language` block in every `common.json`.
+
+`tsc` then lists anything left untranslated.
+
+### Two things that are deliberately not in the packs
+
+**Plurals.** Russian needs three forms where English needs two, and "21 минуту"
+differs from "5 минут". Rather than encode those rules in JSON, relative times go
+through `Intl.RelativeTimeFormat` and dates through `toLocaleDateString`, which
+already know them for every locale.
+
+**Server messages.** An `ApiError`'s text is the backend's `detail` field, which
+is English whatever the UI language is. Translating it means translating the API,
+which is its own job — so the client passes it through and translates only what
+it generates itself.
+
 ## The documents API
 
 All routes are scoped to a workspace and go through the Part 1 role dependency.
@@ -342,6 +394,10 @@ treat `saving` as dirty.
   direct `api` port mapping at the same time would let `TRUST_PROXY_HEADERS` be
   turned on, which is what per-IP throttling needs to work correctly behind the
   proxy.
+- **Translate the backend too.** The UI is bilingual but API error details are
+  not, so a Russian user hitting a 409 or a validation error gets an English
+  sentence. The API would need to read `Accept-Language` and return either a
+  message code the client can look up, or a translated `detail`.
 - **Retire the CSP exemption for `/docs`.** Swagger loads assets from a CDN. Fine locally;
   in production the docs should either be off or served with vendored assets.
 
