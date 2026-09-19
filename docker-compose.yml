@@ -1,7 +1,8 @@
-# Local stack: PostgreSQL, a one-shot migration job, the API, and the client.
+# Local stack: PostgreSQL, Redis, a one-shot migration job, the API, and the
+# client.
 #
 # `docker compose up -d --build` brings the whole thing up in order:
-#   postgres (healthcheck) -> migrate (to completion) -> api (healthcheck) -> web
+#   postgres + redis (healthchecks) -> migrate -> api (healthcheck) -> web
 #
 # Open http://localhost:5173. The web container serves the built client and
 # proxies /api to the API on the same origin, so the browser never makes a
@@ -17,6 +18,7 @@ x-app-environment: &app-environment
   # Overrides whatever .env says: inside the network the database is
   # `postgres:5432`, never localhost.
   DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-synapse}:${POSTGRES_PASSWORD:-synapse}@postgres:5432/${POSTGRES_DB:-synapse_canvas}
+  REDIS_URL: redis://redis:6379/0
   ENVIRONMENT: ${ENVIRONMENT:-local}
   DEBUG: ${DEBUG:-false}
   # Left empty on purpose: the entrypoint generates and persists a key for
@@ -58,6 +60,23 @@ services:
       timeout: 5s
       retries: 10
 
+  # Presence, handshake tickets and the pub/sub channel that joins the
+  # workers' connection registries. Nothing here needs to survive a restart --
+  # every key is a live session or a 30-second ticket -- so there is no volume
+  # and persistence is off.
+  redis:
+    image: ${REDIS_IMAGE:-mirror.gcr.io/library/redis:7-alpine}
+    container_name: synapse_canvas_redis
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no
+    ports:
+      - "${REDIS_PORT:-6381}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   # Runs to completion, then exits 0. `api` waits on that exit rather than
   # running migrations itself: with more than one replica, every one of them
   # would race the same ALTERs on boot. Seeing this container as "Exited (0)"
@@ -84,6 +103,8 @@ services:
     restart: unless-stopped
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully

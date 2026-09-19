@@ -18,8 +18,10 @@ from api.core.middleware import (
     BodySizeLimitMiddleware,
     SecurityHeadersMiddleware,
 )
+from api.core.redis import close_redis, get_redis
 from api.db.session import get_engine
-from api.routers import auth, documents, workspaces
+from api.realtime.hub import DocumentHub
+from api.routers import auth, documents, realtime, workspaces
 from api.schemas.document import DocumentRead, DocumentVersionConflict
 from api.services.documents import StaleDocumentVersionError
 
@@ -29,6 +31,8 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
+    await app.state.hub.aclose()
+    await close_redis()
     await get_engine().dispose()  # close pooled connections on shutdown
 
 
@@ -104,9 +108,15 @@ def create_app() -> FastAPI:
             allow_headers=["*"],
         )
 
+    # One per app instance rather than a module singleton, so each Uvicorn
+    # worker gets its own -- and so the test suite can stand two of them up
+    # against one Redis and watch a message cross between them.
+    app.state.hub = DocumentHub(get_redis())
+
     app.include_router(auth.router)
     app.include_router(workspaces.router)
     app.include_router(documents.router)
+    app.include_router(realtime.router)
 
     @app.get("/health", tags=["meta"], summary="Liveness probe")
     async def health() -> dict[str, str]:

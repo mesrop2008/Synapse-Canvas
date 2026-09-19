@@ -1,6 +1,11 @@
-"""No FastAPI imports: Part 3's WebSocket handlers call these same functions,
-and a handler cannot raise an HTTPException usefully. Failures are the domain
-exceptions from `api.core.exceptions`."""
+"""No FastAPI imports: the WebSocket handlers call these same functions, and a
+handler cannot raise an HTTPException usefully. Failures are the domain
+exceptions from `api.core.exceptions`.
+
+`apply_change` is the only way document content changes -- the WebSocket edit
+handler and the HTTP PATCH both go through it, so there are not two write paths
+to keep in step.
+"""
 
 from __future__ import annotations
 
@@ -9,11 +14,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Final
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.exceptions import ConflictError, NotFoundError
 from api.models.document import Document
+from api.models.document_change import DocumentChange
+from api.models.enums import WorkspaceRole
+from api.models.workspace_member import WorkspaceMember
 
 # The smallest valid ProseMirror doc node; Tiptap refuses anything else.
 EMPTY_DOCUMENT: Final[dict[str, Any]] = {"type": "doc", "content": []}
@@ -52,6 +60,22 @@ def snapshot(document: Document) -> DocumentSnapshot:
     )
 
 
+@dataclass(frozen=True, slots=True)
+class AppliedChange:
+    """One accepted edit: the log row that was written and the snapshot it
+    produced."""
+
+    document: DocumentSnapshot
+    change_id: uuid.UUID
+    base_version: int
+    operation: dict[str, Any]
+    user_id: uuid.UUID | None
+
+    @property
+    def version(self) -> int:
+        return self.document.version
+
+
 class StaleDocumentVersionError(ConflictError):
     """Carries the stored state so the caller can re-sync the client.
 
@@ -82,6 +106,20 @@ async def create_document(
         content=EMPTY_DOCUMENT if content is None else content,
     )
     db.add(document)
+    await db.flush()  # the UUID default lands here, and the log row needs it
+
+    # Version 1 is a log entry too, from a base of 0. Without it the log would
+    # start mid-history and could not be replayed from nothing.
+    db.add(
+        DocumentChange(
+            document_id=document.id,
+            user_id=created_by,
+            base_version=0,
+            version=document.version,
+            operation=patch_operation(title, document.content),
+        )
+    )
+
     await db.commit()
     await db.refresh(document)
     return document
@@ -131,55 +169,148 @@ async def get_document(
     return document
 
 
+async def apply_change(
+    db: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    document_id: uuid.UUID,
+    user_id: uuid.UUID | None,
+    base_version: int,
+    operation: dict[str, Any],
+    content: dict[str, Any] | None = None,
+    title: str | None = None,
+) -> AppliedChange:
+    """Append `operation` to the log and materialise its result, or raise
+    `StaleDocumentVersionError` if `base_version` is no longer the head.
+
+    `operation` is what peers replay and what the log keeps; `content`/`title`
+    are the state it produces, computed by the caller. The client is trusted for
+    that only because `base_version` had to match exactly -- it derived the
+    result from the same bytes this row holds.
+
+    The `FOR UPDATE` is the load-bearing decision in the whole feature. It
+    serialises every writer of *this* document from the read of its version to
+    the commit that moves it, which is what makes "exactly one of two
+    simultaneous edits wins" true rather than likely. Locks are per row, so
+    edits to different documents never wait on each other -- concurrency is
+    bounded by how many people are in one document, not by how busy the
+    deployment is.
+    """
+    document = (
+        await db.execute(
+            select(Document)
+            .where(Document.id == document_id, Document.workspace_id == workspace_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one_or_none()
+
+    if document is None:
+        await db.rollback()
+        raise NotFoundError("Document not found")
+
+    if document.version != base_version:
+        stale = snapshot(document)
+        await db.rollback()  # releases the lock; nothing was written
+        raise StaleDocumentVersionError(stale)
+
+    version = document.version + 1
+    change = DocumentChange(
+        document_id=document.id,
+        user_id=user_id,
+        base_version=base_version,
+        version=version,
+        operation=operation,
+    )
+    db.add(change)
+
+    if content is not None:
+        document.content = content
+    if title is not None:
+        document.title = title
+    document.version = version
+
+    await db.commit()
+    return AppliedChange(
+        document=snapshot(document),
+        change_id=change.id,
+        base_version=base_version,
+        operation=operation,
+        user_id=user_id,
+    )
+
+
+def patch_operation(
+    title: str | None, content: dict[str, Any] | None
+) -> dict[str, Any]:
+    """The log entry for an HTTP PATCH.
+
+    A PATCH replaces rather than transforms, so it cannot be expressed as steps.
+    Peers receiving `replace` swap their whole document for it; peers receiving
+    `title` only relabel. Both still consume a version, which is what keeps the
+    log a complete history of the row.
+    """
+    operation: dict[str, Any] = {}
+    if content is not None:
+        operation["replace"] = content
+    if title is not None:
+        operation["title"] = title
+    return operation
+
+
 async def update_document(
     db: AsyncSession,
     *,
     workspace_id: uuid.UUID,
     document_id: uuid.UUID,
     expected_version: int,
+    user_id: uuid.UUID | None = None,
     title: str | None = None,
     content: dict[str, Any] | None = None,
-) -> Document:
-    """Apply an edit if `expected_version` is still current, else raise
-    `StaleDocumentVersionError`.
-
-    The check is in the UPDATE's WHERE clause, not a preceding SELECT, so there
-    is no window between them: two concurrent calls holding the same version
-    serialise on the row lock, and the loser re-evaluates the predicate against
-    the winner's committed row and matches nothing. SELECT-then-UPDATE would let
-    both write.
+) -> AppliedChange:
+    """The HTTP PATCH path. Onto the same lock, and into the same log, as an
+    edit arriving over a WebSocket.
 
     `None` means "leave alone"; neither column is nullable, so nothing is lost.
     """
-    values: dict[str, Any] = {}
-    if title is not None:
-        values["title"] = title
-    if content is not None:
-        values["content"] = content
-    if not values:
+    if title is None and content is None:
         raise ValueError("update_document requires a title or content")
 
-    result = await db.execute(
-        update(Document)
-        .where(
-            Document.id == document_id,
-            Document.workspace_id == workspace_id,
-            Document.version == expected_version,
-        )
-        .values(**values, version=Document.version + 1)
-        .returning(Document)
+    return await apply_change(
+        db,
+        workspace_id=workspace_id,
+        document_id=document_id,
+        user_id=user_id,
+        base_version=expected_version,
+        operation=patch_operation(title, content),
+        content=content,
+        title=title,
     )
-    document = result.scalar_one_or_none()
 
-    if document is None:
-        await db.rollback()
-        current = await find_document(db, workspace_id, document_id)
-        if current is None:
-            raise NotFoundError("Document not found")
-        raise StaleDocumentVersionError(snapshot(current))
 
-    await db.commit()
-    return document
+async def get_document_for_user(
+    db: AsyncSession, document_id: uuid.UUID, user_id: uuid.UUID
+) -> tuple[Document, WorkspaceRole]:
+    """Resolve a document by id alone, plus the caller's role in the workspace
+    that owns it -- the WebSocket routes are not workspace-scoped.
+
+    The inner join means a document in a workspace the caller is not a member of
+    reads exactly like a document that does not exist.
+    """
+    row = (
+        await db.execute(
+            select(Document, WorkspaceMember.role)
+            .join(
+                WorkspaceMember,
+                WorkspaceMember.workspace_id == Document.workspace_id,
+            )
+            .where(Document.id == document_id, WorkspaceMember.user_id == user_id)
+        )
+    ).first()
+
+    if row is None:
+        raise NotFoundError("Document not found")
+    return row[0], row[1]
 
 
 async def delete_document(

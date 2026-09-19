@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     # Separate database: the suite drops and recreates every table in it.
     test_database_url: str | None = None
 
+    redis_url: str = "redis://localhost:6379/0"
+
     jwt_secret_key: str = Field(min_length=32)
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
@@ -62,6 +64,24 @@ class Settings(BaseSettings):
 
     # Only behind a proxy you control; the header is client-spoofable.
     trust_proxy_headers: bool = False
+
+    # --- real-time collaboration -------------------------------------------
+    # Long enough for the browser to open the socket, short enough that a
+    # ticket leaked through a log or Referer is already dead.
+    ws_ticket_ttl_seconds: int = 30
+    # The client pings on this interval; the server drops a socket that has
+    # said nothing for the timeout. The timeout is the larger of the two by
+    # several pings, so one lost packet does not close a healthy connection.
+    ws_heartbeat_interval_seconds: int = 10
+    ws_idle_timeout_seconds: int = 45
+    # An edit carries the resulting document, so the cap scales with document
+    # size rather than keystroke size.
+    ws_max_message_bytes: int = 262_144
+    ws_edit_rate_limit: int = 60
+    ws_edit_rate_limit_window_seconds: int = 10
+    # Presence entries outlive a dropped socket by this much before a peer
+    # sweeps them; a few seconds of a ghost cursor beats flickering peers.
+    presence_ttl_seconds: int = 30
 
     # str, not list[str]: pydantic-settings JSON-decodes complex types before
     # validators run, which makes CSV env vars awkward.
