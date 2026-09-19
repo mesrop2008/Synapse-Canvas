@@ -1,4 +1,4 @@
-"""Translation only; the logic is in `api.services.documents`, which Part 3's
+"""Translation only; the logic is in `api.services.documents`, which the
 WebSocket handlers share."""
 
 from __future__ import annotations
@@ -94,15 +94,16 @@ async def update_document(
     ctx: RequireEditor,
     db: DbSession,
 ) -> DocumentRead:
-    document = await document_service.update_document(
+    applied = await document_service.update_document(
         db,
         workspace_id=ctx.workspace.id,
         document_id=document_id,
         expected_version=payload.version,
+        user_id=ctx.user.id,
         title=payload.title,
         content=payload.content,
     )
-    return DocumentRead.model_validate(document)
+    return DocumentRead.model_validate(applied.document)
 
 
 @router.delete(
