@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useBlocker, useParams } from 'react-router-dom';
-import { EditorContent, useEditor } from '@tiptap/react';
+import { EditorContent, useEditor, type EditorEvents } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
 import { Step } from '@tiptap/pm/transform';
@@ -85,9 +85,9 @@ function DocumentEditor({
   const applyingRemote = useRef(false);
   const lastCursorSentAt = useRef(0);
   // onTransaction fires during construction, before `socket` below exists.
-  const onTransactionRef = useRef<(payload: TransactionPayload) => void>(
-    () => {},
-  );
+  const onTransactionRef = useRef<
+    (payload: EditorEvents['transaction']) => void
+  >(() => {});
 
   const editor = useEditor(
     {
@@ -283,9 +283,6 @@ function DocumentEditor({
 }
 
 type TiptapEditor = NonNullable<ReturnType<typeof useEditor>>;
-type TransactionPayload = Parameters<
-  NonNullable<Parameters<typeof useEditor>[0]>['onTransaction'] & object
->[0];
 
 /** Enough to exercise what StarterKit provides. */
 function Toolbar({
