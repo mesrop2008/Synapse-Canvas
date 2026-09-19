@@ -854,12 +854,16 @@ a:hover {
   animation: pulse 1.1s ease-in-out infinite;
 }
 
-.connection-indicator[data-state='offline'] {
+.connection-indicator[data-state='offline'],
+.connection-indicator[data-state='deleted'],
+.connection-indicator[data-state='unavailable'] {
   background: var(--danger-soft);
   color: var(--danger);
 }
 
-.connection-indicator[data-state='offline'] .dot {
+.connection-indicator[data-state='offline'] .dot,
+.connection-indicator[data-state='deleted'] .dot,
+.connection-indicator[data-state='unavailable'] .dot {
   background: var(--danger);
 }
 

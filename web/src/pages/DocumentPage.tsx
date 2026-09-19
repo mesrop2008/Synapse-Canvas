@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useBlocker, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { EditorContent, useEditor, type EditorEvents } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
@@ -12,7 +13,7 @@ import { ConnectionIndicator } from '../components/ConnectionIndicator';
 import { PeerList } from '../components/PeerList';
 import { ChevronRightIcon } from '../components/icons';
 import { RemoteCursors, setRemotePeers } from '../editor/remoteCursors';
-import { useDocument } from '../hooks/useDocuments';
+import { documentKeys, useDocument } from '../hooks/useDocuments';
 import {
   useDocumentSocket,
   type DocumentSocketCallbacks,
@@ -161,6 +162,8 @@ function DocumentEditor({
 
   const socket = useDocumentSocket(loaded.id, callbacks);
   const live = socket.state === 'live';
+  const gone =
+    socket.state === 'deleted' || socket.state === 'unavailable';
 
   const titleSave = useTitleSave({
     workspaceId,
@@ -203,6 +206,19 @@ function DocumentEditor({
     if (editor) setRemotePeers(editor.view, socket.peers);
   }, [editor, socket.peers]);
 
+  // The list the user lands on after following the link out has to be right.
+  // `exact`, because the detail key sits under the list key: without it this
+  // refetches the document too, gets a 404, and replaces the notice below with
+  // a generic error that says none of what happened.
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!gone) return;
+    void queryClient.invalidateQueries({
+      queryKey: documentKeys.list(workspaceId),
+      exact: true,
+    });
+  }, [gone, queryClient, workspaceId]);
+
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       titleSave.isDirty && currentLocation.pathname !== nextLocation.pathname,
@@ -231,7 +247,20 @@ function DocumentEditor({
         </Alert>
       )}
 
-      {writable && !live && (
+      {gone && (
+        <Alert>
+          {t(
+            socket.state === 'deleted'
+              ? 'document.gone.deleted'
+              : 'document.gone.unavailable',
+          )}{' '}
+          <Link to={`/workspaces/${workspaceId}`}>
+            {t('document.backToWorkspace')}
+          </Link>
+        </Alert>
+      )}
+
+      {writable && !live && !gone && (
         <Alert kind="warn">
           {t(
             socket.state === 'offline'

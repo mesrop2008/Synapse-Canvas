@@ -28,7 +28,9 @@
     "live": "Live",
     "reconnecting": "Reconnecting…",
     "offline": "Offline",
-    "version": "v{version}"
+    "version": "v{version}",
+    "deleted": "Deleted",
+    "unavailable": "Unavailable"
   },
   "peers": {
     "label": "{count} other people in this document"
@@ -40,5 +42,9 @@
   "offline": {
     "connecting": "Connecting to the live session. Editing is paused until it is ready.",
     "stalled": "No live connection, so editing is paused. Reconnecting in the background — nothing you have written is lost."
+  },
+  "gone": {
+    "deleted": "This document was deleted by someone else in the workspace. Nothing more can be saved to it.",
+    "unavailable": "This document is no longer available to you. It may have been deleted, or your access to the workspace may have changed."
   }
 }

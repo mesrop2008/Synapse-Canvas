@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { ApiError } from '../api/client';
 import { createWsTicket, documentSocketUrl } from '../api/realtime';
 import type {
   InitMessage,
@@ -9,7 +10,18 @@ import type {
   WorkspaceRole,
 } from '../types/api';
 
-export type ConnectionState = 'connecting' | 'live' | 'reconnecting' | 'offline';
+/**
+ * `deleted` and `unavailable` are terminal: retrying cannot fix either, so the
+ * hook stops rather than leaving the user watching a document that is gone
+ * promise to reconnect forever.
+ */
+export type ConnectionState =
+  | 'connecting'
+  | 'live'
+  | 'reconnecting'
+  | 'offline'
+  | 'deleted'
+  | 'unavailable';
 
 /**
  * Why local state was thrown away. `rejected`: someone else's edit reached the
@@ -163,6 +175,21 @@ export function useDocumentSocket(
     awaitingAck.current = false;
   }, []);
 
+  /** Give up for good. Nothing here is recoverable by waiting. */
+  const stop = useCallback(
+    (reason: 'deleted' | 'unavailable') => {
+      closed.current = true;
+      generation.current += 1;
+      if (sendTimer.current !== null) window.clearTimeout(sendTimer.current);
+      if (retryTimer.current !== null) window.clearTimeout(retryTimer.current);
+      pending.current = null;
+      dropSocket();
+      setPeers([]);
+      setState(reason);
+    },
+    [dropSocket],
+  );
+
   const scheduleRetry = useCallback(() => {
     if (closed.current) return;
     attempts.current += 1;
@@ -253,6 +280,9 @@ export function useDocumentSocket(
             current.filter((p) => p.user_id !== message.user_id),
           );
           return;
+        case 'deleted':
+          stop('deleted');
+          return;
         case 'error':
           // Retrying fixes none of these: a viewer's edit, or a frame this
           // client should not have sent in the first place.
@@ -262,7 +292,7 @@ export function useDocumentSocket(
           return;
       }
     },
-    [flush, resync],
+    [flush, resync, stop],
   );
 
   connect.current = useCallback(() => {
@@ -315,11 +345,18 @@ export function useDocumentSocket(
           scheduleRetry();
         };
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (closed.current || attempt !== generation.current) return;
+        // 404 covers both "no such document" and "you are not a member" -- the
+        // API does not distinguish them on purpose. Either way, waiting will
+        // not help.
+        if (error instanceof ApiError && [403, 404].includes(error.status)) {
+          stop('unavailable');
+          return;
+        }
         scheduleRetry();
       });
-  }, [documentId, dropSocket, handle, scheduleRetry, send]);
+  }, [documentId, dropSocket, handle, scheduleRetry, send, stop]);
 
   useEffect(() => {
     closed.current = false;
