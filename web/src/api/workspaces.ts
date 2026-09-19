@@ -12,3 +12,7 @@ export function getWorkspace(workspaceId: string): Promise<Workspace> {
 export function createWorkspace(name: string): Promise<Workspace> {
   return request<Workspace>('POST', '/workspaces', { body: { name } });
 }
+
+export function deleteWorkspace(workspaceId: string): Promise<void> {
+  return request<void>('DELETE', `/workspaces/${workspaceId}`);
+}

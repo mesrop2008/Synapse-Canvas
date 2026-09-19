@@ -3,11 +3,16 @@ import { Link } from 'react-router-dom';
 
 import { errorMessage } from '../api/errors';
 import { Alert } from '../components/Alert';
-import { FolderIcon, PlusIcon } from '../components/icons';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { FolderIcon, PlusIcon, TrashIcon } from '../components/icons';
 import { useI18n } from '../hooks/useI18n';
-import { useCreateWorkspace, useWorkspaces } from '../hooks/useWorkspaces';
+import {
+  useCreateWorkspace,
+  useDeleteWorkspace,
+  useWorkspaces,
+} from '../hooks/useWorkspaces';
 import type { MessageKey } from '../../i18n';
-import type { WorkspaceRole } from '../types/api';
+import type { Workspace, WorkspaceRole } from '../types/api';
 
 const ROLE_LABELS: Record<WorkspaceRole, MessageKey> = {
   owner: 'common.roles.owner',
@@ -16,10 +21,12 @@ const ROLE_LABELS: Record<WorkspaceRole, MessageKey> = {
 };
 
 export function WorkspacesPage() {
-  const { t } = useI18n();
+  const { t, tNode } = useI18n();
   const workspaces = useWorkspaces();
   const create = useCreateWorkspace();
+  const remove = useDeleteWorkspace();
   const [name, setName] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<Workspace | null>(null);
 
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault();
@@ -60,9 +67,16 @@ export function WorkspacesPage() {
         </button>
       </form>
 
-      {create.error && (
-        <Alert onDismiss={() => create.reset()}>
-          {errorMessage(create.error, 'workspaces.createFailed')}
+      {(create.error || remove.error) && (
+        <Alert
+          onDismiss={() => {
+            create.reset();
+            remove.reset();
+          }}
+        >
+          {create.error
+            ? errorMessage(create.error, 'workspaces.createFailed')
+            : errorMessage(remove.error, 'workspaces.deleteFailed')}
         </Alert>
       )}
 
@@ -88,6 +102,20 @@ export function WorkspacesPage() {
                 <span className="row-icon">
                   <FolderIcon size={18} />
                 </span>
+                {/* Owners only. The server enforces it either way; hiding the
+                    button just avoids offering one that can only fail. */}
+                {workspace.role === 'owner' && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-danger btn-icon row-action"
+                    title={t('workspaces.delete', { name: workspace.name })}
+                    aria-label={t('workspaces.delete', { name: workspace.name })}
+                    onClick={() => setPendingDelete(workspace)}
+                    disabled={remove.isPending}
+                  >
+                    <TrashIcon />
+                  </button>
+                )}
               </div>
               <div className="row-main">
                 <Link className="row-title" to={`/workspaces/${workspace.id}`}>
@@ -102,6 +130,26 @@ export function WorkspacesPage() {
         </div>
       )}
 
+      {pendingDelete && (
+        <ConfirmDialog
+          title={t('workspaces.deleteTitle')}
+          message={tNode('workspaces.deleteMessage', {
+            name: <strong>{pendingDelete.name}</strong>,
+          })}
+          confirmLabel={t('common.delete')}
+          confirmPhrase={pendingDelete.name}
+          confirmPhraseLabel={t('workspaces.deleteConfirmLabel', {
+            name: pendingDelete.name,
+          })}
+          destructive
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={() => {
+            const target = pendingDelete;
+            setPendingDelete(null);
+            remove.mutate(target.id);
+          }}
+        />
+      )}
     </main>
   );
 }

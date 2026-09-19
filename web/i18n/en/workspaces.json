@@ -7,5 +7,10 @@
   "creating": "Creating…",
   "createFailed": "Could not create the workspace.",
   "emptyTitle": "No workspaces yet",
-  "emptyText": "Name one above to get going."
+  "emptyText": "Name one above to get going.",
+  "delete": "Delete the workspace {name}",
+  "deleteTitle": "Delete this workspace?",
+  "deleteMessage": "This deletes {name}, every document in it and all of their history. Everyone else loses access at once. It cannot be undone.",
+  "deleteConfirmLabel": "Type {name} to confirm",
+  "deleteFailed": "Could not delete the workspace."
 }
