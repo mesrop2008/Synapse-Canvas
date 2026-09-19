@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { asVersionConflict, updateDocument } from '../api/documents';
-import { errorMessage } from '../api/errors';
+import { failed, type FailedRequest } from '../api/errors';
 
 export type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error';
 
@@ -16,7 +16,7 @@ interface UseTitleSaveOptions {
 
 export interface TitleSave {
   status: SaveStatus;
-  error: string | null;
+  error: FailedRequest | null;
   schedule: () => void;
   isDirty: boolean;
   clearError: () => void;
@@ -43,7 +43,7 @@ export function useTitleSave({
   delayMs = 800,
 }: UseTitleSaveOptions): TitleSave {
   const [status, setStatus] = useState<SaveStatus>('saved');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FailedRequest | null>(null);
 
   const timer = useRef<number | null>(null);
   const inFlight = useRef(false);
@@ -79,7 +79,7 @@ export function useTitleSave({
           } catch (caught) {
             const conflict = asVersionConflict(caught);
             if (!conflict) {
-              setError(errorMessage(caught, 'document.save.failed'));
+              setError(failed(caught, 'document.save.failed'));
               setStatus('error');
               return;
             }
@@ -88,7 +88,7 @@ export function useTitleSave({
         }
 
         if (!saved) {
-          setError(errorMessage(null, 'document.save.failed'));
+          setError(failed(null, 'document.save.failed'));
           setStatus('error');
           return;
         }

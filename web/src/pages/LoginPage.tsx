@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 
-import { errorMessage } from '../api/errors';
+import { describeFailure, failed, type FailedRequest } from '../api/errors';
 import { Alert } from '../components/Alert';
 import { LanguageToggle } from '../components/LanguageToggle';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -17,7 +17,7 @@ export function LoginPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FailedRequest | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Set by ProtectedRoute when it intercepted a deep link.
@@ -38,7 +38,7 @@ export function LoginPage() {
       await signIn(email, password);
       navigate(from, { replace: true });
     } catch (caught) {
-      setError(errorMessage(caught, 'login.failed'));
+      setError(failed(caught, 'login.failed'));
     } finally {
       setSubmitting(false);
     }
@@ -60,7 +60,11 @@ export function LoginPage() {
         <h1 className="auth-title">{t('login.title')}</h1>
         <p className="auth-lede">{t('login.lede')}</p>
 
-        {error && <Alert onDismiss={() => setError(null)}>{error}</Alert>}
+        {error && (
+          <Alert onDismiss={() => setError(null)}>
+            {describeFailure(error)}
+          </Alert>
+        )}
 
         <div className="field">
           <label htmlFor="email">{t('login.email')}</label>

@@ -6,7 +6,7 @@ import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
 import { Step } from '@tiptap/pm/transform';
 
-import { errorMessage } from '../api/errors';
+import { describeFailure, errorMessage } from '../api/errors';
 import { Alert } from '../components/Alert';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ConnectionIndicator } from '../components/ConnectionIndicator';
@@ -271,7 +271,9 @@ function DocumentEditor({
       )}
 
       {titleSave.error && (
-        <Alert onDismiss={titleSave.clearError}>{titleSave.error}</Alert>
+        <Alert onDismiss={titleSave.clearError}>
+          {describeFailure(titleSave.error)}
+        </Alert>
       )}
 
       <div className="doc-head">
