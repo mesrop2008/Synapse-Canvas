@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { useI18n } from '../hooks/useI18n';
 
@@ -8,6 +8,10 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   destructive?: boolean;
+  /** Require this typed back before confirming. For actions that take other
+   *  people's work with them, where a misplaced click is not recoverable. */
+  confirmPhrase?: string;
+  confirmPhraseLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -20,14 +24,21 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel,
   destructive = false,
+  confirmPhrase,
+  confirmPhraseLabel,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
   const { t } = useI18n();
   const confirmButton = useRef<HTMLButtonElement>(null);
+  const phraseInput = useRef<HTMLInputElement>(null);
+  const [typed, setTyped] = useState('');
+  const locked = confirmPhrase !== undefined && typed.trim() !== confirmPhrase;
 
   useEffect(() => {
-    confirmButton.current?.focus();
+    // Focus the field when there is one: focusing a button the user cannot
+    // press yet tells them nothing about what to do next.
+    (phraseInput.current ?? confirmButton.current)?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onCancel();
     };
@@ -46,6 +57,19 @@ export function ConfirmDialog({
       <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
         <h2 className="modal-title">{title}</h2>
         <div className="modal-text">{message}</div>
+        {confirmPhrase !== undefined && (
+          <label className="modal-field">
+            <span>{confirmPhraseLabel}</span>
+            <input
+              ref={phraseInput}
+              className="input"
+              type="text"
+              autoComplete="off"
+              value={typed}
+              onChange={(event) => setTyped(event.target.value)}
+            />
+          </label>
+        )}
         <div className="modal-actions">
           <button type="button" className="btn btn-secondary" onClick={onCancel}>
             {cancelLabel ?? t('common.cancel')}
@@ -54,6 +78,7 @@ export function ConfirmDialog({
             ref={confirmButton}
             type="button"
             className={`btn ${destructive ? 'btn-secondary btn-danger' : 'btn-primary'}`}
+            disabled={locked}
             onClick={onConfirm}
           >
             {confirmLabel ?? t('common.confirm')}

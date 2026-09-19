@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, status
 
 from api.dependencies import CurrentUser, DbSession, RequireOwner, RequireViewer
 from api.schemas.workspace import (
@@ -16,6 +16,7 @@ from api.schemas.workspace import (
     WorkspaceWithRole,
     workspace_with_role,
 )
+from api.services import documents as document_service
 from api.services import workspace_service
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
@@ -88,8 +89,20 @@ async def update_workspace(
     summary="Delete a workspace (owner only)",
     responses=_OWNER_RESPONSES,
 )
-async def delete_workspace(ctx: RequireOwner, db: DbSession) -> None:
+async def delete_workspace(
+    ctx: RequireOwner, db: DbSession, request: Request
+) -> None:
+    # Listed before the delete, because the rows are gone after it. Deleting a
+    # workspace deletes its documents by cascade, and someone with one of them
+    # open has to hear the same thing as if it had been deleted on its own.
+    documents = await document_service.list_documents(db, ctx.workspace.id)
+
     await workspace_service.delete_workspace(db, ctx.workspace)
+
+    for document in documents:
+        await request.app.state.hub.publish(
+            document.id, {"type": "deleted", "user_id": str(ctx.user.id)}
+        )
 
 
 @router.get(

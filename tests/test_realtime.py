@@ -427,6 +427,39 @@ def test_deleting_a_document_tells_everyone_who_has_it_open(live: Fixture) -> No
         assert response.status_code == 404
 
 
+def test_deleting_the_workspace_also_closes_its_documents(live: Fixture) -> None:
+    """A workspace delete cascades to its documents, so it has to reach their
+    open sockets too -- otherwise only the direct delete path is honest."""
+    with websocket_app() as client:
+        ticket = ticket_for(client, live, live.editor_token)
+
+        with client.websocket_connect(socket_url(live, ticket)) as websocket:
+            assert websocket.receive_json()["type"] == "init"
+
+            response = client.delete(
+                f"/workspaces/{live.workspace_id}",
+                headers=live.auth(live.owner_token),  # owner only
+            )
+            assert response.status_code == 204
+
+            assert websocket.receive_json() == {
+                "type": "deleted",
+                "user_id": str(live.owner_id),
+            }
+
+
+def test_only_the_owner_can_delete_the_workspace(live: Fixture) -> None:
+    with websocket_app() as client:
+        response = client.delete(
+            f"/workspaces/{live.workspace_id}",
+            headers=live.auth(live.editor_token),
+        )
+        assert response.status_code == 403
+        assert client.get(
+            f"/workspaces/{live.workspace_id}", headers=live.auth(live.editor_token)
+        ).status_code == 200
+
+
 def test_deleting_a_document_takes_its_change_log_with_it(live: Fixture) -> None:
     with websocket_app() as client:
         ticket = ticket_for(client, live, live.editor_token)

@@ -214,7 +214,8 @@ when a step will not apply, the client reconnects and takes the server's
 document, with a non-destructive notice saying so.
 
 Two states are terminal rather than retried. `deleted` arrives when an editor
-or owner removes the document, which cascades its change log away with it;
+or owner removes the document -- or when the owner deletes the whole workspace,
+which cascades through its documents to their change logs;
 `unavailable` is a 404 or 403 on the ticket, which covers both "no such
 document" and "you are no longer a member" -- the API does not distinguish them,
 on purpose. Neither is fixed by waiting, so the client stops and says which one
