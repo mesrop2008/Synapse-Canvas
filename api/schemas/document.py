@@ -64,5 +64,6 @@ class DocumentVersionConflict(BaseModel):
     """409 body. `current` is the server's row, so a client that lost the race
     can re-sync without a second request."""
 
+    code: str
     detail: str
     current: DocumentRead

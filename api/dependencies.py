@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.core.config import get_settings
 from api.core.exceptions import (
     AuthenticationError,
+    ErrorCode,
     NotFoundError,
     PermissionDeniedError,
 )
@@ -39,13 +40,15 @@ async def get_current_user(
     ],
 ) -> User:
     if credentials is None:
-        raise AuthenticationError("Not authenticated")
+        raise AuthenticationError(
+            "Not authenticated", code=ErrorCode.NOT_AUTHENTICATED
+        )
 
     payload = decode_token(credentials.credentials, ACCESS_TOKEN)
     user = await auth_service.get_user_by_id(db, subject_uuid(payload))
     if user is None:
         # Valid signature, deleted account: the token must stop working.
-        raise AuthenticationError("User no longer exists")
+        raise AuthenticationError("User no longer exists", code=ErrorCode.USER_GONE)
     return user
 
 
@@ -82,13 +85,16 @@ class WorkspaceAccess:
             db, workspace_id, current_user.id
         )
         if found is None:
-            raise NotFoundError("Workspace not found")
+            raise NotFoundError(
+                "Workspace not found", code=ErrorCode.WORKSPACE_NOT_FOUND
+            )
 
         workspace, role = found
         if not role.satisfies(self.minimum_role):
             raise PermissionDeniedError(
                 f"This action requires the '{self.minimum_role}' role or higher; "
-                f"your role is '{role}'."
+                f"your role is '{role}'.",
+                code=ErrorCode.ROLE_TOO_LOW,
             )
         return WorkspaceContext(workspace=workspace, role=role, user=current_user)
 

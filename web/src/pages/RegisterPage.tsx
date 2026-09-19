@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 
 import { register, resendVerification } from '../api/auth';
-import { errorMessage } from '../api/errors';
+import { describeFailure, failed, type FailedRequest } from '../api/errors';
 import { Alert } from '../components/Alert';
 import { LanguageToggle } from '../components/LanguageToggle';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -17,7 +17,7 @@ export function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FailedRequest | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [resent, setResent] = useState(false);
@@ -32,7 +32,7 @@ export function RegisterPage() {
       await register(email, password, name);
       setSubmitted(true);
     } catch (caught) {
-      setError(errorMessage(caught, 'register.failed'));
+      setError(failed(caught, 'register.failed'));
     } finally {
       setSubmitting(false);
     }
@@ -103,7 +103,11 @@ export function RegisterPage() {
         <h1 className="auth-title">{t('register.title')}</h1>
         <p className="auth-lede">{t('register.lede')}</p>
 
-        {error && <Alert onDismiss={() => setError(null)}>{error}</Alert>}
+        {error && (
+          <Alert onDismiss={() => setError(null)}>
+            {describeFailure(error)}
+          </Alert>
+        )}
 
         <div className="field">
           <label htmlFor="name">{t('register.name')}</label>

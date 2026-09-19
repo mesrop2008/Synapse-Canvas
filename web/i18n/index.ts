@@ -79,16 +79,27 @@ export function isLocale(value: unknown): value is Locale {
   return typeof value === 'string' && (LOCALES as readonly string[]).includes(value);
 }
 
-/** The raw template, before interpolation. */
-export function template(locale: Locale, key: MessageKey): string {
+/**
+ * Walk a dotted path, or null if the pack has no string there.
+ *
+ * Takes a plain string rather than a `MessageKey`, because API error codes
+ * arrive at runtime and cannot be checked at compile time. Everything else
+ * should go through `template`, which is typed.
+ */
+export function lookup(locale: Locale, key: string): string | null {
   let node: unknown = MESSAGES[locale];
   for (const segment of key.split('.')) {
-    if (typeof node !== 'object' || node === null) break;
+    if (typeof node !== 'object' || node === null) return null;
     node = (node as Record<string, unknown>)[segment];
   }
+  return typeof node === 'string' ? node : null;
+}
+
+/** The raw template, before interpolation. */
+export function template(locale: Locale, key: MessageKey): string {
   // Falls back to the key so a gap looks wrong rather than taking the page
   // down; `MessageKey` keeps that hypothetical.
-  return typeof node === 'string' ? node : key;
+  return lookup(locale, key) ?? key;
 }
 
 export const PLACEHOLDER = /\{(\w+)\}/g;

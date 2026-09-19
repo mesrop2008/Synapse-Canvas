@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { verifyEmail } from '../api/auth';
-import { errorMessage } from '../api/errors';
+import { describeFailure, failed, type FailedRequest } from '../api/errors';
 import { Alert } from '../components/Alert';
 import { LanguageToggle } from '../components/LanguageToggle';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -19,7 +19,7 @@ export function VerifyEmailPage() {
   const token = params.get('token');
 
   const [state, setState] = useState<State>(token ? 'verifying' : 'missing');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FailedRequest | null>(null);
   // The token is single-use and StrictMode runs this effect twice in dev.
   const attempted = useRef(false);
 
@@ -30,7 +30,7 @@ export function VerifyEmailPage() {
     verifyEmail(token)
       .then(() => setState('verified'))
       .catch((caught: unknown) => {
-        setError(errorMessage(caught, 'verifyEmail.failed'));
+        setError(failed(caught, 'verifyEmail.failed'));
         setState('failed');
       });
   }, [token]);
@@ -64,7 +64,7 @@ export function VerifyEmailPage() {
 
         {state === 'failed' && (
           <>
-            <Alert>{error}</Alert>
+            <Alert>{error && describeFailure(error)}</Alert>
             <p className="note">{t('verifyEmail.expiredNote')}</p>
           </>
         )}

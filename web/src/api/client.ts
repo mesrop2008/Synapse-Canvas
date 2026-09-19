@@ -27,10 +27,18 @@ export class ApiError extends Error {
     /** Parsed body, for endpoints returning more than `detail` -- PATCH
      *  /documents returns the server's row alongside its 409. */
     readonly body: unknown,
+    /** Stable identifier from the API, translated by the language packs.
+     *  Null for a response that carries no code, such as a proxy's own. */
+    readonly code: string | null = null,
   ) {
     super(detail);
     this.name = 'ApiError';
   }
+}
+
+function errorCode(body: unknown): string | null {
+  const code = (body as ErrorBody | null)?.code;
+  return typeof code === 'string' ? code : null;
 }
 
 export function getRefreshToken(): string | null {
@@ -183,7 +191,12 @@ export async function request<T>(
 
   const parsed = await readBody(response);
   if (!response.ok) {
-    throw new ApiError(response.status, describe(response.status, parsed), parsed);
+    throw new ApiError(
+      response.status,
+      describe(response.status, parsed),
+      parsed,
+      errorCode(parsed),
+    );
   }
   return parsed as T;
 }

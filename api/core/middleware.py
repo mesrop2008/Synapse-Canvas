@@ -8,6 +8,8 @@ from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from api.core.exceptions import ErrorCode
+
 # Swagger/ReDoc load CDN assets that default-src 'none' would block.
 _CSP_EXEMPT_PATHS = frozenset({"/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect"})
 
@@ -57,13 +59,18 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
                 declared = int(content_length)
             except ValueError:
                 return JSONResponse(
-                    status_code=400, content={"detail": "Malformed Content-Length"}
+                    status_code=400,
+                    content={
+                        "code": ErrorCode.REQUEST_MALFORMED_LENGTH.value,
+                        "detail": "Malformed Content-Length",
+                    },
                 )
             if declared > self.max_bytes:
                 return JSONResponse(
                     status_code=413,
                     content={
-                        "detail": "Request body exceeds %d bytes" % self.max_bytes
+                        "code": ErrorCode.REQUEST_TOO_LARGE.value,
+                        "detail": "Request body exceeds %d bytes" % self.max_bytes,
                     },
                 )
         return await call_next(request)

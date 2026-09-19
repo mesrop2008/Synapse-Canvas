@@ -11,7 +11,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.config import get_settings
-from api.core.exceptions import AuthenticationError, EmailNotVerifiedError
+from api.core.exceptions import (
+    AuthenticationError,
+    EmailNotVerifiedError,
+    ErrorCode,
+)
 from api.core.security import (
     REFRESH_TOKEN,
     generate_url_token,
@@ -117,11 +121,17 @@ async def verify_email(db: AsyncSession, raw_token: str) -> User:
 
     # Unknown, spent and expired are one indistinguishable failure to the caller.
     if token is None or token.used_at is not None or token.expires_at <= now:
-        raise AuthenticationError("Invalid or expired verification token")
+        raise AuthenticationError(
+            "Invalid or expired verification token",
+            code=ErrorCode.VERIFICATION_INVALID,
+        )
 
     user = await db.get(User, token.user_id)
     if user is None:
-        raise AuthenticationError("Invalid or expired verification token")
+        raise AuthenticationError(
+            "Invalid or expired verification token",
+            code=ErrorCode.VERIFICATION_INVALID,
+        )
 
     token.used_at = now
     if user.email_verified_at is None:
@@ -162,12 +172,16 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> User
         await burn_password_verification()
         if limit > 0:
             await rate_limit_service.enforce(db, bucket, limit, window)
-        raise AuthenticationError("Incorrect email or password")
+        raise AuthenticationError(
+            "Incorrect email or password", code=ErrorCode.INVALID_CREDENTIALS
+        )
 
     if not await verify_password(password, user.hashed_password):
         if limit > 0:
             await rate_limit_service.enforce(db, bucket, limit, window)
-        raise AuthenticationError("Incorrect email or password")
+        raise AuthenticationError(
+            "Incorrect email or password", code=ErrorCode.INVALID_CREDENTIALS
+        )
 
     if limit > 0:
         await rate_limit_service.reset(db, bucket)
@@ -228,20 +242,25 @@ async def refresh_token_pair(db: AsyncSession, refresh_token: str) -> TokenPair:
 
     record = await db.scalar(select(RefreshToken).where(RefreshToken.jti == jti))
     if record is None:
-        raise AuthenticationError("Refresh token is not recognised")
+        raise AuthenticationError(
+            "Refresh token is not recognised", code=ErrorCode.REFRESH_UNKNOWN
+        )
 
     if record.revoked_at is not None:
         await _revoke_family(db, record.family_id)
         raise AuthenticationError(
-            "Refresh token has already been used. All sessions have been ended."
+            "Refresh token has already been used. All sessions have been ended.",
+            code=ErrorCode.REFRESH_REVOKED,
         )
 
     if record.expires_at <= datetime.now(timezone.utc):
-        raise AuthenticationError("Refresh token has expired")
+        raise AuthenticationError(
+            "Refresh token has expired", code=ErrorCode.REFRESH_EXPIRED
+        )
 
     user = await get_user_by_id(db, subject_uuid(payload))
     if user is None:
-        raise AuthenticationError("User no longer exists")
+        raise AuthenticationError("User no longer exists", code=ErrorCode.USER_GONE)
 
     pair = await issue_token_pair(db, user, family_id=record.family_id)
 
