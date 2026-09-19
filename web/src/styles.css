@@ -472,6 +472,56 @@ a:hover {
   cursor: pointer;
 }
 
+/* --- account ------------------------------------------------------------- */
+
+.detail-list {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--border);
+  overflow: hidden;
+}
+
+.detail-list > div {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--surface);
+}
+
+.detail-list dt {
+  color: var(--text-2);
+  font-size: 13.5px;
+  font-weight: 560;
+}
+
+.detail-list dd {
+  margin: 0;
+  font-size: 15px;
+}
+
+/* The chip is a link now; it should not look like one. */
+a.user-chip {
+  text-decoration: none;
+  color: inherit;
+}
+
+a.user-chip:hover {
+  background: var(--surface-3);
+}
+
+@media (max-width: 640px) {
+  .detail-list > div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
 /* --- members -------------------------------------------------------------- */
 
 .members {

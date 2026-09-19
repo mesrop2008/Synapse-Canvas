@@ -7,6 +7,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthProvider } from './hooks/useAuth';
 import { I18nProvider } from './hooks/useI18n';
 import { ThemeProvider } from './hooks/useTheme';
+import { AccountPage } from './pages/AccountPage';
 import { DocumentPage } from './pages/DocumentPage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -41,6 +42,7 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Navigate to="/workspaces" replace /> },
+      { path: 'account', element: <AccountPage /> },
       { path: 'workspaces', element: <WorkspacesPage /> },
       { path: 'workspaces/:workspaceId', element: <WorkspacePage /> },
       {

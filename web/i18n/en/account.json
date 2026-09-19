@@ -1,0 +1,19 @@
+{
+  "title": "Account",
+  "lede": "Your details, and the sessions signed in as you.",
+  "name": "Name",
+  "email": "Email",
+  "since": "Joined",
+  "verified": "Email address",
+  "verifiedYes": "confirmed",
+  "verifiedNo": "not confirmed",
+  "resend": "Send a new confirmation link",
+  "resendSent": "If that address still needs confirming, a new link is on its way.",
+  "resendFailed": "Could not send a new confirmation link.",
+  "sessionsTitle": "Sessions",
+  "sessionsHint": "Signing out everywhere ends every session on every device, including this one. Do it if you think someone else has your password.",
+  "signOutEverywhere": "Sign out everywhere",
+  "signOutEverywhereTitle": "Sign out on every device?",
+  "signOutEverywhereMessage": "Every session is ended, including this one. You will need to sign in again.",
+  "signOutEverywhereFailed": "Could not end the other sessions."
+}

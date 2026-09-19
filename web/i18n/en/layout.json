@@ -1,5 +1,6 @@
 {
   "workspaces": "Workspaces",
   "signOut": "Sign out",
-  "restoringSession": "Restoring your session…"
+  "restoringSession": "Restoring your session…",
+  "account": "Account"
 }

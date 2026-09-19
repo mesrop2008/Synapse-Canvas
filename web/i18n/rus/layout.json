@@ -1,5 +1,6 @@
 {
   "workspaces": "Рабочие пространства",
   "signOut": "Выйти",
-  "restoringSession": "Восстанавливаем сессию…"
+  "restoringSession": "Восстанавливаем сессию…",
+  "account": "Учётная запись"
 }
