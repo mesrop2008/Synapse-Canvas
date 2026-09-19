@@ -399,6 +399,54 @@ def test_the_http_patch_shares_the_log_with_the_socket(live: Fixture) -> None:
     assert asyncio.run(_logged_versions(live.document_id)) == [1, 2]
 
 
+def test_deleting_a_document_tells_everyone_who_has_it_open(live: Fixture) -> None:
+    """An editor may delete, and the people reading it have to hear about it
+    from the server rather than from their next edit failing."""
+    with websocket_app() as client:
+        ticket = ticket_for(client, live, live.owner_token)
+
+        with client.websocket_connect(socket_url(live, ticket)) as websocket:
+            assert websocket.receive_json()["type"] == "init"
+
+            response = client.delete(
+                f"/workspaces/{live.workspace_id}/documents/{live.document_id}",
+                headers=live.auth(live.editor_token),  # an editor, not the owner
+            )
+            assert response.status_code == 204
+
+            assert websocket.receive_json() == {
+                "type": "deleted",
+                "user_id": str(live.editor_id),
+            }
+
+        # And the door is shut behind it: no new socket can be opened.
+        response = client.post(
+            f"/documents/{live.document_id}/ws-ticket",
+            headers=live.auth(live.owner_token),
+        )
+        assert response.status_code == 404
+
+
+def test_deleting_a_document_takes_its_change_log_with_it(live: Fixture) -> None:
+    with websocket_app() as client:
+        ticket = ticket_for(client, live, live.editor_token)
+        with client.websocket_connect(socket_url(live, ticket)) as websocket:
+            assert websocket.receive_json()["type"] == "init"
+            websocket.send_json(edit(1, "Doomed"))
+            assert websocket.receive_json()["type"] == "edit_ack"
+
+        assert asyncio.run(_logged_versions(live.document_id)) == [1, 2]
+
+        response = client.delete(
+            f"/workspaces/{live.workspace_id}/documents/{live.document_id}",
+            headers=live.auth(live.owner_token),
+        )
+        assert response.status_code == 204
+
+    # ON DELETE CASCADE: the log is a concurrency mechanism, not an archive.
+    assert asyncio.run(_logged_versions(live.document_id)) == []
+
+
 # --------------------------------------------------------------------------- #
 # Presence
 # --------------------------------------------------------------------------- #
