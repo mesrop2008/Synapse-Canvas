@@ -75,11 +75,15 @@ export interface DocumentDetail extends DocumentSummary {
 
 /** The 409 body from PATCH: the state the client has to re-sync to. */
 export interface DocumentVersionConflict {
+  code: string;
   detail: string;
   current: DocumentDetail;
 }
 
 export interface ErrorBody {
+  /** Stable identifier; see api/core/exceptions.py. Absent on responses the
+   *  API did not generate itself. */
+  code?: string;
   detail: unknown;
 }
 

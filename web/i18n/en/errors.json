@@ -3,5 +3,46 @@
   "unreachable": "Could not reach the API. Check that the backend is running.",
   "sessionExpired": "Your session has expired. Please sign in again.",
   "notSignedIn": "Not signed in",
-  "status": "Request failed with status {status}"
+  "status": "Request failed with status {status}",
+  "api": {
+    "auth": {
+      "email_unverified": "Confirm your email address before signing in. Check your inbox.",
+      "invalid_credentials": "That email address and password do not match.",
+      "invalid_token": "Your session is not valid. Please sign in again.",
+      "not_authenticated": "Sign in to continue.",
+      "refresh_expired": "Your session has expired. Please sign in again.",
+      "refresh_revoked": "This session was ended for security. Sign in again.",
+      "refresh_unknown": "Your session is not valid. Please sign in again.",
+      "token_expired": "Your session has expired. Please sign in again.",
+      "user_gone": "This account no longer exists.",
+      "verification_invalid": "This confirmation link is invalid or has expired. Request a new one.",
+      "wrong_token_type": "Your session is not valid. Please sign in again."
+    },
+    "document": {
+      "not_found": "That document does not exist, or you cannot open it.",
+      "stale": "This document changed while you were working on it."
+    },
+    "member": {
+      "absent": "They are not a member of this workspace.",
+      "duplicate": "They are already a member of this workspace.",
+      "is_owner": "The owner cannot be removed from their own workspace.",
+      "unknown_email": "No account uses that email address.",
+      "unverified": "That person has not confirmed their email address yet."
+    },
+    "rate_limit": {
+      "exceeded": "Too many attempts. Wait a little and try again."
+    },
+    "request": {
+      "invalid": "Some of what you entered was not accepted. Check the fields and try again.",
+      "malformed_length": "The request was malformed.",
+      "too_large": "That is too large to send."
+    },
+    "server": {
+      "error": "Something went wrong on the server. Try again in a moment."
+    },
+    "workspace": {
+      "not_found": "That workspace does not exist, or you are not a member of it.",
+      "role_too_low": "Your role in this workspace does not allow that."
+    }
+  }
 }
