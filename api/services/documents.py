@@ -17,7 +17,7 @@ from typing import Any, Final
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.core.exceptions import ConflictError, NotFoundError
+from api.core.exceptions import ConflictError, ErrorCode, NotFoundError
 from api.models.document import Document
 from api.models.document_change import DocumentChange
 from api.models.enums import WorkspaceRole
@@ -85,6 +85,7 @@ class StaleDocumentVersionError(ConflictError):
     """
 
     detail = "Document has been modified since you loaded it"
+    code = ErrorCode.DOCUMENT_STALE
 
     def __init__(self, current: DocumentSnapshot) -> None:
         self.current = current
@@ -165,7 +166,9 @@ async def get_document(
 ) -> Document:
     document = await find_document(db, workspace_id, document_id)
     if document is None:
-        raise NotFoundError("Document not found")
+        raise NotFoundError(
+            "Document not found", code=ErrorCode.DOCUMENT_NOT_FOUND
+        )
     return document
 
 
@@ -207,7 +210,9 @@ async def apply_change(
 
     if document is None:
         await db.rollback()
-        raise NotFoundError("Document not found")
+        raise NotFoundError(
+            "Document not found", code=ErrorCode.DOCUMENT_NOT_FOUND
+        )
 
     if document.version != base_version:
         stale = snapshot(document)
@@ -309,7 +314,9 @@ async def get_document_for_user(
     ).first()
 
     if row is None:
-        raise NotFoundError("Document not found")
+        raise NotFoundError(
+            "Document not found", code=ErrorCode.DOCUMENT_NOT_FOUND
+        )
     return row[0], row[1]
 
 

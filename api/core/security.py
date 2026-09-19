@@ -12,7 +12,7 @@ from anyio import to_thread
 from passlib.context import CryptContext
 
 from api.core.config import get_settings
-from api.core.exceptions import AuthenticationError
+from api.core.exceptions import AuthenticationError, ErrorCode
 
 TokenType = Literal["access", "refresh"]
 
@@ -127,7 +127,7 @@ def decode_token(token: str, expected_type: TokenType) -> dict[str, Any]:
     try:
         kid = jwt.get_unverified_header(token).get("kid")
     except jwt.PyJWTError as exc:
-        raise AuthenticationError("Invalid token") from exc
+        raise AuthenticationError("Invalid token", code=ErrorCode.INVALID_TOKEN) from exc
 
     candidates = [ring[kid]] if kid in ring else list(ring.values())
 
@@ -148,18 +148,23 @@ def decode_token(token: str, expected_type: TokenType) -> dict[str, Any]:
         except jwt.ExpiredSignatureError as exc:
             # Expiry is key-independent, so stop rather than report "invalid"
             # after exhausting the ring.
-            raise AuthenticationError("Token has expired") from exc
+            raise AuthenticationError(
+                "Token has expired", code=ErrorCode.TOKEN_EXPIRED
+            ) from exc
         except jwt.InvalidSignatureError:
             continue
         except jwt.PyJWTError as exc:
-            raise AuthenticationError("Invalid token") from exc
+            raise AuthenticationError(
+                "Invalid token", code=ErrorCode.INVALID_TOKEN
+            ) from exc
 
     if payload is None:
-        raise AuthenticationError("Invalid token")
+        raise AuthenticationError("Invalid token", code=ErrorCode.INVALID_TOKEN)
 
     if payload.get("type") != expected_type:
         raise AuthenticationError(
-            f"Expected a {expected_type} token, got {payload.get('type')!r}"
+            f"Expected a {expected_type} token, got {payload.get('type')!r}",
+            code=ErrorCode.WRONG_TOKEN_TYPE,
         )
     return payload
 
@@ -168,14 +173,18 @@ def subject_uuid(payload: dict[str, Any]) -> uuid.UUID:
     try:
         return uuid.UUID(payload["sub"])
     except (KeyError, ValueError, TypeError) as exc:
-        raise AuthenticationError("Invalid token subject") from exc
+        raise AuthenticationError(
+            "Invalid token subject", code=ErrorCode.INVALID_TOKEN
+        ) from exc
 
 
 def token_jti(payload: dict[str, Any]) -> uuid.UUID:
     try:
         return uuid.UUID(payload["jti"])
     except (KeyError, ValueError, TypeError) as exc:
-        raise AuthenticationError("Invalid token identifier") from exc
+        raise AuthenticationError(
+            "Invalid token identifier", code=ErrorCode.INVALID_TOKEN
+        ) from exc
 
 
 @lru_cache(maxsize=1)

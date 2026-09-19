@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from api.core.exceptions import ConflictError, NotFoundError
+from api.core.exceptions import ConflictError, ErrorCode, NotFoundError
 from api.models.enums import WorkspaceRole
 from api.models.user import User
 from api.models.workspace import Workspace
@@ -98,13 +98,16 @@ async def add_member(
     user = await auth_service.get_user_by_email(db, email)
     if user is None:
         # Not the 404-existence case: the caller is a proven owner here.
-        raise NotFoundError("No user with that email address")
+        raise NotFoundError(
+            "No user with that email address", code=ErrorCode.MEMBER_UNKNOWN_EMAIL
+        )
 
     if not user.is_email_verified:
         # Membership is by address, so an unverified account lets a squatter
         # inherit an invitation meant for its real owner.
         raise ConflictError(
-            "That user has not verified their email address yet"
+            "That user has not verified their email address yet",
+            code=ErrorCode.MEMBER_UNVERIFIED,
         )
 
     existing = await db.execute(
@@ -114,7 +117,10 @@ async def add_member(
         )
     )
     if existing.scalar_one_or_none() is not None:
-        raise ConflictError("User is already a member of this workspace")
+        raise ConflictError(
+            "User is already a member of this workspace",
+            code=ErrorCode.MEMBER_DUPLICATE,
+        )
 
     member = WorkspaceMember(
         workspace_id=workspace.id,
@@ -130,7 +136,10 @@ async def add_member(
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
-        raise ConflictError("User is already a member of this workspace") from exc
+        raise ConflictError(
+            "User is already a member of this workspace",
+            code=ErrorCode.MEMBER_DUPLICATE,
+        ) from exc
 
     await db.refresh(member, attribute_names=["id", "created_at", "role"])
     return member
@@ -142,7 +151,8 @@ async def remove_member(
     if user_id == workspace.owner_id:
         # An ownerless workspace is unadministrable; transfer is separate.
         raise ConflictError(
-            "The workspace owner cannot be removed. Transfer ownership first."
+            "The workspace owner cannot be removed. Transfer ownership first.",
+            code=ErrorCode.MEMBER_IS_OWNER,
         )
 
     result = await db.execute(
@@ -153,7 +163,9 @@ async def remove_member(
     )
     member = result.scalar_one_or_none()
     if member is None:
-        raise NotFoundError("User is not a member of this workspace")
+        raise NotFoundError(
+            "User is not a member of this workspace", code=ErrorCode.MEMBER_ABSENT
+        )
 
     await db.delete(member)
     await db.commit()

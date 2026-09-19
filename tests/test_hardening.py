@@ -3,6 +3,7 @@ refusal, pinned token claims, and signing-key rotation."""
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Iterator
 
 import jwt as pyjwt
@@ -12,6 +13,7 @@ from httpx import AsyncClient
 from api.core import security
 from api.core.config import get_settings
 from api.main import create_app
+from tests.conftest import TestUser
 
 
 @pytest.fixture
@@ -185,3 +187,108 @@ async def test_wildcard_cors_origin_is_refused_at_startup(
 
     with pytest.raises(RuntimeError, match="may not contain"):
         create_app()
+
+
+# --------------------------------------------------------------------------- #
+# Error codes
+# --------------------------------------------------------------------------- #
+
+
+async def test_every_client_facing_failure_carries_a_code(
+    client: AsyncClient, owner: TestUser, viewer: TestUser, shared_workspace: dict
+) -> None:
+    """The code is what the client translates. `detail` stays English beside it,
+    so a caller that is not the web client -- or one that predates the code --
+    still reads a sentence."""
+    from api.core.exceptions import ErrorCode
+
+    workspace_id = shared_workspace["id"]
+    created = await client.post(
+        "/workspaces/%s/documents" % workspace_id,
+        json={"title": "Coded"},
+        headers=owner.headers,
+    )
+    document_id = created.json()["id"]
+
+    cases = [
+        (await client.get("/auth/me"), 401, ErrorCode.NOT_AUTHENTICATED),
+        (
+            await client.post(
+                "/auth/login",
+                json={"email": owner.email, "password": "wrong-password"},
+            ),
+            401,
+            ErrorCode.INVALID_CREDENTIALS,
+        ),
+        (
+            await client.get(
+                "/workspaces/%s" % uuid.uuid4(), headers=owner.headers
+            ),
+            404,
+            ErrorCode.WORKSPACE_NOT_FOUND,
+        ),
+        (
+            await client.post(
+                "/workspaces/%s/documents" % workspace_id,
+                json={"title": "Nope"},
+                headers=viewer.headers,
+            ),
+            403,
+            ErrorCode.ROLE_TOO_LOW,
+        ),
+        (
+            await client.get(
+                "/workspaces/%s/documents/%s" % (workspace_id, uuid.uuid4()),
+                headers=owner.headers,
+            ),
+            404,
+            ErrorCode.DOCUMENT_NOT_FOUND,
+        ),
+        (
+            await client.post(
+                "/workspaces/%s/members" % workspace_id,
+                json={"email": viewer.email, "role": "editor"},
+                headers=owner.headers,
+            ),
+            409,
+            ErrorCode.MEMBER_DUPLICATE,
+        ),
+        (
+            await client.patch(
+                "/workspaces/%s/documents/%s" % (workspace_id, document_id),
+                json={"version": 99, "title": "Stale"},
+                headers=owner.headers,
+            ),
+            409,
+            ErrorCode.DOCUMENT_STALE,
+        ),
+        (
+            await client.post(
+                "/workspaces", json={"name": "   "}, headers=owner.headers
+            ),
+            422,
+            ErrorCode.REQUEST_INVALID,
+        ),
+    ]
+
+    for response, status, code in cases:
+        assert response.status_code == status, response.text
+        body = response.json()
+        assert body["code"] == code.value, body
+        assert body["detail"], "detail must survive alongside the code"
+
+
+async def test_the_stale_version_409_keeps_its_payload(
+    client: AsyncClient, owner: TestUser, shared_workspace: dict, document: dict
+) -> None:
+    """Adding `code` must not have displaced what the client re-syncs from."""
+    response = await client.patch(
+        "/workspaces/%s/documents/%s" % (shared_workspace["id"], document["id"]),
+        json={"version": 99, "title": "Stale"},
+        headers=owner.headers,
+    )
+
+    body = response.json()
+    assert body["code"] == "document.stale"
+    assert body["current"]["id"] == document["id"]
+    assert body["current"]["version"] == 1
