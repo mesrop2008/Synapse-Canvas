@@ -18,6 +18,7 @@ from api.core.middleware import (
     BodySizeLimitMiddleware,
     SecurityHeadersMiddleware,
 )
+from api.core.redis import close_redis
 from api.db.session import get_engine
 from api.routers import auth, documents, workspaces
 from api.schemas.document import DocumentRead, DocumentVersionConflict
@@ -29,6 +30,8 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
+    await app.state.hub.aclose()
+    await close_redis()
     await get_engine().dispose()  # close pooled connections on shutdown
 
 

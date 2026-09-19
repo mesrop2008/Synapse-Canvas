@@ -12,6 +12,10 @@ pydantic>=2.9,<3.0
 pydantic-settings>=2.6
 email-validator>=2.2
 
+# Real-time fan-out: presence, handshake tickets and the pub/sub channel that
+# joins one worker's connections to another's.
+redis>=5.2
+
 # Auth
 passlib>=1.7.4
 # Pinned <5: passlib 1.7.4 reads bcrypt.__about__, which bcrypt 5.x removed
