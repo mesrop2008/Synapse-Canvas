@@ -12,14 +12,18 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from api.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
+    from api.models.document_change import DocumentChange
     from api.models.user import User
     from api.models.workspace import Workspace
 
 
 class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """ProseMirror/Tiptap JSON rather than HTML: Part 3 applies edits at the node
+    """ProseMirror/Tiptap JSON rather than HTML: edits are applied at the node
     level and Part 5 walks the tree to chunk it, neither of which is tractable
-    against a serialised string. JSONB so they can query into it server-side."""
+    against a serialised string. JSONB so they can query into it server-side.
+
+    `content` and `version` are a materialised snapshot of `changes`, kept in
+    the same transaction that appends to it."""
 
     __tablename__ = "documents"
     __table_args__ = (
@@ -38,7 +42,8 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
-    # Concurrency token, not a revision count; Part 3's change log owns history.
+    # Concurrency token as well as the head of the change log: every accepted
+    # edit produces exactly one version.
     version: Mapped[int] = mapped_column(
         Integer, nullable=False, default=1, server_default="1"
     )
@@ -62,6 +67,9 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     workspace: Mapped["Workspace"] = relationship(back_populates="documents")
     author: Mapped["User | None"] = relationship(back_populates="created_documents")
+    changes: Mapped[list["DocumentChange"]] = relationship(
+        back_populates="document", cascade="all, delete-orphan", passive_deletes=True
+    )
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"<Document id={self.id} title={self.title!r} version={self.version}>"
