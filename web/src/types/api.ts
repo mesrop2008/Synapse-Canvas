@@ -132,6 +132,7 @@ export type ServerMessage =
   | { type: 'rejected'; server_version: number; content: ProseMirrorDoc }
   | ({ type: 'presence' } & PeerPresence)
   | { type: 'peer_left'; user_id: string }
+  | { type: 'deleted'; user_id: string }
   | { type: 'pong' }
   | { type: 'error'; code: string; detail: string };
 

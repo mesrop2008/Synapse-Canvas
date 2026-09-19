@@ -128,6 +128,13 @@ async def update_document(
     responses=_EDITOR_RESPONSES,
 )
 async def delete_document(
-    document_id: uuid.UUID, ctx: RequireEditor, db: DbSession
+    document_id: uuid.UUID, ctx: RequireEditor, db: DbSession, request: Request
 ) -> None:
     await document_service.delete_document(db, ctx.workspace.id, document_id)
+
+    # Without this, anyone with the document open is told nothing at all until
+    # their next edit is refused -- and then only by a socket that closes and a
+    # reconnect that can never succeed.
+    await request.app.state.hub.publish(
+        document_id, {"type": "deleted", "user_id": str(ctx.user.id)}
+    )

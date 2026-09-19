@@ -7,6 +7,8 @@ const LABELS: Record<ConnectionState, MessageKey> = {
   live: 'document.connection.live',
   reconnecting: 'document.connection.reconnecting',
   offline: 'document.connection.offline',
+  deleted: 'document.connection.deleted',
+  unavailable: 'document.connection.unavailable',
 };
 
 export function ConnectionIndicator({

@@ -187,6 +187,7 @@ Server to client:
 {"type": "rejected", "server_version": 44, "content": {}}
 {"type": "presence", "user_id": "", "name": "", "color": "", "anchor": 120, "head": 125}
 {"type": "peer_left", "user_id": ""}
+{"type": "deleted", "user_id": ""}
 {"type": "error", "code": "forbidden", "detail": ""}
 {"type": "pong"}
 ```
@@ -211,6 +212,13 @@ their own base, and replaying them over unsent local changes would leave this
 copy agreeing with neither the server nor the peers. When that cannot be done, or
 when a step will not apply, the client reconnects and takes the server's
 document, with a non-destructive notice saying so.
+
+Two states are terminal rather than retried. `deleted` arrives when an editor
+or owner removes the document, which cascades its change log away with it;
+`unavailable` is a 404 or 403 on the ticket, which covers both "no such
+document" and "you are no longer a member" -- the API does not distinguish them,
+on purpose. Neither is fixed by waiting, so the client stops and says which one
+happened instead of reconnecting forever behind an "offline" badge.
 
 **Editing is blocked while the socket is down**, rather than buffered. Buffered
 edits would have to be rebased on reconnect, and reject-and-rebase has no rebase:
