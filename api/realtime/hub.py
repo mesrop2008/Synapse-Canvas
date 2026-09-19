@@ -73,7 +73,10 @@ class DocumentHub:
         except asyncio.TimeoutError:
             # Redis is unreachable. The socket still works for this worker's own
             # connections; it just will not hear from the others.
-            logger.warning("Joined %s without a live Redis subscription", connection.document_id)
+            logger.warning(
+                "Joined %s without a live Redis subscription",
+                connection.document_id,
+            )
 
     async def leave(self, connection: Connection) -> None:
         peers = self._connections.get(connection.document_id)
@@ -105,7 +108,9 @@ class DocumentHub:
         try:
             await self._redis.publish(channel_for(document_id), envelope)
         except RedisError:
-            logger.warning("Could not publish to %s; delivering locally only", document_id)
+            logger.warning(
+                "Could not publish to %s; delivering locally only", document_id
+            )
             await self._deliver(document_id, payload, origin)
 
     async def _deliver(
