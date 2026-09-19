@@ -14,6 +14,7 @@ import time
 import uuid
 from typing import Any
 
+import anyio
 from pydantic import ValidationError
 from redis.asyncio import Redis
 from starlette.websockets import WebSocket, WebSocketDisconnect, WebSocketState
@@ -44,6 +45,8 @@ CLOSE_IDLE = 4408
 CLOSE_TOO_MANY_EDITS = 4429
 CLOSE_TOO_LARGE = 1009
 CLOSE_UNSUPPORTED_FRAME = 1003
+
+_CLEANUP_TIMEOUT_SECONDS = 5
 
 
 class _EditBudget:
@@ -120,7 +123,14 @@ class EditorSession:
         except Exception:
             logger.exception("Socket on document %s failed", self._document_id)
         finally:
-            await self._cleanup()
+            # A dropped connection cancels this task, and every `await` in a
+            # cancelled scope raises on the spot -- so an unshielded cleanup
+            # gets as far as its first await and leaves the peer in the
+            # document until its presence entry ages out. The deadline is there
+            # because shielding an unreachable Redis would hang the shutdown
+            # rather than delay it.
+            with anyio.move_on_after(_CLEANUP_TIMEOUT_SECONDS, shield=True):
+                await self._cleanup()
 
     # --- outbound ---------------------------------------------------------- #
 
