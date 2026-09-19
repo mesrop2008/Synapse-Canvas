@@ -83,6 +83,69 @@ export interface ErrorBody {
   detail: unknown;
 }
 
+/* --- real-time protocol ---------------------------------------------------
+   Mirrors api/schemas/realtime.py and the frames assembled in
+   api/realtime/session.py. */
+
+export interface WsTicket {
+  ticket: string;
+  expires_in: number;
+}
+
+export interface PeerPresence {
+  user_id: string;
+  name: string;
+  color: string;
+  /** Null until the peer has moved a cursor. */
+  anchor: number | null;
+  head: number | null;
+}
+
+/**
+ * What one accepted version did. `steps` come from a live editor; `replace` and
+ * `title` from an HTTP PATCH, which cannot be expressed as steps.
+ */
+export interface DocumentOperation {
+  steps?: unknown[];
+  replace?: ProseMirrorDoc;
+  title?: string;
+}
+
+export interface InitMessage {
+  type: 'init';
+  version: number;
+  content: ProseMirrorDoc;
+  title: string;
+  peers: PeerPresence[];
+  you: { user_id: string; name: string; color: string; role: WorkspaceRole };
+}
+
+export type ServerMessage =
+  | InitMessage
+  | { type: 'edit_ack'; version: number }
+  | {
+      type: 'edit';
+      version: number;
+      operation: DocumentOperation;
+      user_id: string;
+    }
+  | { type: 'rejected'; server_version: number; content: ProseMirrorDoc }
+  | ({ type: 'presence' } & PeerPresence)
+  | { type: 'peer_left'; user_id: string }
+  | { type: 'pong' }
+  | { type: 'error'; code: string; detail: string };
+
+export type ClientMessage =
+  | {
+      type: 'edit';
+      base_version: number;
+      /** The steps peers replay, and the document they produced -- the server
+       *  cannot run ProseMirror to derive one from the other. */
+      operation: { steps: unknown[]; doc: ProseMirrorDoc };
+    }
+  | { type: 'cursor'; anchor: number; head: number }
+  | { type: 'ping' };
+
 export const ROLE_RANK: Record<WorkspaceRole, number> = {
   viewer: 1,
   editor: 2,
