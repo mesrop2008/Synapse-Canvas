@@ -35,7 +35,7 @@
   },
   "reloaded": {
     "rejected": "Someone else saved first, so this document was reloaded from the server. Anything you had typed in the last moment was replaced.",
-    "diverged": "An edit arrived while yours was still being sent, so this document was reloaded from the server. Anything you had typed in the last moment was replaced."
+    "diverged": "A change arrived that could not be merged with yours, so this document was reloaded from the server. Anything you had typed in the last moment was replaced."
   },
   "offline": {
     "connecting": "Connecting to the live session. Editing is paused until it is ready.",

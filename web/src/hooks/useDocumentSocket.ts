@@ -13,8 +13,9 @@ export type ConnectionState = 'connecting' | 'live' | 'reconnecting' | 'offline'
 
 /**
  * Why local state was thrown away. `rejected`: someone else's edit reached the
- * server first. `diverged`: a peer's edit arrived while this client still had
- * work of its own, which cannot be merged without operational transform.
+ * server first. `diverged`: a peer's edit could not be replayed on this copy --
+ * either it landed while local work was still outstanding, or its steps did not
+ * apply. Both need operational transform to do better than reload.
  */
 export type ReloadReason = 'rejected' | 'diverged';
 
