@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, status
 
 from api.dependencies import DbSession, RequireEditor, RequireViewer
 from api.schemas.document import (
@@ -93,6 +93,7 @@ async def update_document(
     payload: DocumentUpdate,
     ctx: RequireEditor,
     db: DbSession,
+    request: Request,
 ) -> DocumentRead:
     applied = await document_service.update_document(
         db,
@@ -102,6 +103,20 @@ async def update_document(
         user_id=ctx.user.id,
         title=payload.title,
         content=payload.content,
+    )
+
+    # A PATCH consumes a version like any other edit, so anyone with the
+    # document open has to hear about it or their next edit is rejected for a
+    # change they were never shown. No origin: the caller has no socket here,
+    # and if they also have one open it should see this like any other peer's.
+    await request.app.state.hub.publish(
+        document_id,
+        {
+            "type": "edit",
+            "version": applied.version,
+            "operation": applied.operation,
+            "user_id": str(ctx.user.id),
+        },
     )
     return DocumentRead.model_validate(applied.document)
 
