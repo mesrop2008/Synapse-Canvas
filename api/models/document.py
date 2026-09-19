@@ -26,6 +26,11 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     the same transaction that appends to it."""
 
     __tablename__ = "documents"
+    # `updated_at` is computed by the database on every UPDATE, so without this
+    # the ORM expires the attribute and reloads it on next access -- which, in
+    # an async session, is an await in whatever code happens to touch it.
+    # RETURNING fetches it in the same statement instead.
+    __mapper_args__ = {"eager_defaults": True}
     __table_args__ = (
         # Serves the filter and the sort of the list query at once.
         Index(

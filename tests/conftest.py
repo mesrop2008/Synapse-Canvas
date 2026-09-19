@@ -27,6 +27,12 @@ if not _TEST_DATABASE_URL:
         "at a throwaway database -- the suite drops every table in it."
     )
 
+# Optional. Unset, the suite runs against an in-process fake, which behaves the
+# same for everything here -- hashes with TTLs, GETDEL, pub/sub -- and means the
+# tests need no second service. Set it to prove the real client against the real
+# server; the database it names is flushed between tests.
+_TEST_REDIS_URL = os.environ.get("TEST_REDIS_URL")
+
 # Point the app at the test database so no test can reach development data.
 os.environ["DATABASE_URL"] = _TEST_DATABASE_URL
 os.environ["ENVIRONMENT"] = "test"
@@ -46,11 +52,13 @@ for _limit_var in (
     os.environ[_limit_var] = "0"
 
 from httpx import ASGITransport, AsyncClient  # noqa: E402
+from redis.asyncio import Redis  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 from sqlalchemy.engine import make_url  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine  # noqa: E402
 from sqlalchemy.pool import NullPool  # noqa: E402
 
+from api.core.redis import use_redis  # noqa: E402
 from api.db.session import get_db  # noqa: E402
 from api.main import create_app  # noqa: E402
 from api.models import Base  # noqa: E402
@@ -117,8 +125,35 @@ async def db_session() -> Any:
         await engine.dispose()
 
 
+def new_redis() -> Redis:
+    """A client for the test Redis, or an in-process stand-in for it."""
+    if _TEST_REDIS_URL:
+        return Redis.from_url(_TEST_REDIS_URL, decode_responses=True)
+
+    import fakeredis.aioredis
+
+    return fakeredis.aioredis.FakeRedis(decode_responses=True)
+
+
 @pytest_asyncio.fixture
-async def client(db_session: AsyncSession) -> Any:
+async def redis_client() -> Any:
+    """One client per test. redis-py binds its pool to the event loop that
+    first used it, and every test here gets a fresh loop -- a cached client
+    would reach into a closed one on the second test that touched it."""
+    client = new_redis()
+    use_redis(client)
+    try:
+        await client.flushdb()
+        yield client
+    finally:
+        use_redis(None)
+        await client.aclose()
+
+
+@pytest_asyncio.fixture
+async def client(db_session: AsyncSession, redis_client: Redis) -> Any:
+    # redis_client is a parameter rather than autouse so that it is installed
+    # before create_app() hands the hub a client.
     app = create_app()
 
     async def _override_get_db() -> Any:

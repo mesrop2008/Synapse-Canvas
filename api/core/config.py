@@ -77,7 +77,7 @@ class Settings(BaseSettings):
     # An edit carries the resulting document, so the cap scales with document
     # size rather than keystroke size.
     ws_max_message_bytes: int = 262_144
-    ws_edit_rate_limit: int = 40
+    ws_edit_rate_limit: int = 60
     ws_edit_rate_limit_window_seconds: int = 10
     # Presence entries outlive a dropped socket by this much before a peer
     # sweeps them; a few seconds of a ghost cursor beats flickering peers.
