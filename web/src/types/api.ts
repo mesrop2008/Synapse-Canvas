@@ -38,6 +38,16 @@ export interface Workspace {
   role: WorkspaceRole;
 }
 
+/** A membership row: the tie between a user and a workspace, plus their role. */
+export interface Member {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  role: WorkspaceRole;
+  created_at: Timestamp;
+  user: User;
+}
+
 /**
  * Structural rather than a union of node types: Tiptap owns the schema. Shaped
  * to stay assignable to Tiptap's `JSONContent` so content crosses that boundary
@@ -150,6 +160,9 @@ export type ClientMessage =
     }
   | { type: 'cursor'; anchor: number; head: number }
   | { type: 'ping' };
+
+/** Highest first, which is the order a role picker should offer them in. */
+export const ROLES: readonly WorkspaceRole[] = ['owner', 'editor', 'viewer'];
 
 export const ROLE_RANK: Record<WorkspaceRole, number> = {
   viewer: 1,
