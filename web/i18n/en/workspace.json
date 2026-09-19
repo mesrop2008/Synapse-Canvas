@@ -12,5 +12,27 @@
   "deleteDocument": "Delete {title}",
   "deleteTitle": "Delete this document?",
   "deleteMessage": "{title} and its contents will be removed. This cannot be undone.",
-  "backToWorkspaces": "Back to your workspaces"
+  "backToWorkspaces": "Back to your workspaces",
+  "rename": "Rename",
+  "renaming": "Renaming…",
+  "renameLabel": "Workspace name",
+  "renameFailed": "Could not rename the workspace.",
+  "members": {
+    "title": "Members",
+    "count": "{count} people",
+    "loading": "Loading members…",
+    "emailLabel": "Email address of the person to add",
+    "emailPlaceholder": "someone@example.com",
+    "roleLabel": "Their role",
+    "add": "Add",
+    "adding": "Adding…",
+    "addFailed": "Could not add that person.",
+    "inviteHint": "They need an account that has confirmed its email address before they can be added.",
+    "emptyTitle": "No members yet",
+    "remove": "Remove {name} from the workspace",
+    "removeTitle": "Remove this member?",
+    "removeMessage": "{name} loses access to this workspace and everything in it. Their documents stay.",
+    "removeConfirm": "Remove",
+    "removeFailed": "Could not remove that person."
+  }
 }

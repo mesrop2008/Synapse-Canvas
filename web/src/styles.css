@@ -452,6 +452,85 @@ a:hover {
   height: 44px;
 }
 
+/* Three controls rather than two, so the email still has room to breathe. */
+.composer-wide {
+  max-width: 720px;
+}
+
+/* Native select, restyled to match .input -- a custom listbox would be a lot
+   of markup for three options that never change. */
+.select {
+  width: auto;
+  min-width: 132px;
+  padding-right: 34px;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 18px) 20px, calc(100% - 13px) 20px;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+/* --- members -------------------------------------------------------------- */
+
+.members {
+  margin-top: 44px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 640;
+  letter-spacing: -0.014em;
+}
+
+.members .title-row {
+  margin-bottom: 16px;
+}
+
+.members .hint {
+  margin: -14px 0 20px;
+}
+
+.member-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.member {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+}
+
+.member + .member {
+  border-top: 1px solid var(--border);
+}
+
+.member .row-main {
+  display: grid;
+  gap: 2px;
+}
+
+.member-name {
+  font-weight: 570;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.avatar-lg {
+  width: 36px;
+  height: 36px;
+  font-size: 13px;
+}
+
 .segmented {
   display: inline-flex;
   gap: 2px;
