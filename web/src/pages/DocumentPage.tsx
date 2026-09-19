@@ -3,19 +3,27 @@ import { Link, useBlocker, useParams } from 'react-router-dom';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
+import { Step } from '@tiptap/pm/transform';
 
 import { errorMessage } from '../api/errors';
 import { Alert } from '../components/Alert';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { SaveIndicator } from '../components/SaveIndicator';
+import { ConnectionIndicator } from '../components/ConnectionIndicator';
+import { PeerList } from '../components/PeerList';
 import { ChevronRightIcon } from '../components/icons';
-import { useAutosave, type DocumentSnapshot } from '../hooks/useAutosave';
+import { RemoteCursors, setRemotePeers } from '../editor/remoteCursors';
 import { useDocument } from '../hooks/useDocuments';
+import {
+  useDocumentSocket,
+  type DocumentSocketCallbacks,
+  type ReloadReason,
+} from '../hooks/useDocumentSocket';
 import { useI18n } from '../hooks/useI18n';
+import { useTitleSave } from '../hooks/useTitleSave';
 import { useWorkspace } from '../hooks/useWorkspaces';
 import { canEdit } from '../types/api';
 import type { MessageKey } from '../../i18n';
-import type { DocumentDetail, DocumentVersionConflict, ProseMirrorDoc } from '../types/api';
+import type { DocumentDetail, ProseMirrorDoc } from '../types/api';
 
 export function DocumentPage() {
   const { workspaceId = '', documentId = '' } = useParams();
@@ -59,6 +67,8 @@ interface DocumentEditorProps {
   workspaceName: string;
 }
 
+const CURSOR_THROTTLE_MS = 150;
+
 function DocumentEditor({
   workspaceId,
   loaded,
@@ -67,96 +77,140 @@ function DocumentEditor({
 }: DocumentEditorProps) {
   const { t, locale } = useI18n();
   const [title, setTitle] = useState(loaded.title);
-  const [reloadedFromServer, setReloadedFromServer] = useState(false);
+  const [reloaded, setReloaded] = useState<ReloadReason | null>(null);
 
-  // onUpdate fires during construction, before `autosave` below exists.
-  const scheduleRef = useRef<() => void>(() => {});
-  const titleRef = useRef(title);
-  titleRef.current = title;
-  // Read at save time, so a language switch mid-edit keeps the new one.
-  const untitledRef = useRef(t('document.untitled'));
-  untitledRef.current = t('document.untitled');
+  // Set while a peer's work is being written into the editor, so the resulting
+  // transaction is not mistaken for something the user typed and sent straight
+  // back out.
+  const applyingRemote = useRef(false);
+  const lastCursorSentAt = useRef(0);
+  // onTransaction fires during construction, before `socket` below exists.
+  const onTransactionRef = useRef<(payload: TransactionPayload) => void>(
+    () => {},
+  );
 
   const editor = useEditor(
     {
       extensions: [
-        StarterKit,
+        StarterKit.configure({
+          // The log is the history now, and undoing a peer's edit out from
+          // under them is not what the shortcut should do.
+          undoRedo: false,
+        }),
         Placeholder.configure({ placeholder: t('document.placeholder') }),
+        RemoteCursors,
       ],
       content: loaded.content,
-      editable: writable,
+      editable: false, // until the socket says it is live
       immediatelyRender: true,
       editorProps: {
         attributes: { class: 'tiptap', 'aria-label': t('document.bodyLabel') },
       },
-      onUpdate: () => scheduleRef.current(),
+      onTransaction: (payload) => onTransactionRef.current(payload),
     },
     // Tiptap builds the schema once, so a language change needs a rebuild to
     // reach the placeholder.
     [locale],
   );
 
-  const getSnapshot = useCallback(
-    (): DocumentSnapshot => ({
-      title: titleRef.current.trim() || untitledRef.current,
-      content: (editor?.getJSON() ?? loaded.content) as ProseMirrorDoc,
-    }),
-    [editor, loaded.content],
-  );
+  const applyRemote = useCallback((change: () => void) => {
+    applyingRemote.current = true;
+    try {
+      change();
+    } finally {
+      applyingRemote.current = false;
+    }
+  }, []);
 
-  const handleConflict = useCallback(
-    (conflict: DocumentVersionConflict, replaced: DocumentSnapshot) => {
-      // Part 3 merges instead; until then the server wins, so the losing text
-      // goes somewhere recoverable. English on purpose -- it is for developers.
-      console.warn(
-        '[synapse] Document changed elsewhere; the following local state was replaced. ' +
-          'Copy anything you need from here.',
-        {
-          documentId: conflict.current.id,
-          serverVersion: conflict.current.version,
-          replacedTitle: replaced.title,
-          replacedContent: replaced.content,
-        },
+  const setContent = useCallback(
+    (content: ProseMirrorDoc) => {
+      applyRemote(() =>
+        editor?.commands.setContent(content, { emitUpdate: false }),
       );
-
-      // emitUpdate: false, or this looks like an edit and saves the server's
-      // own content back to it.
-      editor?.commands.setContent(conflict.current.content, { emitUpdate: false });
-      setTitle(conflict.current.title);
-      setReloadedFromServer(true);
     },
-    [editor],
+    [editor, applyRemote],
   );
 
-  const autosave = useAutosave({
+  const callbacks: DocumentSocketCallbacks = {
+    onInit: (init) => {
+      setContent(init.content);
+      setTitle(init.title);
+    },
+
+    onRemoteSteps: (steps) => {
+      if (!editor) return false;
+      const { state, dispatch } = editor.view;
+      try {
+        const transaction = state.tr;
+        for (const raw of steps) {
+          transaction.step(Step.fromJSON(state.schema, raw));
+        }
+        applyRemote(() => dispatch(transaction));
+        return true;
+      } catch {
+        // A step that will not apply means this copy is not where the peer
+        // thought it was. The hook resyncs rather than carrying on.
+        return false;
+      }
+    },
+
+    onRemoteContent: setContent,
+    onRemoteTitle: setTitle,
+    onReloaded: setReloaded,
+  };
+
+  const socket = useDocumentSocket(loaded.id, callbacks);
+  const live = socket.state === 'live';
+
+  const titleSave = useTitleSave({
     workspaceId,
     documentId: loaded.id,
-    initialVersion: loaded.version,
-    getSnapshot,
-    onConflict: handleConflict,
+    currentVersion: () => socket.version,
+    getTitle: () => title.trim() || t('document.untitled'),
   });
-  scheduleRef.current = autosave.schedule;
 
-  // Needs the data router, which is why App.tsx uses createBrowserRouter.
+  onTransactionRef.current = ({ transaction }) => {
+    if (applyingRemote.current) return;
+
+    if (transaction.docChanged && editor) {
+      socket.queueEdit(
+        transaction.steps.map((step) => step.toJSON()),
+        editor.getJSON() as ProseMirrorDoc,
+      );
+    }
+
+    // Throttled: a cursor is worth a frame of latency and not worth a message
+    // per arrow key.
+    if (transaction.selectionSet) {
+      const now = Date.now();
+      if (now - lastCursorSentAt.current >= CURSOR_THROTTLE_MS) {
+        lastCursorSentAt.current = now;
+        const { anchor, head } = transaction.selection;
+        socket.sendCursor(anchor, head);
+      }
+    }
+  };
+
+  // Editing is blocked rather than buffered while the socket is down. Buffered
+  // edits would have to be rebased on reconnect, and reject-and-rebase has no
+  // rebase -- they would be collected, shown as progress, then thrown away.
+  // Refusing them up front loses the same keystrokes without pretending.
+  useEffect(() => {
+    editor?.setEditable(writable && live);
+  }, [editor, writable, live]);
+
+  useEffect(() => {
+    if (editor) setRemotePeers(editor.view, socket.peers);
+  }, [editor, socket.peers]);
+
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      autosave.isDirty && currentLocation.pathname !== nextLocation.pathname,
+      titleSave.isDirty && currentLocation.pathname !== nextLocation.pathname,
   );
-
-  // Closing the tab. The browser picks the wording, not us.
-  useEffect(() => {
-    if (!autosave.isDirty) return;
-    const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [autosave.isDirty]);
 
   function handleTitleChange(next: string) {
     setTitle(next);
-    if (writable) autosave.schedule();
+    if (writable && live) titleSave.schedule();
   }
 
   return (
@@ -167,23 +221,28 @@ function DocumentEditor({
         <Link to={`/workspaces/${workspaceId}`}>{workspaceName}</Link>
       </nav>
 
-      {reloadedFromServer && (
-        <Alert kind="warn" onDismiss={() => setReloadedFromServer(false)}>
-          {t('document.conflict')}
+      {reloaded && (
+        <Alert kind="warn" onDismiss={() => setReloaded(null)}>
+          {t(
+            reloaded === 'rejected'
+              ? 'document.reloaded.rejected'
+              : 'document.reloaded.diverged',
+          )}
         </Alert>
       )}
 
-      {autosave.error && (
-        <Alert onDismiss={autosave.clearError}>
-          {autosave.error}{' '}
-          <button
-            type="button"
-            className="btn-link"
-            onClick={() => void autosave.flush()}
-          >
-            {t('common.tryAgain')}
-          </button>
+      {writable && !live && (
+        <Alert kind="warn">
+          {t(
+            socket.state === 'offline'
+              ? 'document.offline.stalled'
+              : 'document.offline.connecting',
+          )}
         </Alert>
+      )}
+
+      {titleSave.error && (
+        <Alert onDismiss={titleSave.clearError}>{titleSave.error}</Alert>
       )}
 
       <div className="doc-head">
@@ -192,19 +251,17 @@ function DocumentEditor({
           aria-label={t('document.titleLabel')}
           value={title}
           maxLength={255}
-          readOnly={!writable}
+          readOnly={!writable || !live}
           onChange={(event) => handleTitleChange(event.target.value)}
         />
         <div className="doc-status">
-          {writable ? (
-            <SaveIndicator status={autosave.status} version={autosave.version} />
-          ) : (
-            <span className="badge">{t('document.readOnly')}</span>
-          )}
+          <PeerList peers={socket.peers} />
+          {!writable && <span className="badge">{t('document.readOnly')}</span>}
+          <ConnectionIndicator state={socket.state} version={socket.version} />
         </div>
       </div>
 
-      {writable && editor && <Toolbar editor={editor} />}
+      {writable && editor && <Toolbar editor={editor} disabled={!live} />}
 
       <div className="paper">
         <EditorContent editor={editor} />
@@ -226,9 +283,18 @@ function DocumentEditor({
 }
 
 type TiptapEditor = NonNullable<ReturnType<typeof useEditor>>;
+type TransactionPayload = Parameters<
+  NonNullable<Parameters<typeof useEditor>[0]>['onTransaction'] & object
+>[0];
 
 /** Enough to exercise what StarterKit provides. */
-function Toolbar({ editor }: { editor: TiptapEditor }) {
+function Toolbar({
+  editor,
+  disabled,
+}: {
+  editor: TiptapEditor;
+  disabled: boolean;
+}) {
   const { t } = useI18n();
 
   const actions: Array<{ key: string; label: MessageKey; isActive: boolean; run: () => void }> =
@@ -293,6 +359,7 @@ function Toolbar({ editor }: { editor: TiptapEditor }) {
           key={action.key}
           type="button"
           aria-pressed={action.isActive}
+          disabled={disabled}
           onClick={action.run}
         >
           {t(action.label)}
