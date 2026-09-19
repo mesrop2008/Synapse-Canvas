@@ -5,9 +5,8 @@
   "placeholder": "Start writing…",
   "untitled": "Untitled",
   "readOnly": "read-only",
-  "conflict": "This document was changed elsewhere and has been reloaded. Your unsaved text was replaced — it is in the browser console, logged as a warning, so you can copy it back.",
-  "leaveTitle": "Leave with unsaved changes?",
-  "leaveMessage": "This document has edits that have not reached the server yet. Leaving now loses them.",
+  "leaveTitle": "Leave before the rename is saved?",
+  "leaveMessage": "The new title has not reached the server yet. Leaving now loses it.",
   "leaveConfirm": "Leave anyway",
   "leaveCancel": "Keep editing",
   "backToWorkspace": "Back to the workspace",
@@ -22,11 +21,24 @@
     "code": "Code"
   },
   "save": {
-    "saved": "Saved",
-    "saving": "Saving…",
-    "unsaved": "Unsaved changes",
-    "error": "Not saved",
-    "version": "v{version}",
-    "failed": "Could not save."
+    "failed": "Could not rename this document."
+  },
+  "connection": {
+    "connecting": "Connecting…",
+    "live": "Live",
+    "reconnecting": "Reconnecting…",
+    "offline": "Offline",
+    "version": "v{version}"
+  },
+  "peers": {
+    "label": "{count} other people in this document"
+  },
+  "reloaded": {
+    "rejected": "Someone else saved first, so this document was reloaded from the server. Anything you had typed in the last moment was replaced.",
+    "diverged": "A change arrived that could not be merged with yours, so this document was reloaded from the server. Anything you had typed in the last moment was replaced."
+  },
+  "offline": {
+    "connecting": "Connecting to the live session. Editing is paused until it is ready.",
+    "stalled": "No live connection, so editing is paused. Reconnecting in the background — nothing you have written is lost."
   }
 }
