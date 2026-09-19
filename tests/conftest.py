@@ -8,9 +8,10 @@ from __future__ import annotations
 import asyncio
 import os
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Iterator
 
 import pytest
 import pytest_asyncio
@@ -58,8 +59,10 @@ from sqlalchemy.engine import make_url  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine  # noqa: E402
 from sqlalchemy.pool import NullPool  # noqa: E402
 
+from starlette.testclient import TestClient  # noqa: E402
+
 from api.core.redis import use_redis  # noqa: E402
-from api.db.session import get_db  # noqa: E402
+from api.db.session import get_db, get_engine, get_sessionmaker  # noqa: E402
 from api.main import create_app  # noqa: E402
 from api.models import Base  # noqa: E402
 
@@ -125,14 +128,28 @@ async def db_session() -> Any:
         await engine.dispose()
 
 
+_fake_redis_server: Any = None
+
+
 def new_redis() -> Redis:
-    """A client for the test Redis, or an in-process stand-in for it."""
+    """A client for the test Redis, or an in-process stand-in for it.
+
+    Every fake shares one server object, so two clients see each other's keys
+    and each other's published messages -- which is what the two-worker test
+    needs and what a real Redis gives for free.
+    """
     if _TEST_REDIS_URL:
         return Redis.from_url(_TEST_REDIS_URL, decode_responses=True)
 
+    import fakeredis
     import fakeredis.aioredis
 
-    return fakeredis.aioredis.FakeRedis(decode_responses=True)
+    global _fake_redis_server
+    if _fake_redis_server is None:
+        _fake_redis_server = fakeredis.FakeServer()
+    return fakeredis.aioredis.FakeRedis(
+        server=_fake_redis_server, decode_responses=True
+    )
 
 
 @pytest_asyncio.fixture
@@ -361,3 +378,36 @@ def rate_limits() -> Any:
 
     for key, value in saved.items():
         setattr(settings, key, value)
+
+
+@contextmanager
+def websocket_app() -> Iterator[TestClient]:
+    """A TestClient over a fresh app, for the WebSocket tests.
+
+    These are synchronous, unlike the rest of the suite. Starlette's WebSocket
+    test client runs the app on its own event loop in a worker thread, so the
+    async fixtures cannot reach into it -- and the transaction-per-test trick
+    does not work either, because the app opens its own sessions there and
+    would never see uncommitted rows. The realtime tests commit their data for
+    real and clean it up afterwards.
+
+    Both caches are cleared on the way out: an engine and a Redis pool bind to
+    the loop that first used them, and the next test gets a different one.
+    """
+    redis = new_redis()
+    use_redis(redis)  # before create_app(), which hands the hub a client
+    app = create_app()
+
+    with TestClient(app) as client:
+        client.portal.call(redis.flushdb)
+        try:
+            yield client
+        finally:
+            # Ahead of the lifespan's own teardown, so the relay stops before
+            # the connection it is reading from goes away.
+            client.portal.call(app.state.hub.aclose)
+            client.portal.call(redis.aclose)
+
+    use_redis(None)
+    get_engine.cache_clear()
+    get_sessionmaker.cache_clear()

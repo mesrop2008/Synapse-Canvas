@@ -15,6 +15,9 @@ filterwarnings = [
     # passlib 1.7.4 probes bcrypt.__about__, removed in bcrypt >= 4.1. The
     # probe failing is harmless; see api/core/config.py.
     "ignore::DeprecationWarning:passlib",
+    # Starlette's WebSocket test client warns that it still uses httpx 1.x.
+    # Nothing to act on until Starlette ships the replacement.
+    "ignore::starlette.exceptions.StarletteDeprecationWarning",
 ]
 
 [tool.ruff]
