@@ -117,51 +117,7 @@ GEMINI_MODEL=gemini-2.5-flash
 Without a key the app still starts; it logs a warning and each query fails with
 `ai.invalid_key`. The key is a `SecretStr` and is never logged.
 
-## Password recovery
 
-**Forgot the password?** on the login page asks for an email, then a six-digit
-code, then the new password twice. Codes come by email like verification
-codes (or into the API log under `EMAIL_BACKEND=console`).
-
-| | |
-|---|---|
-| `POST /auth/password-reset` | `{email}` → always 202, the same body for any address |
-| `POST /auth/password-reset/verify` | `{email, code}` → `{reset_token, expires_in}` |
-| `POST /auth/password-reset/confirm` | `{reset_token, new_password}` → 204 |
-
-| Rule | Default |
-|---|---|
-| Code lifetime | 5 min |
-| Resend | once a minute; a new code voids the old one |
-| Wrong codes | the third destroys the code and locks the address for 5 min (`auth.reset_locked`) |
-| Across codes | 20 wrong codes per address a day |
-| Reset token | a JWT of its own type, 5 min, one use |
-
-Settings are under *Password recovery* in [`.env.example`](.env.example).
-
-- **Nothing reveals an account.** Unknown and unconfirmed addresses get the
-  same 202, the same cooldown and the same lockout, and their wrong codes
-  count the same. Only the mail differs, and only the inbox sees it.
-- **Redis, not a table.** Code, attempts, cooldown and lock all live minutes,
-  so they are keys that expire on their own. Only a keyed hash of the code is
-  stored. A flush voids outstanding codes and lifts locks.
-- **One version voids every token.** `users.token_version` is stamped into
-  access, refresh and reset tokens and checked on every request. The reset
-  bumps it in the same compare-and-set that writes the password. That spends
-  the reset token, any other reset token, and every session on every device;
-  access tokens die at once, not 30 minutes later. Tokens from before the
-  column count as version 0, so the upgrade signed nobody out.
-- After each reset the owner is emailed that the password changed, which is how
-  they find out if it was not them.
-
-### Before production
-
-- Close open WebSockets on a version bump; today they stay open until they
-  reconnect, which then fails.
-- Bump the version on **sign out everywhere** too, so it ends access tokens
-  at once.
-- A lockout keyed on an address lets anyone who knows it pause that
-  account's recovery for 5 minutes at a time. Login is unaffected.
 
 ## Roadmap
 
