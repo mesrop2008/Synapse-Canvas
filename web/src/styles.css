@@ -529,6 +529,10 @@ a.user-chip:hover {
   margin-top: 44px;
 }
 
+.page-section .hint {
+  margin: 6px 0 16px;
+}
+
 .section-title {
   margin: 0;
   font-size: 19px;
