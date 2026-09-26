@@ -7,6 +7,7 @@
  * neither can call a hook.
  */
 
+import enAccount from './en/account.json';
 import enCommon from './en/common.json';
 import enDocument from './en/document.json';
 import enErrors from './en/errors.json';
@@ -18,6 +19,7 @@ import enVerifyEmail from './en/verify-email.json';
 import enWorkspace from './en/workspace.json';
 import enWorkspaces from './en/workspaces.json';
 
+import ruAccount from './rus/account.json';
 import ruCommon from './rus/common.json';
 import ruDocument from './rus/document.json';
 import ruErrors from './rus/errors.json';
@@ -35,6 +37,7 @@ export type Locale = (typeof LOCALES)[number];
 /** Filenames are kebab-case; the namespace they are addressed by is not. */
 const english = {
   common: enCommon,
+  account: enAccount,
   layout: enLayout,
   login: enLogin,
   register: enRegister,
@@ -54,6 +57,7 @@ export const MESSAGES: Record<Locale, Messages> = {
   en: english,
   ru: {
     common: ruCommon,
+    account: ruAccount,
     layout: ruLayout,
     login: ruLogin,
     register: ruRegister,

@@ -1,16 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
+  addMember,
   createWorkspace,
   deleteWorkspace,
   getWorkspace,
+  listMembers,
   listWorkspaces,
+  removeMember,
+  renameWorkspace,
 } from '../api/workspaces';
+import type { WorkspaceRole } from '../types/api';
 
 /** In one place so an invalidation cannot miss a cache by typo. */
 export const workspaceKeys = {
   all: ['workspaces'] as const,
   detail: (workspaceId: string) => ['workspaces', workspaceId] as const,
+  members: (workspaceId: string) =>
+    ['workspaces', workspaceId, 'members'] as const,
 };
 
 export function useWorkspaces() {
@@ -47,5 +54,59 @@ export function useDeleteWorkspace() {
         exact: true,
       });
     },
+  });
+}
+
+export function useMembers(workspaceId: string) {
+  return useQuery({
+    queryKey: workspaceKeys.members(workspaceId),
+    queryFn: () => listMembers(workspaceId),
+  });
+}
+
+export function useRenameWorkspace(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => renameWorkspace(workspaceId, name),
+    onSuccess: (renamed) => {
+      // Written straight in rather than refetched: the response is the row.
+      // `exact` throughout, because the detail key is a prefix of the member
+      // and document keys and a name change says nothing about either.
+      queryClient.setQueryData(workspaceKeys.detail(workspaceId), renamed);
+      return queryClient.invalidateQueries({
+        queryKey: workspaceKeys.all,
+        exact: true,
+      });
+    },
+  });
+}
+
+interface AddMemberInput {
+  email: string;
+  role: WorkspaceRole;
+}
+
+export function useAddMember(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ email, role }: AddMemberInput) =>
+      addMember(workspaceId, email, role),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: workspaceKeys.members(workspaceId),
+        exact: true,
+      }),
+  });
+}
+
+export function useRemoveMember(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => removeMember(workspaceId, userId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: workspaceKeys.members(workspaceId),
+        exact: true,
+      }),
   });
 }

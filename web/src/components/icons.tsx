@@ -76,6 +76,21 @@ export const LogOutIcon = (props: IconProps) => (
   </Svg>
 );
 
+export const UsersIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M16 19v-1.6a3.4 3.4 0 0 0-3.4-3.4H6.4A3.4 3.4 0 0 0 3 17.4V19" />
+    <circle cx="9.5" cy="7.5" r="3.2" />
+    <path d="M21 19v-1.6a3.4 3.4 0 0 0-2.6-3.3M15.8 4.5a3.2 3.2 0 0 1 0 6.1" />
+  </Svg>
+);
+
+export const PencilIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z" />
+    <path d="M14.5 5.5l3 3" />
+  </Svg>
+);
+
 export function Logo({ size = 24 }: { size?: number }) {
   return (
     <svg

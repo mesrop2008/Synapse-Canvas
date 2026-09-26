@@ -58,3 +58,11 @@ export async function logout(): Promise<void> {
   }
   clearSession();
 }
+
+/**
+ * Revokes every refresh token this account has, on every device. This tab's
+ * own session is included, so the caller has to sign out locally too.
+ */
+export function logoutEverywhere(): Promise<void> {
+  return request<void>('POST', '/auth/logout-all');
+}

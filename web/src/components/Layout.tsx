@@ -36,12 +36,12 @@ export function Layout() {
 
             <div className="topbar-group">
               {user && (
-                <div className="user-chip">
+                <Link className="user-chip" to="/account" title={t('layout.account')}>
                   <span className="avatar" aria-hidden="true">
                     {user.name.trim().charAt(0) || user.email.charAt(0)}
                   </span>
                   <span>{user.email}</span>
-                </div>
+                </Link>
               )}
               <button
                 type="button"

@@ -4,9 +4,11 @@ import { Link, useParams } from 'react-router-dom';
 import { errorMessage } from '../api/errors';
 import { Alert } from '../components/Alert';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { MemberPanel } from '../components/MemberPanel';
 import {
   ChevronRightIcon,
   FileIcon,
+  PencilIcon,
   PlusIcon,
   TrashIcon,
 } from '../components/icons';
@@ -16,7 +18,7 @@ import {
   useDocuments,
 } from '../hooks/useDocuments';
 import { useI18n } from '../hooks/useI18n';
-import { useWorkspace } from '../hooks/useWorkspaces';
+import { useRenameWorkspace, useWorkspace } from '../hooks/useWorkspaces';
 import { canEdit } from '../types/api';
 import type { MessageKey } from '../../i18n';
 import type { DocumentSummary, WorkspaceRole } from '../types/api';
@@ -34,13 +36,33 @@ export function WorkspacePage() {
   const documents = useDocuments(workspaceId);
   const create = useCreateDocument(workspaceId);
   const remove = useDeleteDocument(workspaceId);
+  const rename = useRenameWorkspace(workspaceId);
 
   const [title, setTitle] = useState('');
   const [pendingDelete, setPendingDelete] = useState<DocumentSummary | null>(null);
+  // Null unless a rename is in progress, so the heading is not an input the
+  // rest of the time and cannot be edited by a stray click.
+  const [draftName, setDraftName] = useState<string | null>(null);
+  const current = workspace.data?.name ?? '';
 
   // The server enforces this; hiding the controls just avoids offering a viewer
   // a button that can only fail.
   const writable = workspace.data ? canEdit(workspace.data.role) : false;
+
+  async function handleRename(event: React.FormEvent) {
+    event.preventDefault();
+    const trimmed = (draftName ?? '').trim();
+    if (!trimmed || trimmed === workspace.data?.name) {
+      setDraftName(null);
+      return;
+    }
+    try {
+      await rename.mutateAsync(trimmed);
+      setDraftName(null);
+    } catch {
+      // Surfaced from rename.error below; the draft stays so it is not lost.
+    }
+  }
 
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault();
@@ -72,16 +94,57 @@ export function WorkspacePage() {
       </nav>
 
       <div className="page-head">
-        <div className="title-row">
-          <h1 className="page-title" style={{ marginBottom: 0 }}>
-            {workspace.data?.name ?? t('common.loading')}
-          </h1>
-          {workspace.data && (
-            <span className="badge badge-accent">
-              {t(ROLE_LABELS[workspace.data.role])}
-            </span>
-          )}
-        </div>
+        {draftName !== null ? (
+          <form className="composer" onSubmit={handleRename}>
+            <input
+              className="input"
+              autoFocus
+              aria-label={t('workspace.renameLabel')}
+              maxLength={255}
+              value={draftName}
+              onChange={(event) => setDraftName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') setDraftName(null);
+              }}
+            />
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={rename.isPending || !draftName.trim()}
+            >
+              {rename.isPending ? t('workspace.renaming') : t('workspace.rename')}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setDraftName(null)}
+            >
+              {t('common.cancel')}
+            </button>
+          </form>
+        ) : (
+          <div className="title-row">
+            <h1 className="page-title" style={{ marginBottom: 0 }}>
+              {workspace.data?.name ?? t('common.loading')}
+            </h1>
+            {workspace.data && (
+              <span className="badge badge-accent">
+                {t(ROLE_LABELS[workspace.data.role])}
+              </span>
+            )}
+            {workspace.data?.role === 'owner' && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon"
+                title={t('workspace.rename')}
+                aria-label={t('workspace.rename')}
+                onClick={() => setDraftName(current)}
+              >
+                <PencilIcon />
+              </button>
+            )}
+          </div>
+        )}
         {!writable && workspace.data && (
           <p className="page-sub" style={{ marginTop: 6 }}>
             {t('workspace.viewerNotice')}
@@ -109,6 +172,12 @@ export function WorkspacePage() {
             {create.isPending ? t('workspace.creating') : t('workspace.newDocument')}
           </button>
         </form>
+      )}
+
+      {rename.error && (
+        <Alert onDismiss={() => rename.reset()}>
+          {errorMessage(rename.error, 'workspace.renameFailed')}
+        </Alert>
       )}
 
       {(create.error || remove.error) && (
@@ -187,6 +256,8 @@ export function WorkspacePage() {
           ))}
         </div>
       )}
+
+      {workspace.data && <MemberPanel workspace={workspace.data} />}
 
       {pendingDelete && (
         <ConfirmDialog
