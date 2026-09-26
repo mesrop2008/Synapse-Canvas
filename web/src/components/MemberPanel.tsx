@@ -60,7 +60,7 @@ export function MemberPanel({ workspace }: { workspace: Workspace }) {
   }
 
   return (
-    <section className="members">
+    <section className="members page-section">
       <div className="title-row">
         <h2 className="section-title">{t('workspace.members.title')}</h2>
         {members.data && (

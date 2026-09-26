@@ -106,7 +106,7 @@ export function AccountPage() {
         </div>
       </dl>
 
-      <section className="members">
+      <section className="page-section">
         <h2 className="section-title">{t('account.sessionsTitle')}</h2>
         <p className="hint">{t('account.sessionsHint')}</p>
         <button
