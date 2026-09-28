@@ -56,17 +56,6 @@ Settings are commented in [`.env.example`](.env.example).
 | API on the host | `uvicorn api.main:app --reload` |
 | Tests | `pytest` |
 
-## Layout
-
-```
-api/            FastAPI app — core/ db/ models/ schemas/ services/ routers/
-  realtime/     connection registry, Redis relay, per-socket session loop
-alembic/        migrations
-tests/          pytest suite
-web/
-  i18n/         language packs — one folder per language, one JSON per section
-  src/          api/ editor/ hooks/ pages/ components/ types/
-```
 
 ## Roadmap
 
