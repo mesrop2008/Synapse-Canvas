@@ -8,10 +8,11 @@ import uuid
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends, Header, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.core import i18n
 from api.core.config import get_settings
 from api.core.exceptions import (
     AuthenticationError,
@@ -52,6 +53,16 @@ async def get_current_user(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def request_locale(
+    accept_language: Annotated[str | None, Header()] = None,
+) -> i18n.Locale:
+    return i18n.negotiate(accept_language)
+
+
+# The language of any email a request triggers; the client sends its own.
+RequestLocale = Annotated[i18n.Locale, Depends(request_locale)]
 
 
 @dataclass(frozen=True, slots=True)

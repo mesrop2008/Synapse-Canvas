@@ -16,5 +16,6 @@
   "verifiedTitle": "Email confirmed",
   "verified": "Your address is confirmed and your account is active. You can sign in now.",
   "goToSignIn": "Go to sign in",
-  "backToSignIn": "Back to sign in"
+  "backToSignIn": "Back to sign in",
+  "codePlaceholder": "000000"
 }

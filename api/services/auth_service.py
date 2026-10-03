@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.config import get_settings
+from api.core.i18n import DEFAULT_LOCALE, Locale
 from api.core.exceptions import (
     AuthenticationError,
     EmailNotVerifiedError,
@@ -58,7 +59,9 @@ async def get_user_by_id(db: AsyncSession, user_id: uuid.UUID) -> User | None:
     return await db.get(User, user_id)
 
 
-async def register_user(db: AsyncSession, data: RegisterRequest) -> None:
+async def register_user(
+    db: AsyncSession, data: RegisterRequest, locale: Locale = DEFAULT_LOCALE
+) -> None:
     """Enumeration-resistant: a new and an existing address get the same
     response and timing (both hash, mail is sent in the background); the real
     owner of an existing one is told by email. Within the send cooldown no
@@ -75,7 +78,7 @@ async def register_user(db: AsyncSession, data: RegisterRequest) -> None:
 
     if await get_user_by_email(db, email) is not None:
         if may_send:
-            email_service.send_duplicate_registration_notice(to=email)
+            email_service.send_duplicate_registration_notice(to=email, locale=locale)
         return
 
     user = User(email=email, name=data.name, hashed_password=hashed_password)
@@ -86,13 +89,13 @@ async def register_user(db: AsyncSession, data: RegisterRequest) -> None:
         # A concurrent duplicate, settled by the unique index.
         await db.rollback()
         if may_send:
-            email_service.send_duplicate_registration_notice(to=email)
+            email_service.send_duplicate_registration_notice(to=email, locale=locale)
         return
 
     if may_send:
         await db.refresh(user)
         code = await issue_verification_code(db, user)
-        email_service.send_verification_code(to=user.email, code=code)
+        email_service.send_verification_code(to=user.email, code=code, locale=locale)
 
 
 _DNS_TIMEOUT_SECONDS = 5
@@ -259,7 +262,9 @@ async def verify_email(db: AsyncSession, email: str, code: str) -> User:
     return user
 
 
-async def resend_verification(db: AsyncSession, email: str) -> None:
+async def resend_verification(
+    db: AsyncSession, email: str, locale: Locale = DEFAULT_LOCALE
+) -> None:
     """Silent for unknown and already-verified addresses, like registration."""
     email = normalize_email(email)
     await _reserve_verification_send(db, email)
@@ -269,7 +274,7 @@ async def resend_verification(db: AsyncSession, email: str) -> None:
         return
 
     code = await issue_verification_code(db, user)
-    email_service.send_verification_code(to=user.email, code=code)
+    email_service.send_verification_code(to=user.email, code=code, locale=locale)
 
 
 async def purge_expired_verification_codes(db: AsyncSession) -> int:

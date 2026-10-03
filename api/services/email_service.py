@@ -14,7 +14,9 @@ from typing import Any, Protocol
 
 import aiosmtplib
 
+from api.core import i18n
 from api.core.config import Settings, get_settings
+from api.core.i18n import DEFAULT_LOCALE, Locale
 
 logger = logging.getLogger(__name__)
 
@@ -236,58 +238,60 @@ async def drain(timeout: float | None = None) -> None:
         logger.warning("Abandoned %d undelivered email(s) at shutdown", len(still_pending))
 
 
-def _ttl_phrase(seconds: int) -> str:
-    minutes, rest = divmod(seconds, 60)
-    if rest == 0 and minutes > 0:
-        return f"{minutes} minute{'s' if minutes != 1 else ''}"
-    return f"{seconds} seconds"
-
-
-def send_verification_code(*, to: str, code: str) -> None:
+def _verification_lines(locale: Locale) -> dict[str, str]:
     settings = get_settings()
     brand = settings.mail_from_name
-    lifetime = _ttl_phrase(settings.email_verification_code_ttl_seconds)
+    return {
+        "subject": i18n.text(locale, "email.verification.subject", brand=brand),
+        "intro": i18n.text(locale, "email.verification.intro", brand=brand),
+        "instructions": i18n.text(
+            locale,
+            "email.verification.instructions",
+            minutes=max(1, round(settings.email_verification_code_ttl_seconds / 60)),
+            attempts=settings.email_verification_max_attempts,
+        ),
+        "never_share": i18n.text(locale, "email.verification.neverShare"),
+        "ignore": i18n.text(locale, "email.verification.ignore"),
+    }
 
-    # The code stays out of the subject, which lock screens and notification
-    # previews show to anyone looking at the device.
-    subject = f"Your {brand} verification code"
+
+def send_verification_code(
+    *, to: str, code: str, locale: Locale = DEFAULT_LOCALE
+) -> None:
+    # The code stays out of the subject, which lock screens show to anyone.
+    lines = _verification_lines(locale)
     body = (
-        f"Your {brand} verification code is:\n\n"
-        f"    {code}\n\n"
-        f"Enter it on the verification page to finish creating your account. "
-        f"It expires in {lifetime} and stops working after "
-        f"{settings.email_verification_max_attempts} wrong attempts.\n\n"
-        "Never share this code. We will never ask you for it.\n"
-        "If you did not create an account, ignore this message."
+        f"{lines['intro']}\n\n    {code}\n\n{lines['instructions']}\n\n"
+        f"{lines['never_share']}\n{lines['ignore']}"
     )
-    safe_brand = html.escape(brand)
+    e = {key: html.escape(value) for key, value in lines.items()}
     html_body = f"""\
 <!doctype html>
-<html>
+<html lang="{locale}">
   <body style="margin:0;padding:24px;background:#f5f5f4;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1c1917">
     <div style="max-width:440px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px">
-      <p style="margin:0 0 16px;font-size:15px">Your {safe_brand} verification code is:</p>
+      <p style="margin:0 0 16px;font-size:15px">{e['intro']}</p>
       <p style="margin:0 0 24px;font-size:32px;font-weight:700;letter-spacing:8px;font-family:ui-monospace,Menlo,Consolas,monospace">{html.escape(code)}</p>
-      <p style="margin:0 0 12px;font-size:14px;line-height:1.5">Enter it on the verification page to finish creating your account. It expires in {html.escape(lifetime)} and stops working after {settings.email_verification_max_attempts} wrong attempts.</p>
-      <p style="margin:0 0 12px;font-size:14px;line-height:1.5"><strong>Never share this code.</strong> We will never ask you for it.</p>
-      <p style="margin:0;font-size:13px;color:#78716c">If you did not create an account, ignore this message.</p>
+      <p style="margin:0 0 12px;font-size:14px;line-height:1.5">{e['instructions']}</p>
+      <p style="margin:0 0 12px;font-size:14px;line-height:1.5"><strong>{e['never_share']}</strong></p>
+      <p style="margin:0;font-size:13px;color:#78716c">{e['ignore']}</p>
     </div>
   </body>
 </html>
 """
-    dispatch(to=to, subject=subject, body=body, html_body=html_body)
+    dispatch(to=to, subject=lines["subject"], body=body, html_body=html_body)
 
 
-def send_duplicate_registration_notice(*, to: str) -> None:
-    # The only place a duplicate registration surfaces, since the HTTP response
-    # is identical either way.
+def send_duplicate_registration_notice(
+    *, to: str, locale: Locale = DEFAULT_LOCALE
+) -> None:
+    # The only place a duplicate registration surfaces; the HTTP response is
+    # identical either way.
     dispatch(
         to=to,
-        subject="Someone tried to register with your email address",
+        subject=i18n.text(locale, "email.duplicate.subject"),
         body=(
-            "An account already exists for this address, so nothing was "
-            "created.\n\nIf this was you, sign in instead, or reset your "
-            "password if you have forgotten it. If it was not you, no action "
-            "is needed -- your account was not changed."
+            f"{i18n.text(locale, 'email.duplicate.exists')}\n\n"
+            f"{i18n.text(locale, 'email.duplicate.advice')}"
         ),
     )

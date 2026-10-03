@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, status
 from api.dependencies import (
     CurrentUser,
     DbSession,
+    RequestLocale,
     login_ip_rate_limit,
     refresh_ip_rate_limit,
     register_ip_rate_limit,
@@ -36,9 +37,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
         429: {"description": "Too many registrations from this address"},
     },
 )
-async def register(payload: RegisterRequest, db: DbSession) -> AcceptedResponse:
+async def register(
+    payload: RegisterRequest, db: DbSession, locale: RequestLocale
+) -> AcceptedResponse:
     # Always 202: a 409 would reveal which addresses have accounts.
-    await auth_service.register_user(db, payload)
+    await auth_service.register_user(db, payload, locale)
     return AcceptedResponse(
         detail="If that address can receive mail, a verification code is on its way."
     )
@@ -73,10 +76,10 @@ async def verify_email(payload: VerifyEmailRequest, db: DbSession) -> UserRead:
     },
 )
 async def resend_verification(
-    payload: ResendVerificationRequest, db: DbSession
+    payload: ResendVerificationRequest, db: DbSession, locale: RequestLocale
 ) -> AcceptedResponse:
     # Always 202, and the 429 applies to every address alike.
-    await auth_service.resend_verification(db, payload.email)
+    await auth_service.resend_verification(db, payload.email, locale)
     return AcceptedResponse(
         detail="If that address needs verifying, a new code is on its way."
     )

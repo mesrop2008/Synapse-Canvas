@@ -1,0 +1,18 @@
+{
+  "verification": {
+    "subject": "Your {brand} verification code",
+    "intro": "Your {brand} verification code is:",
+    "instructions": "Enter it on the verification page to finish creating your account. The code expires in {minutes} min and stops working after {attempts} wrong attempts.",
+    "neverShare": "Never share this code. We will never ask you for it.",
+    "ignore": "If you did not create an account, ignore this message."
+  },
+  "duplicate": {
+    "subject": "Someone tried to register with your email address",
+    "exists": "An account already exists for this address, so nothing was created.",
+    "advice": "If this was you, sign in instead. If it was not you, no action is needed: your account was not changed."
+  },
+  "test": {
+    "subject": "{brand}: test message",
+    "body": "This is a test message from the mail check. If you are reading it, verification codes will be delivered too."
+  }
+}

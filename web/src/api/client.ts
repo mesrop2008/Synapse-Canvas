@@ -1,6 +1,6 @@
 /** Holds the session and, on a 401, refreshes once and replays. */
 
-import { translate } from '../../i18n';
+import { getActiveLocale, translate } from '../../i18n';
 import type { ErrorBody, TokenPair } from '../types/api';
 
 export const API_BASE_URL = (
@@ -94,7 +94,8 @@ async function send(
   body: unknown,
   token: string | null,
 ): Promise<Response> {
-  const headers: Record<string, string> = {};
+  // Any email this request triggers is written in the active language.
+  const headers: Record<string, string> = { 'Accept-Language': getActiveLocale() };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
 

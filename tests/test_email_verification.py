@@ -706,3 +706,50 @@ async def test_a_dns_failure_does_not_block_registration(
         _undeliverable(OSError("network is unreachable")),
     )
     await _register(client, "offline@example.com")
+
+
+# --- language -------------------------------------------------------------------
+
+
+async def test_emails_follow_the_clients_language(
+    client: AsyncClient, capture_email: _CapturingSender
+) -> None:
+    await client.post(
+        "/auth/register",
+        json={"email": "ivan@example.com", "password": DEFAULT_PASSWORD, "name": "I"},
+        headers={"Accept-Language": "ru"},
+    )
+    await _register(client, "john@example.com")
+
+    by_recipient = {m["to"]: m for m in await capture_email.outbox()}
+    assert by_recipient["ivan@example.com"]["subject"].startswith("Код подтверждения")
+    assert 'lang="ru"' in by_recipient["ivan@example.com"]["html"]
+    assert by_recipient["john@example.com"]["subject"].startswith("Your ")
+
+
+@pytest.mark.parametrize(
+    ("header", "expected"),
+    [(None, "en"), ("ru", "ru"), ("ru-RU,ru;q=0.9", "ru"), ("de, ru", "ru"), ("fr", "en")],
+)
+def test_language_negotiation(header: str | None, expected: str) -> None:
+    from api.core import i18n
+
+    assert i18n.negotiate(header) == expected
+
+
+def test_server_language_packs_have_the_same_keys() -> None:
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent / "api" / "i18n"
+
+    def keys(node: Any, prefix: str = "") -> set[str]:
+        if not isinstance(node, dict):
+            return {prefix}
+        return set().union(*(keys(v, f"{prefix}.{k}") for k, v in node.items()))
+
+    for english in (root / "en").glob("*.json"):
+        russian = root / "rus" / english.name
+        assert keys(json.loads(english.read_text(encoding="utf-8"))) == keys(
+            json.loads(russian.read_text(encoding="utf-8"))
+        ), english.name

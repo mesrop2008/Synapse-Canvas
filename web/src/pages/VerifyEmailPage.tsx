@@ -150,7 +150,7 @@ export function VerifyEmailPage() {
               autoComplete="one-time-code"
               // No maxLength: it would cut a pasted "123 456" to "123 45"
               // before the filter below could drop the space.
-              placeholder="000000"
+              placeholder={t('verifyEmail.codePlaceholder')}
               autoFocus={Boolean(handedOver.email)}
               value={code}
               // Pasting "123 456" or "123-456" should still work.
