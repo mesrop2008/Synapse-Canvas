@@ -7,10 +7,14 @@ import logging
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["local", "test", "staging", "production"]
+EmailBackend = Literal["console", "smtp"]
+# starttls: plain connect, then upgrade (port 587). tls: TLS from the first
+# byte (port 465). none: no encryption -- a relay on the same host only.
+SmtpSecurity = Literal["starttls", "tls", "none"]
 
 
 class Settings(BaseSettings):
@@ -44,9 +48,35 @@ class Settings(BaseSettings):
 
     jwt_issuer: str = "synapse-canvas"
     jwt_audience: str = "synapse-canvas-api"
-    email_verification_expire_hours: int = 24
-    # Frontend route that reads the token and POSTs it to /auth/verify-email.
-    email_verification_link_base: str = "http://localhost:5173/verify-email"
+
+    # --- email verification ----------------------------------------------
+    # A six-digit code has a million values, so its safety is entirely in how
+    # few guesses each one allows: lifetime, attempts per code, how often a new
+    # code can be had, and a per-address budget of wrong guesses across codes.
+    email_verification_code_ttl_seconds: int = 300
+    email_verification_max_attempts: int = 5
+    # One code per address per cooldown, whether or not the address has an
+    # account -- so a 429 here says nothing about who is registered.
+    email_verification_resend_cooldown_seconds: int = 60
+    email_verification_send_limit: int = 5
+    email_verification_send_limit_window_seconds: int = 3600
+    # Bounds an attacker who keeps requesting fresh codes: without it, five
+    # guesses per code times a code a minute is 7,200 guesses a day.
+    email_verification_failure_limit: int = 20
+    email_verification_failure_limit_window_seconds: int = 86400
+
+    # --- outgoing mail ---------------------------------------------------
+    # console writes messages to the log, codes included, so it is refused
+    # outside local/test.
+    email_backend: EmailBackend = "console"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: SecretStr = SecretStr("")
+    smtp_security: SmtpSecurity = "starttls"
+    smtp_timeout_seconds: float = 15.0
+    mail_from_address: str = ""
+    mail_from_name: str = "Synapse Canvas"
 
     # The suite lowers this to 4 so tests are not KDF-bound.
     bcrypt_rounds: int = 12
@@ -61,6 +91,8 @@ class Settings(BaseSettings):
     register_rate_limit_per_ip_window_seconds: int = 3600
     refresh_rate_limit_per_ip: int = 30
     refresh_rate_limit_per_ip_window_seconds: int = 300
+    verify_email_rate_limit_per_ip: int = 30
+    verify_email_rate_limit_per_ip_window_seconds: int = 300
 
     # Only behind a proxy you control; the header is client-spoofable.
     trust_proxy_headers: bool = False
@@ -101,6 +133,33 @@ class Settings(BaseSettings):
 
     # Refused before the body is read; a proxy should also cap this.
     max_request_body_bytes: int = 1_048_576
+
+    @model_validator(mode="after")
+    def _check_mail_settings(self) -> "Settings":
+        if self.email_backend == "console":
+            if self.environment not in ("local", "test"):
+                raise ValueError(
+                    "EMAIL_BACKEND=console logs every verification code and is "
+                    "only allowed when ENVIRONMENT is local or test. Configure "
+                    "EMAIL_BACKEND=smtp and the SMTP_* settings."
+                )
+            return self
+
+        # Gmail, Yandex and Mail.ru only send as the mailbox you log in as, so
+        # that is the right sender unless told otherwise.
+        if not self.mail_from_address and "@" in self.smtp_username:
+            self.mail_from_address = self.smtp_username
+        if not self.smtp_host or not self.mail_from_address:
+            raise ValueError(
+                "EMAIL_BACKEND=smtp needs SMTP_HOST, and MAIL_FROM_ADDRESS unless "
+                "SMTP_USERNAME is an email address."
+            )
+        if self.smtp_security == "none" and self.smtp_username:
+            raise ValueError(
+                "SMTP_SECURITY=none would send SMTP_PASSWORD in the clear. Use "
+                "starttls (port 587) or tls (port 465)."
+            )
+        return self
 
     @property
     def cors_origins(self) -> list[str]:

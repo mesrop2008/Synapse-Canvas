@@ -49,6 +49,7 @@ for _limit_var in (
     "LOGIN_RATE_LIMIT_PER_ACCOUNT",
     "REGISTER_RATE_LIMIT_PER_IP",
     "REFRESH_RATE_LIMIT_PER_IP",
+    "VERIFY_EMAIL_RATE_LIMIT_PER_IP",
 ):
     os.environ[_limit_var] = "0"
 
@@ -93,7 +94,11 @@ async def _reset_schema(url: str) -> None:
     engine = create_async_engine(url, poolclass=NullPool)
     try:
         async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
+            # The whole schema, not metadata.drop_all: that only knows the
+            # current models, and a table a later change removed would keep
+            # its foreign keys into `users` and block the drop.
+            await conn.execute(text("DROP SCHEMA public CASCADE"))
+            await conn.execute(text("CREATE SCHEMA public"))
             await conn.run_sync(Base.metadata.create_all)
     finally:
         await engine.dispose()
@@ -182,6 +187,11 @@ async def client(db_session: AsyncSession, redis_client: Redis) -> Any:
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield ac
     app.dependency_overrides.clear()
+    # Mail is sent from background tasks on this test's loop; let them finish
+    # before the loop closes under them.
+    from api.services import email_service
+
+    await email_service.drain()
 
 
 @dataclass
@@ -203,37 +213,27 @@ class TestUser:
 UserFactory = Callable[..., Awaitable[TestUser]]
 
 
-async def latest_verification_token_hash(
-    db_session: AsyncSession, email: str
-) -> str | None:
-    """The raw token only exists in the (console) email, so a test cannot know it.
-    This confirms one was issued."""
+async def pending_verification_code(db_session: AsyncSession, email: str) -> Any:
+    """The user's outstanding code row, or None. The raw code only exists in
+    the email, so this confirms one was issued without knowing it."""
     from sqlalchemy import select
 
-    from api.models import EmailVerificationToken, User
+    from api.models import EmailVerificationCode, User
 
-    user = (
-        await db_session.execute(select(User).where(User.email == email))
-    ).scalar_one_or_none()
-    if user is None:
-        return None
-    row = await db_session.execute(
-        select(EmailVerificationToken)
-        .where(
-            EmailVerificationToken.user_id == user.id,
-            EmailVerificationToken.used_at.is_(None),
+    return (
+        await db_session.execute(
+            select(EmailVerificationCode)
+            .join(User, User.id == EmailVerificationCode.user_id)
+            .where(User.email == email)
         )
-        .order_by(EmailVerificationToken.created_at.desc())
-    )
-    token = row.scalars().first()
-    return token.token_hash if token else None
+    ).scalar_one_or_none()
 
 
 @pytest_asyncio.fixture
 async def make_user(client: AsyncClient, db_session: AsyncSession) -> UserFactory:
     """Register, verify and log in through the real endpoints, so a break in
     either fails every dependent test. Verification is mirrored rather than
-    redeemed (the raw token is unknowable here); the redemption path itself is
+    redeemed (the raw code is unknowable here); the redemption path itself is
     covered in test_email_verification.
 
     Pass `verified=False` for an account that has registered but not verified.
@@ -258,7 +258,7 @@ async def make_user(client: AsyncClient, db_session: AsyncSession) -> UserFactor
         )
         assert registered.status_code == 202, registered.text
 
-        assert await latest_verification_token_hash(db_session, email) is not None
+        assert await pending_verification_code(db_session, email) is not None
 
         user = (
             await db_session.execute(select(User).where(User.email == email))
@@ -274,7 +274,7 @@ async def make_user(client: AsyncClient, db_session: AsyncSession) -> UserFactor
                 refresh_token="",
             )
 
-        # Stands in for the user clicking the emailed link.
+        # Stands in for the user typing in the emailed code.
         user.email_verified_at = datetime.now(timezone.utc)
         await db_session.commit()
 

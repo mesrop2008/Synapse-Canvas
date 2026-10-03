@@ -3,6 +3,7 @@ overrides."""
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -25,6 +26,7 @@ from api.db.session import get_engine
 from api.realtime.hub import DocumentHub
 from api.routers import auth, documents, realtime, workspaces
 from api.schemas.document import DocumentRead, DocumentVersionConflict
+from api.services import email_service
 from api.services.documents import StaleDocumentVersionError
 
 logger = logging.getLogger(__name__)
@@ -32,7 +34,14 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # In the background: an unreachable mail server takes the full SMTP
+    # timeout to fail, and the API should be serving while it does.
+    mail_check = asyncio.create_task(email_service.report_delivery_status())
     yield
+    mail_check.cancel()
+    # Before anything else closes: a code queued just before shutdown is one
+    # the user is already waiting for.
+    await email_service.drain(timeout=10)
     await app.state.hub.aclose()
     await close_redis()
     await get_engine().dispose()  # close pooled connections on shutdown

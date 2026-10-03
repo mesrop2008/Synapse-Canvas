@@ -8,10 +8,14 @@
 # proxies /api to the API on the same origin, so the browser never makes a
 # cross-origin request and the API's address is not baked into the bundle.
 #
-# Postgres is published on host port 5433 by default so it can run alongside a
-# natively installed server already holding 5432. Inside the compose network
-# the API reaches it as `postgres:5432`, which is why the two DATABASE_URLs in
-# .env.example differ by host and port.
+# That is the only port published to the host. Postgres, Redis and the API talk
+# over the compose network, so the stack starts on a machine that already runs
+# its own Postgres, Redis or anything else on 5432/5433/6379/8000. Taken, 5173
+# itself moves with WEB_PORT in .env.
+#
+# Running tests, migrations or the Vite dev server from the host needs those
+# services reachable from it -- docker-compose.dev.yml publishes them, on
+# localhost only. See the comment at the top of that file.
 
 # Shared by `migrate` and `api` so the two cannot drift apart.
 x-app-environment: &app-environment
@@ -30,7 +34,18 @@ x-app-environment: &app-environment
   REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
   BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
   CORS_ORIGINS: ${CORS_ORIGINS:-}
-  EMAIL_VERIFICATION_LINK_BASE: ${EMAIL_VERIFICATION_LINK_BASE:-http://localhost:5173/verify-email}
+  EMAIL_BACKEND: ${EMAIL_BACKEND:-console}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-15}
+  MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-}
+  MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Synapse Canvas}
+  EMAIL_VERIFICATION_CODE_TTL_SECONDS: ${EMAIL_VERIFICATION_CODE_TTL_SECONDS:-300}
+  EMAIL_VERIFICATION_MAX_ATTEMPTS: ${EMAIL_VERIFICATION_MAX_ATTEMPTS:-5}
+  EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS: ${EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS:-60}
 
 x-app-build: &app-build
   context: .
@@ -50,8 +65,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-synapse}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-synapse}
       POSTGRES_DB: ${POSTGRES_DB:-synapse_canvas}
-    ports:
-      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -69,8 +82,6 @@ services:
     container_name: synapse_canvas_redis
     restart: unless-stopped
     command: redis-server --save "" --appendonly no
-    ports:
-      - "${REDIS_PORT:-6381}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -109,8 +120,6 @@ services:
       migrate:
         condition: service_completed_successfully
     environment: *app-environment
-    ports:
-      - "${API_PORT:-8000}:8000"
     volumes:
       # Development convenience: edit on the host, uvicorn reloads in the
       # container. Drop both mounts and --reload for a real deployment, where

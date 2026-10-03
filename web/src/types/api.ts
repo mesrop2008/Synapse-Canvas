@@ -13,6 +13,8 @@ export interface User {
   name: string;
   created_at: Timestamp;
   email_verified_at: Timestamp | null;
+  /** False until the emailed code is redeemed; login is refused until then. */
+  is_active: boolean;
 }
 
 export interface TokenPair {

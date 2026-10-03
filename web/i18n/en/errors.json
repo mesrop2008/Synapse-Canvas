@@ -6,7 +6,7 @@
   "status": "Request failed with status {status}",
   "api": {
     "auth": {
-      "email_unverified": "Confirm your email address before signing in. Check your inbox.",
+      "email_unverified": "Confirm your email address before signing in.",
       "invalid_credentials": "That email address and password do not match.",
       "invalid_token": "Your session is not valid. Please sign in again.",
       "not_authenticated": "Sign in to continue.",
@@ -15,7 +15,7 @@
       "refresh_unknown": "Your session is not valid. Please sign in again.",
       "token_expired": "Your session has expired. Please sign in again.",
       "user_gone": "This account no longer exists.",
-      "verification_invalid": "This confirmation link is invalid or has expired. Request a new one.",
+      "verification_invalid": "That code is wrong or has expired. Check it and try again, or request a new one.",
       "wrong_token_type": "Your session is not valid. Please sign in again."
     },
     "document": {

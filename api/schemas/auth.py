@@ -30,7 +30,13 @@ class TokenPair(BaseModel):
 
 
 class VerifyEmailRequest(BaseModel):
-    token: str = Field(min_length=1)
+    email: EmailStr
+    # [0-9], not \d: pydantic's regex engine treats \d as any Unicode digit.
+    code: str = Field(
+        pattern=r"^[0-9]{6}$",
+        description="The six-digit code from the verification email",
+        examples=["042917"],
+    )
 
 
 class ResendVerificationRequest(BaseModel):

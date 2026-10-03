@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 
+import { ApiError } from '../api/client';
 import { describeFailure, failed, type FailedRequest } from '../api/errors';
 import { Alert } from '../components/Alert';
 import { LanguageToggle } from '../components/LanguageToggle';
@@ -8,6 +9,7 @@ import { ThemeToggle } from '../components/ThemeToggle';
 import { Logo } from '../components/icons';
 import { useAuth } from '../hooks/useAuth';
 import { useI18n } from '../hooks/useI18n';
+import type { VerifyEmailState } from './VerifyEmailPage';
 
 export function LoginPage() {
   const { status, signIn } = useAuth();
@@ -63,6 +65,19 @@ export function LoginPage() {
         {error && (
           <Alert onDismiss={() => setError(null)}>
             {describeFailure(error)}
+            {error.cause instanceof ApiError &&
+              error.cause.code === 'auth.email_unverified' && (
+                <>
+                  {' '}
+                  <Link
+                    to="/verify-email"
+                    state={{ email } satisfies VerifyEmailState}
+                    className="btn-link"
+                  >
+                    {t('login.enterCode')}
+                  </Link>
+                </>
+              )}
           </Alert>
         )}
 

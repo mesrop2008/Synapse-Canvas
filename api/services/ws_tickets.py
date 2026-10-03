@@ -31,8 +31,8 @@ class Ticket:
 
 
 def _key(raw_token: str) -> str:
-    # Hashed like the email-verification tokens: whoever can list the keyspace
-    # should not come away with anything redeemable.
+    # Hashed: whoever can list the keyspace should not come away with anything
+    # redeemable.
     return _KEY_PREFIX + hash_url_token(raw_token)
 
 

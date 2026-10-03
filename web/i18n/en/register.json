@@ -11,11 +11,5 @@
   "submitting": "Creating…",
   "haveAccount": "Already registered?",
   "signIn": "Sign in",
-  "failed": "Could not register.",
-  "sentTitle": "Check your email",
-  "sentLede": "If {email} can receive mail, a verification link is on its way. You can sign in once you have followed it.",
-  "sentDevNote": "Running locally, the backend logs the link instead of sending it — look for {marker} in the API output.",
-  "resend": "Send it again",
-  "resent": "Link re-sent",
-  "backToSignIn": "Back to sign in"
+  "failed": "Could not register."
 }

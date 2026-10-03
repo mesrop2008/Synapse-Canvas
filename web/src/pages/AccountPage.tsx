@@ -1,14 +1,13 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
-import { logoutEverywhere, resendVerification } from '../api/auth';
+import { logoutEverywhere } from '../api/auth';
 import { describeFailure, failed, type FailedRequest } from '../api/errors';
 import { Alert } from '../components/Alert';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useAuth } from '../hooks/useAuth';
 import { useI18n } from '../hooks/useI18n';
-
-type Notice = 'verificationSent' | null;
+import type { VerifyEmailState } from './VerifyEmailPage';
 
 export function AccountPage() {
   const { t, formatRelative } = useI18n();
@@ -16,26 +15,10 @@ export function AccountPage() {
   const navigate = useNavigate();
 
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<Notice>(null);
   const [error, setError] = useState<FailedRequest | null>(null);
   const [confirming, setConfirming] = useState(false);
 
   if (!user) return <p className="placeholder">{t('common.loading')}</p>;
-
-  const { email } = user;
-
-  async function handleResend() {
-    setBusy(true);
-    setError(null);
-    try {
-      await resendVerification(email);
-      setNotice('verificationSent');
-    } catch (caught) {
-      setError(failed(caught, 'account.resendFailed'));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function handleSignOutEverywhere() {
     setBusy(true);
@@ -59,12 +42,6 @@ export function AccountPage() {
         <p className="page-sub">{t('account.lede')}</p>
       </div>
 
-      {notice === 'verificationSent' && (
-        <Alert kind="warn" onDismiss={() => setNotice(null)}>
-          {t('account.resendSent')}
-        </Alert>
-      )}
-
       {error && (
         <Alert onDismiss={() => setError(null)}>{describeFailure(error)}</Alert>
       )}
@@ -85,21 +62,20 @@ export function AccountPage() {
         <div>
           <dt>{t('account.verified')}</dt>
           <dd>
-            {user.email_verified_at ? (
+            {user.is_active ? (
               <span className="badge badge-accent">
                 {t('account.verifiedYes')}
               </span>
             ) : (
               <>
                 <span className="badge">{t('account.verifiedNo')}</span>{' '}
-                <button
-                  type="button"
+                <Link
+                  to="/verify-email"
+                  state={{ email: user.email } satisfies VerifyEmailState}
                   className="btn-link"
-                  onClick={handleResend}
-                  disabled={busy}
                 >
                   {t('account.resend')}
-                </button>
+                </Link>
               </>
             )}
           </dd>

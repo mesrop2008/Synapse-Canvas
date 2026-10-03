@@ -3,14 +3,15 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, String
+from sqlalchemy import ColumnElement, DateTime, String
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from api.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
     from api.models.document import Document
-    from api.models.email_verification import EmailVerificationToken
+    from api.models.email_verification import EmailVerificationCode
     from api.models.refresh_token import RefreshToken
     from api.models.workspace import Workspace
     from api.models.workspace_member import WorkspaceMember
@@ -34,6 +35,18 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     def is_email_verified(self) -> bool:
         return self.email_verified_at is not None
 
+    # Registration is complete -- the address is proven -- once this is true.
+    # Derived rather than stored, so it cannot drift from email_verified_at;
+    # as a hybrid it also works in queries (`where(User.is_active)`).
+    @hybrid_property
+    def is_active(self) -> bool:
+        return self.email_verified_at is not None
+
+    @is_active.inplace.expression
+    @classmethod
+    def _is_active_expression(cls) -> ColumnElement[bool]:
+        return cls.email_verified_at.is_not(None)
+
     owned_workspaces: Mapped[list["Workspace"]] = relationship(
         back_populates="owner",
         cascade="all, delete-orphan",
@@ -44,10 +57,11 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
-    email_verification_tokens: Mapped[list["EmailVerificationToken"]] = relationship(
+    email_verification_code: Mapped["EmailVerificationCode | None"] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
         passive_deletes=True,
+        uselist=False,
     )
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
         back_populates="user",

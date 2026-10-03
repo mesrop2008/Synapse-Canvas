@@ -1,5 +1,5 @@
 """Uvicorn configures only its own loggers, so app records would propagate to a
-handler-less root and vanish -- including the dev email link and the catch-all's
+handler-less root and vanish -- including the dev email codes and the catch-all's
 tracebacks."""
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ def configure_logging(level: int | str = logging.INFO) -> None:
     if _CONFIGURED:
         return
 
-    app_logger = logging.getLogger("app")
+    app_logger = logging.getLogger("api")
     app_logger.setLevel(level)
     app_logger.propagate = False
 

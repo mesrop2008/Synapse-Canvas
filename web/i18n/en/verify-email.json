@@ -1,9 +1,20 @@
 {
-  "title": "Email verification",
-  "missing": "This link is missing its token. Use the link from the email as-is.",
-  "checking": "Checking the link…",
-  "verified": "Your address is confirmed. You can sign in now.",
-  "failed": "That link could not be used.",
-  "expiredNote": "Links expire and can only be used once. Registering again sends a fresh one.",
-  "goToSignIn": "Go to sign in"
+  "title": "Enter your code",
+  "lede": "Enter your email address and the six-digit code we sent to it.",
+  "ledeKnown": "We sent a six-digit code to {email}. Enter it below to finish creating your account.",
+  "email": "Email",
+  "emailPlaceholder": "you@example.com",
+  "code": "Verification code",
+  "codeHint": "The code expires 5 minutes after it was sent and stops working after 5 wrong attempts.",
+  "submit": "Confirm email",
+  "submitting": "Checking…",
+  "failed": "That code could not be used.",
+  "resend": "Send a new code",
+  "resendIn": "Send a new code ({seconds} s)",
+  "resent": "If that address still needs confirming, a new code is on its way. Earlier codes no longer work.",
+  "resendFailed": "Could not send a new code.",
+  "verifiedTitle": "Email confirmed",
+  "verified": "Your address is confirmed and your account is active. You can sign in now.",
+  "goToSignIn": "Go to sign in",
+  "backToSignIn": "Back to sign in"
 }

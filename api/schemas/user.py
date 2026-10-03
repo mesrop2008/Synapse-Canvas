@@ -16,3 +16,5 @@ class UserRead(BaseModel):
     name: str
     created_at: datetime
     email_verified_at: datetime | None
+    # False until the emailed code is redeemed; login is refused until then.
+    is_active: bool
