@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 
+import dns.resolver
+import email_validator
+from anyio import to_thread
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
@@ -14,6 +18,7 @@ from api.core.config import get_settings
 from api.core.exceptions import (
     AuthenticationError,
     EmailNotVerifiedError,
+    EmailUndeliverableError,
     ErrorCode,
     RateLimitExceededError,
 )
@@ -59,6 +64,7 @@ async def register_user(db: AsyncSession, data: RegisterRequest) -> None:
     owner of an existing one is told by email. Within the send cooldown no
     mail goes out at all, so repeated registration cannot mail-bomb anyone."""
     email = normalize_email(data.email)
+    await ensure_deliverable(email)
     hashed_password = await hash_password(data.password)
 
     try:
@@ -87,6 +93,46 @@ async def register_user(db: AsyncSession, data: RegisterRequest) -> None:
         await db.refresh(user)
         code = await issue_verification_code(db, user)
         email_service.send_verification_code(to=user.email, code=code)
+
+
+_DNS_TIMEOUT_SECONDS = 5
+
+
+@lru_cache(maxsize=4)
+def _resolver(servers: tuple[str, ...]) -> dns.resolver.Resolver:
+    resolver = dns.resolver.Resolver(configure=not servers)
+    if servers:
+        resolver.nameservers = list(servers)
+    resolver.lifetime = _DNS_TIMEOUT_SECONDS
+    return resolver
+
+
+def _look_up_mail_domain(email: str) -> None:
+    resolver = _resolver(tuple(get_settings().email_dns_servers))
+    email_validator.validate_email(email, check_deliverability=True, dns_resolver=resolver)
+
+
+async def ensure_deliverable(email: str) -> None:
+    """Refuse a domain DNS says cannot receive mail. A DNS failure lets the
+    address through, so an outage cannot stop sign-ups."""
+    if not get_settings().email_check_deliverability:
+        return
+
+    def _check() -> bool:
+        try:
+            _look_up_mail_domain(email)
+        except email_validator.EmailUndeliverableError as exc:
+            # Also raised, chained, for DNS errors; only a definite answer counts.
+            cause = exc.__cause__
+            return cause is not None and not isinstance(
+                cause, (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer)
+            )
+        except email_validator.EmailNotValidError:
+            return False
+        return True
+
+    if not await to_thread.run_sync(_check):
+        raise EmailUndeliverableError()
 
 
 async def _reserve_verification_send(db: AsyncSession, email: str) -> None:

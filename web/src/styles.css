@@ -449,6 +449,24 @@ a:hover {
   color: var(--text-3);
 }
 
+.field-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--danger);
+}
+
+.input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.input[aria-invalid='true']:focus {
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+.composer + .field-error {
+  margin: -18px 0 18px;
+}
+
 .composer {
   display: flex;
   gap: 10px;

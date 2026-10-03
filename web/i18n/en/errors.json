@@ -6,6 +6,7 @@
   "status": "Request failed with status {status}",
   "api": {
     "auth": {
+      "email_undeliverable": "That email domain does not exist or cannot receive mail. Check the address for typos.",
       "email_unverified": "Confirm your email address before signing in.",
       "invalid_credentials": "That email address and password do not match.",
       "invalid_token": "Your session is not valid. Please sign in again.",
@@ -44,5 +45,13 @@
       "not_found": "That workspace does not exist, or you are not a member of it.",
       "role_too_low": "Your role in this workspace does not allow that."
     }
+  },
+  "validation": {
+    "required": "This field is required.",
+    "emailRequired": "Enter your email address.",
+    "emailInvalid": "Enter a valid email address, like name@example.com.",
+    "passwordTooShort": "Use at least 8 characters.",
+    "passwordTooLong": "That password is too long. Use at most 72 bytes.",
+    "codeIncomplete": "Enter all six digits of the code."
   }
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { describeFailure, failed, type FailedRequest } from '../api/errors';
+import { useField, validateAll } from '../hooks/useField';
 import { useI18n } from '../hooks/useI18n';
 import {
   useAddMember,
@@ -10,9 +11,11 @@ import {
 import { ROLES } from '../types/api';
 import { Alert } from './Alert';
 import { ConfirmDialog } from './ConfirmDialog';
+import { FieldError, invalidProps } from './FieldError';
 import { TrashIcon, UsersIcon } from './icons';
 import type { MessageKey } from '../../i18n';
 import type { Member, Workspace, WorkspaceRole } from '../types/api';
+import { checkEmail } from '../validation';
 
 const ROLE_LABELS: Record<WorkspaceRole, MessageKey> = {
   owner: 'common.roles.owner',
@@ -37,7 +40,7 @@ export function MemberPanel({ workspace }: { workspace: Workspace }) {
   const add = useAddMember(workspace.id);
   const remove = useRemoveMember(workspace.id);
 
-  const [email, setEmail] = useState('');
+  const email = useField(checkEmail);
   const [role, setRole] = useState<WorkspaceRole>('editor');
   const [formError, setFormError] = useState<FailedRequest | null>(null);
   const [pendingRemove, setPendingRemove] = useState<Member | null>(null);
@@ -46,12 +49,11 @@ export function MemberPanel({ workspace }: { workspace: Workspace }) {
 
   async function handleAdd(event: React.FormEvent) {
     event.preventDefault();
-    const trimmed = email.trim();
-    if (!trimmed) return;
     setFormError(null);
+    if (!validateAll([[email, 'member-email']])) return;
     try {
-      await add.mutateAsync({ email: trimmed, role });
-      setEmail('');
+      await add.mutateAsync({ email: email.value.trim(), role });
+      email.setValue('');
     } catch (caught) {
       setFormError(failed(caught, 'workspace.members.addFailed'));
     }
@@ -69,15 +71,17 @@ export function MemberPanel({ workspace }: { workspace: Workspace }) {
       </div>
 
       {administers && (
-        <form className="composer composer-wide" onSubmit={handleAdd}>
+        <form className="composer composer-wide" onSubmit={handleAdd} noValidate>
           <input
+            id="member-email"
             className="input"
             type="email"
-            required
             aria-label={t('workspace.members.emailLabel')}
             placeholder={t('workspace.members.emailPlaceholder')}
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            value={email.value}
+            onChange={(event) => email.setValue(event.target.value)}
+            onBlur={() => email.value && email.touch()}
+            {...invalidProps('member-email', email.shown)}
           />
           <select
             className="input select"
@@ -96,7 +100,7 @@ export function MemberPanel({ workspace }: { workspace: Workspace }) {
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={add.isPending || !email.trim()}
+            disabled={add.isPending || !email.value.trim()}
           >
             {add.isPending
               ? t('workspace.members.adding')
@@ -104,6 +108,8 @@ export function MemberPanel({ workspace }: { workspace: Workspace }) {
           </button>
         </form>
       )}
+
+      {administers && <FieldError inputId="member-email" problem={email.shown} />}
 
       {administers && (
         <p className="hint">{t('workspace.members.inviteHint')}</p>

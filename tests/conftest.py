@@ -46,6 +46,12 @@ for _limit_var in (
     "VERIFY_EMAIL_RATE_LIMIT_PER_IP",
 ):
     os.environ[_limit_var] = "0"
+# The suite registers @example.com, which publishes a null MX, and must not
+# depend on DNS.
+os.environ["EMAIL_CHECK_DELIVERABILITY"] = "false"
+# Forced, not defaulted: .env may hold real SMTP credentials, and the suite
+# registers hundreds of fake addresses.
+os.environ["EMAIL_BACKEND"] = "console"
 
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from redis.asyncio import Redis  # noqa: E402

@@ -32,6 +32,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     summary="Create an inactive account and email it a verification code",
     dependencies=[Depends(register_ip_rate_limit)],
     responses={
+        422: {"description": "Malformed address, or a domain that cannot receive mail"},
         429: {"description": "Too many registrations from this address"},
     },
 )

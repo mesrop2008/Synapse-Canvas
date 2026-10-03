@@ -23,6 +23,7 @@ class ErrorCode(StrEnum):
     INVALID_CREDENTIALS = "auth.invalid_credentials"
     USER_GONE = "auth.user_gone"
     EMAIL_UNVERIFIED = "auth.email_unverified"
+    EMAIL_UNDELIVERABLE = "auth.email_undeliverable"
     VERIFICATION_INVALID = "auth.verification_invalid"
     REFRESH_UNKNOWN = "auth.refresh_unknown"
     REFRESH_REVOKED = "auth.refresh_revoked"
@@ -91,6 +92,12 @@ class RateLimitExceededError(AppError):
             self.__class__.detail,
             headers={"Retry-After": str(retry_after_seconds)},
         )
+
+
+class EmailUndeliverableError(AppError):
+    status_code = 422
+    detail = "That email domain does not exist or does not accept mail"
+    code = ErrorCode.EMAIL_UNDELIVERABLE
 
 
 class EmailNotVerifiedError(AppError):

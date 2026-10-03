@@ -632,3 +632,77 @@ async def test_verified_user_can_be_added_normally(
         headers=owner.headers,
     )
     assert response.status_code == 201
+
+
+# --- address quality ------------------------------------------------------------
+
+
+@pytest.mark.parametrize("email", ["someone@g.c", "someone@host.123", "someone@nodot"])
+async def test_registration_refuses_an_implausible_domain(
+    client: AsyncClient, email: str
+) -> None:
+    response = await client.post(
+        "/auth/register",
+        json={"email": email, "password": DEFAULT_PASSWORD, "name": "N"},
+    )
+    assert response.status_code == 422
+
+
+def _undeliverable(cause: Exception | None) -> Any:
+    import email_validator
+
+    def fake(*_: Any, **__: Any) -> None:
+        error = email_validator.EmailUndeliverableError("no")
+        error.__cause__ = cause
+        raise error
+
+    return fake
+
+
+@pytest.mark.parametrize(
+    "cause",
+    ["nxdomain", "no_answer", "null_mx"],
+)
+async def test_registration_refuses_a_domain_that_cannot_receive_mail(
+    client: AsyncClient,
+    db_session,
+    monkeypatch: pytest.MonkeyPatch,
+    rate_limits: Any,
+    cause: str,
+) -> None:
+    import dns.resolver
+
+    from api.services import auth_service
+
+    causes = {
+        "nxdomain": dns.resolver.NXDOMAIN(),
+        "no_answer": dns.resolver.NoAnswer(),
+        "null_mx": None,
+    }
+    rate_limits(email_check_deliverability=True)
+    monkeypatch.setattr(
+        auth_service, "_look_up_mail_domain", _undeliverable(causes[cause])
+    )
+
+    response = await client.post(
+        "/auth/register",
+        json={"email": "typo@gmail.con", "password": DEFAULT_PASSWORD, "name": "T"},
+    )
+    assert response.status_code == 422
+    assert response.json()["code"] == "auth.email_undeliverable"
+    user = await db_session.scalar(select(User).where(User.email == "typo@gmail.con"))
+    assert user is None
+
+
+async def test_a_dns_failure_does_not_block_registration(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch, rate_limits: Any
+) -> None:
+    from api.services import auth_service
+
+    rate_limits(email_check_deliverability=True)
+    monkeypatch.setattr(
+        auth_service,
+        "_look_up_mail_domain",
+        _undeliverable(OSError("network is unreachable")),
+    )
+    await _register(client, "offline@example.com")

@@ -5,10 +5,13 @@ import { resendVerification, verifyEmail } from '../api/auth';
 import { ApiError } from '../api/client';
 import { describeFailure, failed, type FailedRequest } from '../api/errors';
 import { Alert } from '../components/Alert';
+import { FieldError, invalidProps } from '../components/FieldError';
 import { LanguageToggle } from '../components/LanguageToggle';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { Logo } from '../components/icons';
+import { useField, validateAll } from '../hooks/useField';
 import { useI18n } from '../hooks/useI18n';
+import { checkEmail } from '../validation';
 
 /** A hint mirroring the server's cooldown; its Retry-After wins. */
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -24,7 +27,7 @@ export function VerifyEmailPage() {
   const { t, tNode } = useI18n();
   const handedOver = (useLocation().state as VerifyEmailState | null) ?? {};
 
-  const [email, setEmail] = useState(handedOver.email ?? '');
+  const email = useField(checkEmail, handedOver.email ?? '');
   const [code, setCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [verified, setVerified] = useState(false);
@@ -44,9 +47,11 @@ export function VerifyEmailPage() {
     event.preventDefault();
     setError(null);
     setResent(false);
+    if (!validateAll([[email, 'email']])) return;
+
     setSubmitting(true);
     try {
-      await verifyEmail(email, code);
+      await verifyEmail(email.value.trim(), code);
       setVerified(true);
     } catch (caught) {
       setError(failed(caught, 'verifyEmail.failed'));
@@ -60,7 +65,7 @@ export function VerifyEmailPage() {
     setError(null);
     setResent(false);
     try {
-      await resendVerification(email);
+      await resendVerification(email.value.trim());
       setResent(true);
       setCode('');
       setCooldown(RESEND_COOLDOWN_SECONDS);
@@ -92,7 +97,7 @@ export function VerifyEmailPage() {
           </Link>
         </div>
       ) : (
-        <form className="auth-card" onSubmit={handleSubmit}>
+        <form className="auth-card" onSubmit={handleSubmit} noValidate>
           <div className="auth-brand">
             <Logo size={26} />
             {t('common.appName')}
@@ -125,10 +130,12 @@ export function VerifyEmailPage() {
                 type="email"
                 autoComplete="username"
                 placeholder={t('verifyEmail.emailPlaceholder')}
-                required
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                value={email.value}
+                onChange={(event) => email.setValue(event.target.value)}
+                onBlur={email.touch}
+                {...invalidProps('email', email.shown)}
               />
+              <FieldError inputId="email" problem={email.shown} />
             </div>
           )}
 
@@ -141,11 +148,9 @@ export function VerifyEmailPage() {
               inputMode="numeric"
               // Lets iOS and Android offer the code straight from the email.
               autoComplete="one-time-code"
-              pattern="[0-9]{6}"
               // No maxLength: it would cut a pasted "123 456" to "123 45"
               // before the filter below could drop the space.
               placeholder="000000"
-              required
               autoFocus={Boolean(handedOver.email)}
               value={code}
               // Pasting "123 456" or "123-456" should still work.
@@ -168,7 +173,7 @@ export function VerifyEmailPage() {
             <button
               type="button"
               className="btn btn-secondary btn-block"
-              disabled={cooldown > 0 || !email}
+              disabled={cooldown > 0 || Boolean(email.problem)}
               onClick={() => void handleResend()}
             >
               {cooldown > 0

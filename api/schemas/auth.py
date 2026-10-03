@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from pydantic import BaseModel, EmailStr, Field
 
-from api.schemas.common import NonEmptyName, Password
+from api.schemas.common import NewEmail, NonEmptyName, Password
 
 
 class RegisterRequest(BaseModel):
-    email: EmailStr
+    email: NewEmail
     password: Password
     name: NonEmptyName
 

@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     email_verification_send_limit_window_seconds: int = 3600
     email_verification_failure_limit: int = 20
     email_verification_failure_limit_window_seconds: int = 86400
+    email_check_deliverability: bool = True
+    email_dns_servers_raw: str = Field(default="", alias="EMAIL_DNS_SERVERS")
 
     email_backend: EmailBackend = "console"
     smtp_host: str = ""
@@ -129,6 +131,10 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.cors_origins_raw.split(",") if o.strip()]
+
+    @property
+    def email_dns_servers(self) -> list[str]:
+        return [s.strip() for s in self.email_dns_servers_raw.split(",") if s.strip()]
 
     @property
     def previous_jwt_secret_keys(self) -> list[str]:

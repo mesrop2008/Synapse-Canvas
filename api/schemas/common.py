@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import re
 from typing import Annotated
 
-from pydantic import AfterValidator, Field, StringConstraints
+from pydantic import AfterValidator, EmailStr, Field, StringConstraints
 
 from api.core.security import BCRYPT_MAX_BYTES
 
@@ -15,6 +16,19 @@ def _within_bcrypt_limit(value: str) -> str:
         )
     return value
 
+
+_TOP_LEVEL_DOMAIN = re.compile(r"^(?:[^\W\d_]{2,63}|xn--[a-z0-9-]{1,59})$", re.IGNORECASE)
+
+
+def _has_real_top_level_domain(value: str) -> str:
+    # EmailStr accepts a@g.c; no top-level domain is one letter or numeric.
+    if not _TOP_LEVEL_DOMAIN.match(value.rpartition(".")[2]):
+        raise ValueError("The domain must end in a real top-level domain, like .com")
+    return value
+
+
+# For new accounts only; lookups keep plain EmailStr.
+NewEmail = Annotated[EmailStr, AfterValidator(_has_real_top_level_domain)]
 
 Password = Annotated[
     str,
