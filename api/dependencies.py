@@ -145,3 +145,10 @@ register_ip_rate_limit = IPRateLimit(
 refresh_ip_rate_limit = IPRateLimit(
     "refresh", "refresh_rate_limit_per_ip", "refresh_rate_limit_per_ip_window_seconds"
 )
+# Alongside the per-code and per-address limits in auth_service, which bound
+# guesses at one account; this bounds one client spraying guesses across many.
+verify_email_ip_rate_limit = IPRateLimit(
+    "verify-email",
+    "verify_email_rate_limit_per_ip",
+    "verify_email_rate_limit_per_ip_window_seconds",
+)

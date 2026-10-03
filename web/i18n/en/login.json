@@ -9,5 +9,6 @@
   "submitting": "Signing in…",
   "noAccount": "No account yet?",
   "createOne": "Create one",
-  "failed": "Could not sign in."
+  "failed": "Could not sign in.",
+  "enterCode": "Enter your code"
 }

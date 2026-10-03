@@ -424,6 +424,18 @@ a:hover {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+/* Six digits, read back against an email: spaced and monospaced so a
+   transposed pair stands out. */
+.input-code {
+  height: 52px;
+  font-family: var(--font-mono);
+  font-size: 24px;
+  letter-spacing: 0.4em;
+  /* Balances the spacing letter-spacing leaves after the last digit. */
+  text-indent: 0.4em;
+  text-align: center;
+}
+
 .field {
   display: grid;
   gap: 7px;

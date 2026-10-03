@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,11 +16,14 @@ from api.core.exceptions import (
     AuthenticationError,
     EmailNotVerifiedError,
     ErrorCode,
+    RateLimitExceededError,
 )
+from api.core.redis import get_redis
 from api.core.security import (
     REFRESH_TOKEN,
-    generate_url_token,
-    hash_url_token,
+    generate_otp,
+    hash_otp,
+    otp_matches,
     refresh_token_lifetime,
     token_jti,
     burn_password_verification,
@@ -30,11 +34,11 @@ from api.core.security import (
     subject_uuid,
     verify_password,
 )
-from api.models.email_verification import EmailVerificationToken
+from api.models.email_verification import EmailVerificationCode
 from api.models.refresh_token import RefreshToken
 from api.models.user import User
 from api.schemas.auth import RegisterRequest, TokenPair
-from api.services import email_service, rate_limit_service
+from api.services import email_service, rate_limit_service, verification_cooldown
 
 
 def normalize_email(email: str) -> str:
@@ -52,17 +56,30 @@ async def get_user_by_id(db: AsyncSession, user_id: uuid.UUID) -> User | None:
 
 
 async def register_user(db: AsyncSession, data: RegisterRequest) -> None:
-    """Create an account, or silently notice a duplicate.
+    """Create an inactive account and email it a verification code, or
+    silently notice a duplicate.
 
     Enumeration-resistant: identical outcome either way (this endpoint is
     unauthenticated), and the real owner is notified by email instead. The
-    password is hashed on both paths so their timing matches too.
+    password is hashed on both paths so their timing matches too, and mail goes
+    out in the background so SMTP latency cannot tell them apart either.
+
+    Both paths take the address's send cooldown. When it is already held, the
+    account is still created but no mail goes out -- a burst of registrations
+    for one address is a mail bomb, not a user -- and the response is the same.
     """
     email = normalize_email(data.email)
     hashed_password = await hash_password(data.password)
 
+    try:
+        await _reserve_verification_send(db, email)
+        may_send = True
+    except RateLimitExceededError:
+        may_send = False
+
     if await get_user_by_email(db, email) is not None:
-        await email_service.send_duplicate_registration_notice(to=email)
+        if may_send:
+            email_service.send_duplicate_registration_notice(to=email)
         return
 
     user = User(email=email, name=data.name, hashed_password=hashed_password)
@@ -72,84 +89,192 @@ async def register_user(db: AsyncSession, data: RegisterRequest) -> None:
     except IntegrityError:
         # Concurrent duplicate; the unique index settled it. Same outcome.
         await db.rollback()
-        await email_service.send_duplicate_registration_notice(to=email)
+        if may_send:
+            email_service.send_duplicate_registration_notice(to=email)
         return
 
-    await db.refresh(user)
-    raw_token = await create_email_verification(db, user)
-    await email_service.send_verification_email(to=user.email, raw_token=raw_token)
+    if may_send:
+        await db.refresh(user)
+        code = await issue_verification_code(db, user)
+        email_service.send_verification_code(to=user.email, code=code)
 
 
-async def create_email_verification(db: AsyncSession, user: User) -> str:
-    # Only the hash is stored; the raw token is returned to be emailed and then
-    # exists nowhere on the server.
-    now = datetime.now(timezone.utc)
+async def _reserve_verification_send(db: AsyncSession, email: str) -> None:
+    """Take the address's cooldown and count a send against its hourly cap,
+    raising RateLimitExceededError if either says no.
+
+    Runs before the user lookup and for every address, registered or not, so
+    a 429 is no evidence that an account exists.
+    """
     settings = get_settings()
 
-    # Retire any outstanding token, so an old link in an inbox stops working.
-    await db.execute(
-        update(EmailVerificationToken)
-        .where(
-            EmailVerificationToken.user_id == user.id,
-            EmailVerificationToken.used_at.is_(None),
-        )
-        .values(used_at=now)
+    retry_after = await verification_cooldown.claim(
+        get_redis(), email, settings.email_verification_resend_cooldown_seconds
     )
+    if retry_after:
+        raise RateLimitExceededError(retry_after_seconds=retry_after)
 
-    raw_token = generate_url_token()
-    db.add(
-        EmailVerificationToken(
-            user_id=user.id,
-            token_hash=hash_url_token(raw_token),
-            expires_at=now + timedelta(hours=settings.email_verification_expire_hours),
+    limit = settings.email_verification_send_limit
+    if limit > 0:
+        await rate_limit_service.enforce(
+            db,
+            rate_limit_service.account_key("verification-send", email),
+            limit,
+            settings.email_verification_send_limit_window_seconds,
         )
-    )
-    await db.commit()
-    return raw_token
 
 
-async def verify_email(db: AsyncSession, raw_token: str) -> User:
-    """Redeem a verification token. Single use, and expiring."""
+async def issue_verification_code(db: AsyncSession, user: User) -> str:
+    """Mint a code for `user`, replacing any outstanding one, and return it.
+
+    The raw code is returned to be emailed and is stored nowhere. The upsert
+    on the unique user_id is what retires the previous code: its hash is
+    overwritten and its attempt count reset in the same statement, so two
+    concurrent issues leave exactly one live code, never two.
+    """
+    settings = get_settings()
     now = datetime.now(timezone.utc)
+    code = generate_otp()
+    code_hash = hash_otp(code, subject=user.id)
+    expires_at = now + timedelta(seconds=settings.email_verification_code_ttl_seconds)
 
-    result = await db.execute(
-        select(EmailVerificationToken).where(
-            EmailVerificationToken.token_hash == hash_url_token(raw_token)
+    statement = (
+        pg_insert(EmailVerificationCode)
+        .values(
+            id=uuid.uuid4(),
+            user_id=user.id,
+            code_hash=code_hash,
+            expires_at=expires_at,
+            failed_attempts=0,
+            created_at=now,
+        )
+        .on_conflict_do_update(
+            index_elements=[EmailVerificationCode.user_id],
+            set_={
+                "code_hash": code_hash,
+                "expires_at": expires_at,
+                "failed_attempts": 0,
+                "created_at": now,
+            },
         )
     )
-    token = result.scalar_one_or_none()
+    await db.execute(statement)
+    await db.commit()
+    return code
 
-    # Unknown, spent and expired are one indistinguishable failure to the caller.
-    if token is None or token.used_at is not None or token.expires_at <= now:
-        raise AuthenticationError(
-            "Invalid or expired verification token",
-            code=ErrorCode.VERIFICATION_INVALID,
+
+def _invalid_code() -> AuthenticationError:
+    # Unknown address, already verified, no code, expired, wrong, exhausted:
+    # one failure to the caller, so the endpoint reveals nothing about which
+    # addresses have accounts or what state they are in.
+    return AuthenticationError(
+        "Invalid or expired verification code", code=ErrorCode.VERIFICATION_INVALID
+    )
+
+
+async def verify_email(db: AsyncSession, email: str, code: str) -> User:
+    """Redeem a verification code and activate the account.
+
+    The code row is locked (SELECT ... FOR UPDATE) for the check, so parallel
+    guesses queue behind each other and each sees the attempt count the
+    previous one left: five wrong answers cost exactly five attempts, however
+    they are timed. A correct answer deletes the row, which makes it single-use.
+
+    Wrong guesses also count against a per-address budget that spans codes,
+    checked before the code is: otherwise requesting a fresh code every
+    cooldown would buy an attacker five more guesses each time, indefinitely.
+    """
+    settings = get_settings()
+    email = normalize_email(email)
+
+    failure_limit = settings.email_verification_failure_limit
+    failure_window = settings.email_verification_failure_limit_window_seconds
+    failure_bucket = rate_limit_service.account_key("verify-email", email)
+    if failure_limit > 0:
+        await rate_limit_service.ensure_under_limit(
+            db, failure_bucket, failure_limit, failure_window
         )
 
-    user = await db.get(User, token.user_id)
-    if user is None:
-        raise AuthenticationError(
-            "Invalid or expired verification token",
-            code=ErrorCode.VERIFICATION_INVALID,
-        )
+    async def _fail() -> AuthenticationError:
+        # Persists whatever the failure changed (attempt count, wiped row)
+        # before the caller raises, which would otherwise roll it back.
+        if failure_limit > 0:
+            # Commits, and raises a 429 itself once this failure is one too many.
+            await rate_limit_service.enforce(
+                db, failure_bucket, failure_limit, failure_window
+            )
+        else:
+            await db.commit()
+        return _invalid_code()
 
-    token.used_at = now
-    if user.email_verified_at is None:
-        user.email_verified_at = now
+    user = await get_user_by_email(db, email)
+    if user is None or user.is_active:
+        # Same HMAC work as a real check, so timing does not separate the cases.
+        hash_otp(code, subject=uuid.uuid4())
+        raise await _fail()
+
+    record = await db.scalar(
+        select(EmailVerificationCode)
+        .where(EmailVerificationCode.user_id == user.id)
+        .with_for_update()
+    )
+    if record is None:
+        hash_otp(code, subject=user.id)
+        raise await _fail()
+
+    now = datetime.now(timezone.utc)
+    if record.expires_at <= now:
+        await db.delete(record)
+        raise await _fail()
+
+    if not otp_matches(code, subject=user.id, stored_hash=record.code_hash):
+        record.failed_attempts += 1
+        if record.failed_attempts >= settings.email_verification_max_attempts:
+            # Wiped, not just flagged: there is nothing left to guess against.
+            await db.delete(record)
+        raise await _fail()
+
+    await db.delete(record)
+    user.email_verified_at = now
     await db.commit()
     await db.refresh(user)
+
+    if failure_limit > 0:
+        await rate_limit_service.reset(db, failure_bucket)
     return user
 
 
 async def resend_verification(db: AsyncSession, email: str) -> None:
-    # Silent in every case (unknown, already verified, sent) for the same
-    # enumeration reason as registration.
+    """Send a fresh code, retiring the previous one.
+
+    The cooldown and cap apply to every address before anything is looked up,
+    so a 429 here is the same for an unknown address as for a real one. Past
+    that, silent in every case (unknown, already verified, sent) for the same
+    enumeration reason as registration.
+    """
+    email = normalize_email(email)
+    await _reserve_verification_send(db, email)
+
     user = await get_user_by_email(db, email)
-    if user is None or user.is_email_verified:
+    if user is None or user.is_active:
         return
 
-    raw_token = await create_email_verification(db, user)
-    await email_service.send_verification_email(to=user.email, raw_token=raw_token)
+    code = await issue_verification_code(db, user)
+    email_service.send_verification_code(to=user.email, code=code)
+
+
+async def purge_expired_verification_codes(db: AsyncSession) -> int:
+    """Drop codes that can no longer be redeemed. Run periodically; an expired
+    row is also deleted when someone tries it."""
+    from sqlalchemy import delete
+
+    result = await db.execute(
+        delete(EmailVerificationCode).where(
+            EmailVerificationCode.expires_at <= datetime.now(timezone.utc)
+        )
+    )
+    await db.commit()
+    return int(result.rowcount or 0)
 
 
 async def authenticate_user(db: AsyncSession, email: str, password: str) -> User:
@@ -187,7 +312,7 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> User
         await rate_limit_service.reset(db, bucket)
 
     # After the password check, so the 403 is not an enumeration signal.
-    if not user.is_email_verified:
+    if not user.is_active:
         raise EmailNotVerifiedError()
 
     return user

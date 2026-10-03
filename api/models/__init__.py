@@ -4,7 +4,7 @@ inspects it; a missed one vanishes from migrations."""
 from api.db.base import Base
 from api.models.document import Document
 from api.models.document_change import DocumentChange
-from api.models.email_verification import EmailVerificationToken
+from api.models.email_verification import EmailVerificationCode
 from api.models.enums import WORKSPACE_ROLE_ENUM_NAME, WorkspaceRole
 from api.models.rate_limit import RateLimitBucket
 from api.models.refresh_token import RefreshToken
@@ -16,7 +16,7 @@ __all__ = [
     "Base",
     "Document",
     "DocumentChange",
-    "EmailVerificationToken",
+    "EmailVerificationCode",
     "RateLimitBucket",
     "RefreshToken",
     "User",

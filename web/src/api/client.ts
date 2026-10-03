@@ -30,10 +30,19 @@ export class ApiError extends Error {
     /** Stable identifier from the API, translated by the language packs.
      *  Null for a response that carries no code, such as a proxy's own. */
     readonly code: string | null = null,
+    /** Seconds from a 429's Retry-After, so a button can count down to the
+     *  moment the server will say yes. */
+    readonly retryAfter: number | null = null,
   ) {
     super(detail);
     this.name = 'ApiError';
   }
+}
+
+function retryAfterSeconds(response: Response): number | null {
+  // Only the delta-seconds form; the API never sends an HTTP date.
+  const seconds = Number(response.headers.get('Retry-After'));
+  return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : null;
 }
 
 function errorCode(body: unknown): string | null {
@@ -196,6 +205,7 @@ export async function request<T>(
       describe(response.status, parsed),
       parsed,
       errorCode(parsed),
+      retryAfterSeconds(response),
     );
   }
   return parsed as T;

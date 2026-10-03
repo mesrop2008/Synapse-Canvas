@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -57,6 +58,39 @@ def generate_url_token() -> str:
 # no dictionary to attack. What matters is that the DB holds nothing redeemable.
 def hash_url_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+
+OTP_DIGITS: Final[int] = 6
+
+
+def generate_otp() -> str:
+    # randbelow, not random.randint: the code is a credential, so it comes from
+    # the CSPRNG. Zero-padded, so every code is exactly six digits.
+    return f"{secrets.randbelow(10**OTP_DIGITS):0{OTP_DIGITS}d}"
+
+
+@lru_cache(maxsize=1)
+def _otp_key() -> bytes:
+    # Derived from the signing secret rather than configured separately, with a
+    # label so the derived key is good for nothing a JWT checks. Rotating the
+    # signing secret invalidates outstanding codes; they last minutes anyway.
+    return hmac.new(
+        get_settings().jwt_secret_key.encode("utf-8"),
+        b"synapse-canvas/email-verification-otp/v1",
+        hashlib.sha256,
+    ).digest()
+
+
+def hash_otp(code: str, *, subject: uuid.UUID) -> str:
+    """Keyed, unlike `hash_url_token`: a million possible codes means a plain
+    hash from a leaked row is reversed by enumeration in milliseconds. Binding
+    the user id in means a row only ever matches its own user's code."""
+    message = f"{subject}:{code}".encode("utf-8")
+    return hmac.new(_otp_key(), message, hashlib.sha256).hexdigest()
+
+
+def otp_matches(code: str, *, subject: uuid.UUID, stored_hash: str) -> bool:
+    return hmac.compare_digest(hash_otp(code, subject=subject), stored_hash)
 
 
 def _key_id(secret: str) -> str:

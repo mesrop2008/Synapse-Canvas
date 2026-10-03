@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 
-import { register, resendVerification } from '../api/auth';
+import { register } from '../api/auth';
 import { describeFailure, failed, type FailedRequest } from '../api/errors';
 import { Alert } from '../components/Alert';
 import { LanguageToggle } from '../components/LanguageToggle';
@@ -9,18 +9,18 @@ import { ThemeToggle } from '../components/ThemeToggle';
 import { Logo } from '../components/icons';
 import { useAuth } from '../hooks/useAuth';
 import { useI18n } from '../hooks/useI18n';
+import type { VerifyEmailState } from './VerifyEmailPage';
 
 export function RegisterPage() {
   const { status } = useAuth();
-  const { t, tNode } = useI18n();
+  const { t } = useI18n();
+  const navigate = useNavigate();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<FailedRequest | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [resent, setResent] = useState(false);
 
   if (status === 'authenticated') return <Navigate to="/workspaces" replace />;
 
@@ -30,61 +30,15 @@ export function RegisterPage() {
     setSubmitting(true);
     try {
       await register(email, password, name);
-      setSubmitted(true);
+      // The backend answers 202 either way and the account stays inactive
+      // until the emailed code comes back, so the next stop is entering it.
+      const state: VerifyEmailState = { email, sent: true };
+      navigate('/verify-email', { state });
     } catch (caught) {
       setError(failed(caught, 'register.failed'));
     } finally {
       setSubmitting(false);
     }
-  }
-
-  // The backend answers 202 either way and refuses login until verified, so
-  // there is nobody to sign in here -- only somewhere to send them.
-  if (submitted) {
-    return (
-      <main className="auth">
-        <div className="auth-theme">
-          <LanguageToggle />
-          <ThemeToggle />
-        </div>
-
-        <div className="auth-card">
-          <div className="auth-brand">
-            <Logo size={26} />
-            {t('common.appName')}
-          </div>
-
-          <h1 className="auth-title">{t('register.sentTitle')}</h1>
-          <p className="auth-lede">
-            {tNode('register.sentLede', { email: <strong>{email}</strong> })}
-          </p>
-
-          <p className="note">
-            {tNode('register.sentDevNote', {
-              marker: <code>[email:console]</code>,
-            })}
-          </p>
-
-          <div style={{ marginTop: 18 }}>
-            <button
-              type="button"
-              className="btn btn-secondary btn-block"
-              disabled={resent}
-              onClick={() => {
-                void resendVerification(email).catch(() => undefined);
-                setResent(true);
-              }}
-            >
-              {resent ? t('register.resent') : t('register.resend')}
-            </button>
-          </div>
-
-          <p className="auth-foot">
-            <Link to="/login">{t('register.backToSignIn')}</Link>
-          </p>
-        </div>
-      </main>
-    );
   }
 
   return (

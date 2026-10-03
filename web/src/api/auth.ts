@@ -12,7 +12,8 @@ export async function login(email: string, password: string): Promise<TokenPair>
 
 /**
  * Answers 202 whether or not the address was already taken -- the backend will
- * not say, so the UI cannot either. Verification is required before login.
+ * not say, so the UI cannot either. The account stays inactive until the
+ * emailed code is redeemed with `verifyEmail`.
  */
 export function register(
   email: string,
@@ -25,13 +26,16 @@ export function register(
   });
 }
 
-export function verifyEmail(token: string): Promise<User> {
+/** Every failure -- wrong, expired, used up, unknown address -- is the same
+ *  401, by design; five wrong codes wipe the code outright. */
+export function verifyEmail(email: string, code: string): Promise<User> {
   return request<User>('POST', '/auth/verify-email', {
-    body: { token },
+    body: { email, code },
     authenticated: false,
   });
 }
 
+/** 429 with `retryAfter` within a minute of the last code, for any address. */
 export function resendVerification(email: string): Promise<AcceptedResponse> {
   return request<AcceptedResponse>('POST', '/auth/resend-verification', {
     body: { email },

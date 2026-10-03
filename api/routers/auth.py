@@ -10,6 +10,7 @@ from api.dependencies import (
     login_ip_rate_limit,
     refresh_ip_rate_limit,
     register_ip_rate_limit,
+    verify_email_ip_rate_limit,
 )
 from api.schemas.auth import (
     AcceptedResponse,
@@ -30,7 +31,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     "/register",
     response_model=AcceptedResponse,
     status_code=status.HTTP_202_ACCEPTED,
-    summary="Create an account and send a verification email",
+    summary="Create an inactive account and email it a verification code",
     dependencies=[Depends(register_ip_rate_limit)],
     responses={
         429: {"description": "Too many registrations from this address"},
@@ -40,18 +41,22 @@ async def register(payload: RegisterRequest, db: DbSession) -> AcceptedResponse:
     # Always 202: a 409 would reveal which addresses have accounts.
     await auth_service.register_user(db, payload)
     return AcceptedResponse(
-        detail="If that address can receive mail, a verification link is on its way."
+        detail="If that address can receive mail, a verification code is on its way."
     )
 
 
 @router.post(
     "/verify-email",
     response_model=UserRead,
-    summary="Redeem an emailed verification token",
-    responses={401: {"description": "Invalid, expired or already-used token"}},
+    summary="Redeem an emailed verification code and activate the account",
+    dependencies=[Depends(verify_email_ip_rate_limit)],
+    responses={
+        401: {"description": "Wrong, expired, used-up or unknown code"},
+        429: {"description": "Too many attempts from this address or for this account"},
+    },
 )
 async def verify_email(payload: VerifyEmailRequest, db: DbSession) -> UserRead:
-    user = await auth_service.verify_email(db, payload.token)
+    user = await auth_service.verify_email(db, payload.email, payload.code)
     return UserRead.model_validate(user)
 
 
@@ -59,17 +64,23 @@ async def verify_email(payload: VerifyEmailRequest, db: DbSession) -> UserRead:
     "/resend-verification",
     response_model=AcceptedResponse,
     status_code=status.HTTP_202_ACCEPTED,
-    summary="Request a fresh verification link",
+    summary="Request a fresh verification code",
     dependencies=[Depends(register_ip_rate_limit)],
-    responses={429: {"description": "Too many requests from this address"}},
+    responses={
+        429: {
+            "description": "A code was sent to this address under a minute ago, "
+            "or too many have been sent this hour. Retry-After says when to retry."
+        },
+    },
 )
 async def resend_verification(
     payload: ResendVerificationRequest, db: DbSession
 ) -> AcceptedResponse:
-    # Always 202: unknown, already-verified and sent look identical.
+    # Always 202: unknown, already-verified and sent look identical. The 429
+    # is applied to every address alike, so it is no signal either.
     await auth_service.resend_verification(db, payload.email)
     return AcceptedResponse(
-        detail="If that address needs verifying, a new link is on its way."
+        detail="If that address needs verifying, a new code is on its way."
     )
 
 
