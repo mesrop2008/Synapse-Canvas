@@ -58,12 +58,7 @@ export function deleteDocument(
   );
 }
 
-/**
- * Narrows a failed PATCH to the stale-version case, whose body carries the
- * server's current row. Checked structurally rather than on status alone,
- * because `current` is what callers actually need and its absence would
- * otherwise surface as a runtime undefined.
- */
+/** Checked structurally, not by status: callers need `current` to exist. */
 export function asVersionConflict(
   error: unknown,
 ): DocumentVersionConflict | null {

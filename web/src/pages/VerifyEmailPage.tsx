@@ -10,12 +10,10 @@ import { ThemeToggle } from '../components/ThemeToggle';
 import { Logo } from '../components/icons';
 import { useI18n } from '../hooks/useI18n';
 
-/** Mirrors EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS. Only a hint for the
- *  button: the server enforces the real one, and its Retry-After wins. */
+/** A hint mirroring the server's cooldown; its Retry-After wins. */
 const RESEND_COOLDOWN_SECONDS = 60;
 
-/** How the register, login and account pages hand over the address. In router
- *  state rather than the query string, so it stays out of history and logs. */
+/** In router state, not the query string, to keep the address out of logs. */
 export interface VerifyEmailState {
   email?: string;
   /** True when a code was sent on the way here, so the cooldown is running. */

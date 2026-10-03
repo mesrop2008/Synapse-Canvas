@@ -1,6 +1,5 @@
-"""Uvicorn configures only its own loggers, so app records would propagate to a
-handler-less root and vanish -- including the dev email codes and the catch-all's
-tracebacks."""
+"""Uvicorn configures only its own loggers; without this, app records reach a
+handler-less root and vanish."""
 
 from __future__ import annotations
 

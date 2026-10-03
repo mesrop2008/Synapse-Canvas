@@ -1,5 +1,4 @@
-"""A factory, not a singleton, so tests build isolated instances with their own
-overrides."""
+"""A factory, so each test builds an app with its own overrides."""
 
 from __future__ import annotations
 
@@ -34,13 +33,11 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # In the background: an unreachable mail server takes the full SMTP
-    # timeout to fail, and the API should be serving while it does.
+    # Background: an unreachable mail server takes the full timeout to fail.
     mail_check = asyncio.create_task(email_service.report_delivery_status())
     yield
     mail_check.cancel()
-    # Before anything else closes: a code queued just before shutdown is one
-    # the user is already waiting for.
+    # First, so a code queued just before shutdown still goes out.
     await email_service.drain(timeout=10)
     await app.state.hub.aclose()
     await close_redis()
@@ -48,11 +45,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
-    """The one place domain errors map to HTTP status codes.
-
-    `code` is what the client translates; `detail` stays English for everyone
-    else, and for a client that predates the code it is being sent.
-    """
     headers = dict(exc.headers or {})
     if exc.status_code == 401:
         headers.setdefault("WWW-Authenticate", "Bearer")
@@ -66,8 +58,7 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
 async def stale_document_version_handler(
     request: Request, exc: StaleDocumentVersionError
 ) -> JSONResponse:
-    """Carries the server's row so the loser of a race can re-sync from the
-    response rather than issuing another GET."""
+    """Includes the server's row, so the client re-syncs without another GET."""
     body = DocumentVersionConflict(
         code=exc.code.value,
         detail=exc.detail,
@@ -112,15 +103,10 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Pydantic's own 422 body is a list of field errors, which is the useful
-    # thing to show a developer but not a sentence to show a user. The code
-    # gives the client something to translate; the list stays for the console.
     app.add_exception_handler(  # type: ignore[arg-type]
         RequestValidationError, validation_error_handler
     )
 
-    # Starlette walks the exception MRO, so the specific handler wins whatever
-    # the registration order.
     app.add_exception_handler(  # type: ignore[arg-type]
         StaleDocumentVersionError, stale_document_version_handler
     )
@@ -134,8 +120,7 @@ def create_app() -> FastAPI:
 
     if settings.cors_origins:
         if "*" in settings.cors_origins:
-            # Starlette pairs a wildcard with credentials by echoing the
-            # caller's origin, which grants any site access.
+            # With credentials, Starlette answers '*' by echoing any origin.
             raise RuntimeError(
                 "CORS_ORIGINS may not contain '*' while credentials are allowed. "
                 "List the exact origins that need access."
@@ -148,9 +133,7 @@ def create_app() -> FastAPI:
             allow_headers=["*"],
         )
 
-    # One per app instance rather than a module singleton, so each Uvicorn
-    # worker gets its own -- and so the test suite can stand two of them up
-    # against one Redis and watch a message cross between them.
+    # Per app, not per module: one per worker, and tests can run two.
     app.state.hub = DocumentHub(get_redis())
 
     app.include_router(auth.router)

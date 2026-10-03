@@ -47,9 +47,7 @@ export function DocumentPage() {
     return <p className="placeholder">{t('document.loading')}</p>;
   }
 
-  // Mounting only once content exists avoids loading into a live editor, which
-  // would mean telling that write apart from a user edit. The key remounts it
-  // when the route moves to another document.
+  // Mounted once content exists, so loading it is not mistaken for an edit.
   return (
     <DocumentEditor
       key={document.data.id}
@@ -80,9 +78,7 @@ function DocumentEditor({
   const [title, setTitle] = useState(loaded.title);
   const [reloaded, setReloaded] = useState<ReloadReason | null>(null);
 
-  // Set while a peer's work is being written into the editor, so the resulting
-  // transaction is not mistaken for something the user typed and sent straight
-  // back out.
+  // Set while applying a peer's edit, so it is not sent back out.
   const applyingRemote = useRef(false);
   const lastCursorSentAt = useRef(0);
   // onTransaction fires during construction, before `socket` below exists.
@@ -94,8 +90,7 @@ function DocumentEditor({
     {
       extensions: [
         StarterKit.configure({
-          // The log is the history now, and undoing a peer's edit out from
-          // under them is not what the shortcut should do.
+          // Undo must not revert peers' edits.
           undoRedo: false,
         }),
         Placeholder.configure({ placeholder: t('document.placeholder') }),
@@ -109,8 +104,7 @@ function DocumentEditor({
       },
       onTransaction: (payload) => onTransactionRef.current(payload),
     },
-    // Tiptap builds the schema once, so a language change needs a rebuild to
-    // reach the placeholder.
+    // Rebuilt on language change: Tiptap builds the placeholder once.
     [locale],
   );
 
@@ -149,8 +143,6 @@ function DocumentEditor({
         applyRemote(() => dispatch(transaction));
         return true;
       } catch {
-        // A step that will not apply means this copy is not where the peer
-        // thought it was. The hook resyncs rather than carrying on.
         return false;
       }
     },
@@ -182,8 +174,6 @@ function DocumentEditor({
       );
     }
 
-    // Throttled: a cursor is worth a frame of latency and not worth a message
-    // per arrow key.
     if (transaction.selectionSet) {
       const now = Date.now();
       if (now - lastCursorSentAt.current >= CURSOR_THROTTLE_MS) {
@@ -194,10 +184,7 @@ function DocumentEditor({
     }
   };
 
-  // Editing is blocked rather than buffered while the socket is down. Buffered
-  // edits would have to be rebased on reconnect, and reject-and-rebase has no
-  // rebase -- they would be collected, shown as progress, then thrown away.
-  // Refusing them up front loses the same keystrokes without pretending.
+  // Blocked, not buffered, while offline: buffered edits could not be rebased.
   useEffect(() => {
     editor?.setEditable(writable && live);
   }, [editor, writable, live]);
@@ -206,10 +193,7 @@ function DocumentEditor({
     if (editor) setRemotePeers(editor.view, socket.peers);
   }, [editor, socket.peers]);
 
-  // The list the user lands on after following the link out has to be right.
-  // `exact`, because the detail key sits under the list key: without it this
-  // refetches the document too, gets a 404, and replaces the notice below with
-  // a generic error that says none of what happened.
+  // `exact`: refetching the deleted document would 404 over the notice.
   const queryClient = useQueryClient();
   useEffect(() => {
     if (!gone) return;

@@ -1,5 +1,4 @@
-/** Holds the session, attaches the access token, and recovers from an expired
- *  one by refreshing once and replaying. The rest of `api/` wraps `request()`. */
+/** Holds the session and, on a 401, refreshes once and replays. */
 
 import { translate } from '../../i18n';
 import type { ErrorBody, TokenPair } from '../types/api';
@@ -10,28 +9,19 @@ export const API_BASE_URL = (
 
 const REFRESH_TOKEN_KEY = 'synapse.refresh_token';
 
-/**
- * In a module variable, so it is gone on reload and never readable from storage.
- *
- * The refresh token, by contrast, is in localStorage, which any injected script
- * can read -- an XSS becomes a stolen long-lived session. The production answer
- * is an httpOnly, Secure, SameSite cookie plus a CSRF token. Deliberate
- * simplification for Part 2; Part 6 changes it.
- */
+/** Memory only. The refresh token sits in localStorage, readable by any
+ *  injected script; an httpOnly cookie plus CSRF token would be safer. */
 let accessToken: string | null = null;
 
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly detail: string,
-    /** Parsed body, for endpoints returning more than `detail` -- PATCH
-     *  /documents returns the server's row alongside its 409. */
+    /** e.g. the server's row alongside a PATCH 409. */
     readonly body: unknown,
-    /** Stable identifier from the API, translated by the language packs.
-     *  Null for a response that carries no code, such as a proxy's own. */
+    /** Null when the response is not the API's own, e.g. a proxy's. */
     readonly code: string | null = null,
-    /** Seconds from a 429's Retry-After, so a button can count down to the
-     *  moment the server will say yes. */
+    /** Seconds from a 429's Retry-After. */
     readonly retryAfter: number | null = null,
   ) {
     super(detail);
@@ -115,8 +105,7 @@ async function send(
   });
 }
 
-/** FastAPI returns `{detail: "..."}` from handlers and `{detail: [{loc, msg}]}`
- *  from validation; flatten both to one string. */
+/** Flattens both FastAPI shapes: `{detail: "..."}` and `{detail: [{msg}]}`. */
 function describe(status: number, body: unknown): string {
   const detail = (body as ErrorBody | null)?.detail;
   if (typeof detail === 'string') return detail;
@@ -142,12 +131,8 @@ async function readBody(response: Response): Promise<unknown> {
 
 let inFlightRefresh: Promise<string> | null = null;
 
-/**
- * Collapses concurrent callers onto one request. Several queries 401-ing at once
- * is the normal case, and one refresh each would mint several token pairs racing
- * to write localStorage. The slot clears once settled, so a later expiry
- * refreshes again.
- */
+/** One refresh for concurrent 401s, or several token pairs would race to
+ *  write localStorage. */
 function refreshAccessToken(): Promise<string> {
   inFlightRefresh ??= performRefresh().finally(() => {
     inFlightRefresh = null;

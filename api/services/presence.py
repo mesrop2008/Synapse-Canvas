@@ -1,14 +1,7 @@
-"""Who is in a document, and where their cursor is.
+"""Who is in a document and where their cursor is: one Redis hash per document.
 
-None of this reaches Postgres. It is true for as long as a socket is open and
-worthless afterwards, so writing it to a durable store would mean a table whose
-rows are all garbage after a restart. Redis holds one hash per document, keyed
-by user, and the whole hash expires once nobody refreshes it.
-
-The per-field TTL is carried in the value: Redis expires keys, not hash fields,
-and a socket that dies without closing leaves its field behind. Readers sweep
-what has lapsed, so a heartbeat from any peer clears the ghosts.
-"""
+Redis expires keys, not hash fields, so each value carries its own expiry and
+readers sweep lapsed entries left by sockets that died without closing."""
 
 from __future__ import annotations
 
@@ -25,8 +18,7 @@ from api.core.config import get_settings
 
 _KEY_PREFIX = "presence:"
 
-# Picked for contrast against both themes and against each other; a cursor
-# label has to be readable on white and on near-black.
+# Readable on both themes and distinct from each other.
 PALETTE: tuple[str, ...] = (
     "#e0567a",
     "#e08a2e",
@@ -40,9 +32,7 @@ PALETTE: tuple[str, ...] = (
 
 
 def colour_for(user_id: uuid.UUID) -> str:
-    """Stable per user, so the same person is the same colour in every session
-    and on every worker. Derived rather than stored: nothing has to be
-    allocated, freed, or reconciled when someone joins or leaves."""
+    """Derived from the id, so stable everywhere with nothing to allocate."""
     digest = hashlib.sha256(str(user_id).encode("utf-8")).digest()
     return PALETTE[digest[0] % len(PALETTE)]
 
@@ -54,8 +44,7 @@ class Peer:
     color: str
     anchor: int | None
     head: int | None
-    # Which socket last wrote this entry, so a stale tab cannot delete a fresh
-    # one's presence on its way out.
+    # So a stale tab cannot delete a fresh one's entry on its way out.
     connection_id: str
 
     def as_message(self) -> dict[str, Any]:
@@ -103,21 +92,15 @@ def _decode(user_id: str, raw: str) -> tuple[Peer, float] | None:
 
 
 async def touch(redis: Redis, document_id: uuid.UUID, peer: Peer) -> None:
-    """Write or refresh an entry. Called on join, on every cursor move, and on
-    every heartbeat."""
     ttl = get_settings().presence_ttl_seconds
     key = _key(document_id)
     await redis.hset(key, str(peer.user_id), _encode(peer, time.time() + ttl))
-    # Twice the field TTL: long enough that a live document's hash is never
-    # dropped between heartbeats, short enough that an abandoned one goes away
-    # on its own rather than leaking a key per document ever opened.
+    # Twice the field TTL: survives between heartbeats, expires when abandoned.
     await redis.expire(key, ttl * 2)
 
 
 async def sweep(redis: Redis, document_id: uuid.UUID) -> list[uuid.UUID]:
-    """Drop entries whose TTL lapsed -- the ungraceful-disconnect case, where no
-    `leave` ever ran. Returns the users removed so the caller can announce them.
-    """
+    """Returns the users removed, for the caller to announce."""
     key = _key(document_id)
     now = time.time()
     expired: list[uuid.UUID] = []
@@ -133,7 +116,6 @@ async def sweep(redis: Redis, document_id: uuid.UUID) -> list[uuid.UUID]:
 
 
 async def peers(redis: Redis, document_id: uuid.UUID) -> list[Peer]:
-    """Everyone currently in the document, expired entries excluded."""
     now = time.time()
     found: list[Peer] = []
 
@@ -147,13 +129,10 @@ async def peers(redis: Redis, document_id: uuid.UUID) -> list[Peer]:
 async def leave(
     redis: Redis, document_id: uuid.UUID, user_id: uuid.UUID, connection_id: str
 ) -> bool:
-    """Remove an entry on disconnect. False when the entry belongs to a newer
-    connection -- the same user in a second tab -- and so must stay.
+    """False when the entry belongs to a newer connection (a second tab).
 
-    Read-compare-delete is not atomic, so a second tab that writes between the
-    two can still lose its entry. Its next heartbeat restores it, a second
-    later; a Lua script would close the window if that ever mattered.
-    """
+    Read-compare-delete is not atomic; a tab losing that race gets its entry
+    back on its next heartbeat."""
     key = _key(document_id)
     raw = await redis.hget(key, str(user_id))
     if raw is None:

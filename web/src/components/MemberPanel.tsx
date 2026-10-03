@@ -42,8 +42,6 @@ export function MemberPanel({ workspace }: { workspace: Workspace }) {
   const [formError, setFormError] = useState<FailedRequest | null>(null);
   const [pendingRemove, setPendingRemove] = useState<Member | null>(null);
 
-  // Only the owner may change membership. The server enforces it; hiding the
-  // controls avoids offering a button that can only fail.
   const administers = workspace.role === 'owner';
 
   async function handleAdd(event: React.FormEvent) {
@@ -134,8 +132,6 @@ export function MemberPanel({ workspace }: { workspace: Workspace }) {
       {members.data && (
         <ul className="member-list">
           {members.data.map((member) => {
-            // The workspace owner has no "remove" -- the server refuses it, and
-            // an ownerless workspace could not be administered anyway.
             const isOwner = member.user_id === workspace.owner_id;
             return (
               <li key={member.id} className="member">

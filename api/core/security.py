@@ -20,7 +20,7 @@ TokenType = Literal["access", "refresh"]
 ACCESS_TOKEN: Final[TokenType] = "access"
 REFRESH_TOKEN: Final[TokenType] = "refresh"
 
-# bcrypt silently truncates past 72 bytes; enforced at the schema layer.
+# bcrypt silently truncates past this; the schema refuses longer passwords.
 BCRYPT_MAX_BYTES: Final[int] = 72
 
 
@@ -34,8 +34,7 @@ def _crypt_context() -> CryptContext:
     )
 
 
-# bcrypt is CPU-bound and releases the GIL, so hashing runs in a worker thread
-# rather than blocking the event loop for every concurrent request.
+# In a worker thread: bcrypt is CPU-bound and would block the event loop.
 async def hash_password(password: str) -> str:
     return await to_thread.run_sync(_crypt_context().hash, password)
 
@@ -54,8 +53,7 @@ def generate_url_token() -> str:
     return secrets.token_urlsafe(32)
 
 
-# A plain hash, not a KDF: the input is 32 bytes of CSPRNG output, so there is
-# no dictionary to attack. What matters is that the DB holds nothing redeemable.
+# A plain hash suffices: 32 random bytes leave no dictionary to attack.
 def hash_url_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
@@ -64,16 +62,13 @@ OTP_DIGITS: Final[int] = 6
 
 
 def generate_otp() -> str:
-    # randbelow, not random.randint: the code is a credential, so it comes from
-    # the CSPRNG. Zero-padded, so every code is exactly six digits.
     return f"{secrets.randbelow(10**OTP_DIGITS):0{OTP_DIGITS}d}"
 
 
 @lru_cache(maxsize=1)
 def _otp_key() -> bytes:
-    # Derived from the signing secret rather than configured separately, with a
-    # label so the derived key is good for nothing a JWT checks. Rotating the
-    # signing secret invalidates outstanding codes; they last minutes anyway.
+    # Derived from the signing secret under its own label, so it verifies no
+    # JWT. Rotating the secret voids outstanding codes, which last minutes.
     return hmac.new(
         get_settings().jwt_secret_key.encode("utf-8"),
         b"synapse-canvas/email-verification-otp/v1",
@@ -82,9 +77,8 @@ def _otp_key() -> bytes:
 
 
 def hash_otp(code: str, *, subject: uuid.UUID) -> str:
-    """Keyed, unlike `hash_url_token`: a million possible codes means a plain
-    hash from a leaked row is reversed by enumeration in milliseconds. Binding
-    the user id in means a row only ever matches its own user's code."""
+    """Keyed: an unkeyed hash of one of a million codes is reversed by brute
+    force. The user id binds a row to its own user's code."""
     message = f"{subject}:{code}".encode("utf-8")
     return hmac.new(_otp_key(), message, hashlib.sha256).hexdigest()
 
@@ -94,12 +88,11 @@ def otp_matches(code: str, *, subject: uuid.UUID, stored_hash: str) -> bool:
 
 
 def _key_id(secret: str) -> str:
-    """A `kid` that identifies a signing key without revealing it."""
     return hashlib.sha256(secret.encode("utf-8")).hexdigest()[:16]
 
 
 def _keyring() -> dict[str, str]:
-    """Active signing key plus retired ones, so keys rotate without mass logout."""
+    """Retired keys stay on the ring so rotation does not log everyone out."""
     settings = get_settings()
     ring = {_key_id(settings.jwt_secret_key): settings.jwt_secret_key}
     for retired in settings.previous_jwt_secret_keys:
@@ -120,8 +113,8 @@ def create_token(
         "type": token_type,
         "iat": now,
         "exp": now + expires_delta,
-        "jti": str(jti or uuid.uuid4()),  # revocation key; refresh callers pass their own
-        "iss": settings.jwt_issuer,  # bind to this deployment even if a secret is shared
+        "jti": str(jti or uuid.uuid4()),
+        "iss": settings.jwt_issuer,
         "aud": settings.jwt_audience,
     }
     return jwt.encode(
@@ -146,18 +139,15 @@ def refresh_token_lifetime() -> timedelta:
 
 
 def create_refresh_token(subject: uuid.UUID | str, jti: uuid.UUID) -> str:
-    # jti is caller-supplied so the same value can be persisted in one unit of
-    # work; a token whose row was never written is rejected on first use.
+    # The caller persists the same jti; a token without its row is rejected.
     return create_token(subject, REFRESH_TOKEN, refresh_token_lifetime(), jti=jti)
 
 
 def decode_token(token: str, expected_type: TokenType) -> dict[str, Any]:
-    """Decode a token, or raise `AuthenticationError`."""
     settings = get_settings()
     ring = _keyring()
 
-    # kid is untrusted, so it only picks among keys we already hold; an unknown
-    # or absent kid falls back to trying all of them.
+    # kid is untrusted: it only picks among keys we hold, else try them all.
     try:
         kid = jwt.get_unverified_header(token).get("kid")
     except jwt.PyJWTError as exc:
@@ -180,8 +170,7 @@ def decode_token(token: str, expected_type: TokenType) -> dict[str, Any]:
             )
             break
         except jwt.ExpiredSignatureError as exc:
-            # Expiry is key-independent, so stop rather than report "invalid"
-            # after exhausting the ring.
+            # Expiry does not depend on the key, so stop here.
             raise AuthenticationError(
                 "Token has expired", code=ErrorCode.TOKEN_EXPIRED
             ) from exc

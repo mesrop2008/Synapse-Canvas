@@ -1,5 +1,4 @@
-"""Registration, verification, login and token refresh. No FastAPI imports,
-so this stays callable from non-HTTP entry points."""
+"""Registration, verification, login and token refresh. FastAPI-free."""
 
 from __future__ import annotations
 
@@ -42,7 +41,6 @@ from api.services import email_service, rate_limit_service, verification_cooldow
 
 
 def normalize_email(email: str) -> str:
-    # One canonical form, so the unique index on users.email actually holds.
     return email.strip().lower()
 
 
@@ -56,18 +54,10 @@ async def get_user_by_id(db: AsyncSession, user_id: uuid.UUID) -> User | None:
 
 
 async def register_user(db: AsyncSession, data: RegisterRequest) -> None:
-    """Create an inactive account and email it a verification code, or
-    silently notice a duplicate.
-
-    Enumeration-resistant: identical outcome either way (this endpoint is
-    unauthenticated), and the real owner is notified by email instead. The
-    password is hashed on both paths so their timing matches too, and mail goes
-    out in the background so SMTP latency cannot tell them apart either.
-
-    Both paths take the address's send cooldown. When it is already held, the
-    account is still created but no mail goes out -- a burst of registrations
-    for one address is a mail bomb, not a user -- and the response is the same.
-    """
+    """Enumeration-resistant: a new and an existing address get the same
+    response and timing (both hash, mail is sent in the background); the real
+    owner of an existing one is told by email. Within the send cooldown no
+    mail goes out at all, so repeated registration cannot mail-bomb anyone."""
     email = normalize_email(data.email)
     hashed_password = await hash_password(data.password)
 
@@ -87,7 +77,7 @@ async def register_user(db: AsyncSession, data: RegisterRequest) -> None:
     try:
         await db.commit()
     except IntegrityError:
-        # Concurrent duplicate; the unique index settled it. Same outcome.
+        # A concurrent duplicate, settled by the unique index.
         await db.rollback()
         if may_send:
             email_service.send_duplicate_registration_notice(to=email)
@@ -100,12 +90,8 @@ async def register_user(db: AsyncSession, data: RegisterRequest) -> None:
 
 
 async def _reserve_verification_send(db: AsyncSession, email: str) -> None:
-    """Take the address's cooldown and count a send against its hourly cap,
-    raising RateLimitExceededError if either says no.
-
-    Runs before the user lookup and for every address, registered or not, so
-    a 429 is no evidence that an account exists.
-    """
+    """Applied to every address before any lookup, so a 429 reveals nothing
+    about which accounts exist."""
     settings = get_settings()
 
     retry_after = await verification_cooldown.claim(
@@ -125,13 +111,8 @@ async def _reserve_verification_send(db: AsyncSession, email: str) -> None:
 
 
 async def issue_verification_code(db: AsyncSession, user: User) -> str:
-    """Mint a code for `user`, replacing any outstanding one, and return it.
-
-    The raw code is returned to be emailed and is stored nowhere. The upsert
-    on the unique user_id is what retires the previous code: its hash is
-    overwritten and its attempt count reset in the same statement, so two
-    concurrent issues leave exactly one live code, never two.
-    """
+    """The upsert on unique user_id retires the previous code and resets its
+    attempts in one statement, so concurrent issues leave one live code."""
     settings = get_settings()
     now = datetime.now(timezone.utc)
     code = generate_otp()
@@ -164,26 +145,16 @@ async def issue_verification_code(db: AsyncSession, user: User) -> str:
 
 
 def _invalid_code() -> AuthenticationError:
-    # Unknown address, already verified, no code, expired, wrong, exhausted:
-    # one failure to the caller, so the endpoint reveals nothing about which
-    # addresses have accounts or what state they are in.
+    # Every failure looks the same, so the endpoint reveals no account state.
     return AuthenticationError(
         "Invalid or expired verification code", code=ErrorCode.VERIFICATION_INVALID
     )
 
 
 async def verify_email(db: AsyncSession, email: str, code: str) -> User:
-    """Redeem a verification code and activate the account.
-
-    The code row is locked (SELECT ... FOR UPDATE) for the check, so parallel
-    guesses queue behind each other and each sees the attempt count the
-    previous one left: five wrong answers cost exactly five attempts, however
-    they are timed. A correct answer deletes the row, which makes it single-use.
-
-    Wrong guesses also count against a per-address budget that spans codes,
-    checked before the code is: otherwise requesting a fresh code every
-    cooldown would buy an attacker five more guesses each time, indefinitely.
-    """
+    """The row is locked FOR UPDATE, so parallel guesses cannot exceed the
+    attempt limit. Wrong guesses also draw on a per-address budget across
+    codes; otherwise each fresh code would buy five more guesses."""
     settings = get_settings()
     email = normalize_email(email)
 
@@ -196,10 +167,9 @@ async def verify_email(db: AsyncSession, email: str, code: str) -> User:
         )
 
     async def _fail() -> AuthenticationError:
-        # Persists whatever the failure changed (attempt count, wiped row)
-        # before the caller raises, which would otherwise roll it back.
+        # Commit before raising, which would roll back the attempt count.
         if failure_limit > 0:
-            # Commits, and raises a 429 itself once this failure is one too many.
+            # Commits, and raises 429 once over the budget.
             await rate_limit_service.enforce(
                 db, failure_bucket, failure_limit, failure_window
             )
@@ -209,7 +179,7 @@ async def verify_email(db: AsyncSession, email: str, code: str) -> User:
 
     user = await get_user_by_email(db, email)
     if user is None or user.is_active:
-        # Same HMAC work as a real check, so timing does not separate the cases.
+        # Same HMAC work as a real check, so timing reveals nothing.
         hash_otp(code, subject=uuid.uuid4())
         raise await _fail()
 
@@ -230,7 +200,6 @@ async def verify_email(db: AsyncSession, email: str, code: str) -> User:
     if not otp_matches(code, subject=user.id, stored_hash=record.code_hash):
         record.failed_attempts += 1
         if record.failed_attempts >= settings.email_verification_max_attempts:
-            # Wiped, not just flagged: there is nothing left to guess against.
             await db.delete(record)
         raise await _fail()
 
@@ -245,13 +214,7 @@ async def verify_email(db: AsyncSession, email: str, code: str) -> User:
 
 
 async def resend_verification(db: AsyncSession, email: str) -> None:
-    """Send a fresh code, retiring the previous one.
-
-    The cooldown and cap apply to every address before anything is looked up,
-    so a 429 here is the same for an unknown address as for a real one. Past
-    that, silent in every case (unknown, already verified, sent) for the same
-    enumeration reason as registration.
-    """
+    """Silent for unknown and already-verified addresses, like registration."""
     email = normalize_email(email)
     await _reserve_verification_send(db, email)
 
@@ -264,8 +227,7 @@ async def resend_verification(db: AsyncSession, email: str) -> None:
 
 
 async def purge_expired_verification_codes(db: AsyncSession) -> int:
-    """Drop codes that can no longer be redeemed. Run periodically; an expired
-    row is also deleted when someone tries it."""
+    """Run periodically."""
     from sqlalchemy import delete
 
     result = await db.execute(
@@ -278,11 +240,8 @@ async def purge_expired_verification_codes(db: AsyncSession) -> int:
 
 
 async def authenticate_user(db: AsyncSession, email: str, password: str) -> User:
-    """Verify credentials, throttling failed attempts per account.
-
-    Only failures count and a success clears the bucket. The limit is checked
-    before the password, so an attacker over it cannot keep forcing bcrypt work.
-    """
+    """Only failures count against the per-account limit, checked before bcrypt
+    so an attacker over it cannot keep forcing the work."""
     settings = get_settings()
     limit = settings.login_rate_limit_per_account
     window = settings.login_rate_limit_per_account_window_seconds
@@ -311,7 +270,7 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> User
     if limit > 0:
         await rate_limit_service.reset(db, bucket)
 
-    # After the password check, so the 403 is not an enumeration signal.
+    # After the password check, so the 403 reveals no account.
     if not user.is_active:
         raise EmailNotVerifiedError()
 
@@ -321,10 +280,7 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> User
 async def issue_token_pair(
     db: AsyncSession, user: User, *, family_id: uuid.UUID | None = None
 ) -> TokenPair:
-    """Mint an access/refresh pair and record the refresh token server-side.
-
-    `family_id` links a rotated token to its login; omit it to start a family.
-    """
+    """`family_id` links a rotated token to its login; omit it for a new one."""
     settings = get_settings()
     jti = uuid.uuid4()
     lifetime = refresh_token_lifetime()
@@ -356,12 +312,8 @@ async def _revoke_family(db: AsyncSession, family_id: uuid.UUID) -> None:
 
 
 async def refresh_token_pair(db: AsyncSession, refresh_token: str) -> TokenPair:
-    """Exchange a valid refresh token for a fresh pair, rotating it.
-
-    A token that was already rotated away is treated as a compromise (replay or
-    theft, indistinguishable): the whole family is revoked. The user is re-read
-    from the DB, so a deleted account cannot keep minting tokens.
-    """
+    """Reuse of a rotated-away token means replay or theft, so the whole family
+    is revoked."""
     payload = decode_token(refresh_token, REFRESH_TOKEN)
     jti = token_jti(payload)
 
@@ -397,11 +349,7 @@ async def refresh_token_pair(db: AsyncSession, refresh_token: str) -> TokenPair:
 
 
 async def revoke_refresh_token(db: AsyncSession, refresh_token: str) -> None:
-    """Log out one session by revoking its whole family.
-
-    A bad/unknown/revoked token is accepted silently: logout is not an oracle,
-    and the caller's intent is satisfied either way.
-    """
+    """Silent for a bad or unknown token: logout is not an oracle."""
     try:
         payload = decode_token(refresh_token, REFRESH_TOKEN)
         jti = token_jti(payload)
@@ -414,7 +362,6 @@ async def revoke_refresh_token(db: AsyncSession, refresh_token: str) -> None:
 
 
 async def revoke_all_for_user(db: AsyncSession, user_id: uuid.UUID) -> int:
-    """Log out every session for one user (e.g. after a password change)."""
     result = await db.execute(
         update(RefreshToken)
         .where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))
@@ -425,7 +372,7 @@ async def revoke_all_for_user(db: AsyncSession, user_id: uuid.UUID) -> int:
 
 
 async def purge_expired_refresh_tokens(db: AsyncSession) -> int:
-    """Drop rows whose tokens can no longer be presented. Run periodically."""
+    """Run periodically."""
     from sqlalchemy import delete
 
     result = await db.execute(

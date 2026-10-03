@@ -1,9 +1,4 @@
-"""Authentication throttling.
-
-Rate limits are disabled for the rest of the suite (see conftest) because
-every request shares one client address. These tests switch them on
-explicitly, one behaviour at a time.
-"""
+"""Authentication throttling, switched on per test (see conftest)."""
 
 from __future__ import annotations
 
@@ -86,11 +81,8 @@ async def test_registration_is_throttled_per_ip(
 async def test_forwarded_header_cannot_be_used_to_evade_the_limit(
     client: AsyncClient, rate_limits
 ) -> None:
-    """X-Forwarded-For is client-controlled and ignored unless trusted.
-
-    If it were honoured by default, an attacker would get an unlimited number
-    of fresh rate-limit identities simply by varying one header.
-    """
+    """Honoured by default, the header would give an attacker unlimited
+    rate-limit identities."""
     rate_limits(
         login_rate_limit_per_ip=2,
         login_rate_limit_per_ip_window_seconds=300,
@@ -165,12 +157,7 @@ async def test_login_is_throttled_per_account(
 async def test_account_throttle_blocks_even_the_correct_password(
     client: AsyncClient, owner: TestUser, rate_limits
 ) -> None:
-    """Proves the limit is checked *before* the password is verified.
-
-    Otherwise an attacker could keep forcing bcrypt work indefinitely -- the
-    throttle would report 429 only after paying the CPU cost it is meant to
-    avoid.
-    """
+    """The limit is checked before bcrypt, or the CPU cost is paid anyway."""
     rate_limits(
         login_rate_limit_per_account=2,
         login_rate_limit_per_account_window_seconds=900,

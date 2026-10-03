@@ -189,17 +189,13 @@ async def test_wildcard_cors_origin_is_refused_at_startup(
         create_app()
 
 
-# --------------------------------------------------------------------------- #
-# Error codes
-# --------------------------------------------------------------------------- #
+# --- Error codes ---
 
 
 async def test_every_client_facing_failure_carries_a_code(
     client: AsyncClient, owner: TestUser, viewer: TestUser, shared_workspace: dict
 ) -> None:
-    """The code is what the client translates. `detail` stays English beside it,
-    so a caller that is not the web client -- or one that predates the code --
-    still reads a sentence."""
+    """The client translates `code`; `detail` stays English for other callers."""
     from api.core.exceptions import ErrorCode
 
     workspace_id = shared_workspace["id"]

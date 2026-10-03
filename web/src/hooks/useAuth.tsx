@@ -26,15 +26,13 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  // 'loading' only when a session is worth restoring, or the login page
-  // flashes a spinner on every first visit.
+  // 'loading' only with a session to restore, or /login flashes a spinner.
   const [status, setStatus] = useState<AuthStatus>(() =>
     getRefreshToken() ? 'loading' : 'anonymous',
   );
   const queryClient = useQueryClient();
 
-  // The access token is memory-only and therefore gone, so this goes out
-  // unauthenticated, 401s, and the client's refresh-and-retry signs it in.
+  // The access token died with the page: this 401s and the client refreshes.
   useEffect(() => {
     if (status !== 'loading') return;
     let cancelled = false;
@@ -55,7 +53,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-    // Runs once: `status` leaves 'loading' for good.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -1,14 +1,7 @@
-"""Connection registry and the Redis fan-out that joins the registries.
+"""Per-process connection registry, joined across workers through Redis.
 
-A registry is per process. Uvicorn runs several workers and each holds its own,
-so two people editing the same document are usually not in the same one: every
-outbound message goes out through Redis and comes back to every process, which
-then delivers it to whichever of its own sockets are in that document.
-
-Each message names the connection that caused it. That connection has already
-applied the edit locally and been acknowledged directly, so the relay skips it
-rather than sending back an echo it would have to detect and discard.
-"""
+Every message goes through Redis to every process, which delivers it to its own
+sockets in that document, skipping the originating connection."""
 
 from __future__ import annotations
 
@@ -34,8 +27,7 @@ def channel_for(document_id: uuid.UUID) -> str:
 
 
 class Socket(Protocol):
-    """Just enough of Starlette's WebSocket to send on it, so the hub is
-    testable without one and carries no FastAPI import."""
+    """The slice of Starlette's WebSocket the hub needs."""
 
     async def send_json(self, data: Any) -> None: ...
 
@@ -52,18 +44,12 @@ class Connection:
 
 
 class DocumentHub:
-    """One per process. Created with the app, closed with it."""
-
     def __init__(self, redis: Redis) -> None:
         self._redis = redis
         self._connections: dict[uuid.UUID, set[Connection]] = {}
         self._relay: asyncio.Task[None] | None = None
-        # Set once the subscription is live. Joining waits on it, so a socket is
-        # never told it is connected while messages for it are still being
-        # dropped.
+        # Joining waits on this, so no socket is told it is live too early.
         self._subscribed = asyncio.Event()
-
-    # --- registry ---------------------------------------------------------- #
 
     async def join(self, connection: Connection) -> None:
         self._connections.setdefault(connection.document_id, set()).add(connection)
@@ -71,8 +57,7 @@ class DocumentHub:
         try:
             await asyncio.wait_for(self._subscribed.wait(), timeout=5)
         except asyncio.TimeoutError:
-            # Redis is unreachable. The socket still works for this worker's own
-            # connections; it just will not hear from the others.
+            # Redis is down: this worker still serves its own connections.
             logger.warning(
                 "Joined %s without a live Redis subscription",
                 connection.document_id,
@@ -89,8 +74,6 @@ class DocumentHub:
     def local_connections(self, document_id: uuid.UUID) -> frozenset[Connection]:
         return frozenset(self._connections.get(document_id, ()))
 
-    # --- fan-out ----------------------------------------------------------- #
-
     async def publish(
         self,
         document_id: uuid.UUID,
@@ -98,12 +81,8 @@ class DocumentHub:
         *,
         origin: str | None = None,
     ) -> None:
-        """Send to every connection in the document except `origin`, on this
-        worker and every other.
-
-        Best-effort on purpose: the write it describes has already committed, so
-        a Redis outage should cost live updates, not the edit.
-        """
+        """Best-effort: the write has committed, so a Redis outage costs only
+        live updates."""
         envelope = json.dumps({"origin": origin, "payload": payload})
         try:
             await self._redis.publish(channel_for(document_id), envelope)
@@ -122,29 +101,18 @@ class DocumentHub:
             try:
                 await connection.send(payload)
             except Exception:
-                # Closed between the lookup and the send. The session's own
-                # cleanup will deregister it; dropping it here keeps one dead
-                # socket from failing the whole fan-out.
+                # Closed mid-send; its own cleanup will deregister it.
                 logger.debug("Dropping send to closed connection %s", connection.id)
                 await self.leave(connection)
-
-    # --- subscriber -------------------------------------------------------- #
 
     def _ensure_relay(self) -> None:
         if self._relay is None or self._relay.done():
             self._relay = asyncio.create_task(self._run_relay())
 
     async def _run_relay(self) -> None:
-        """One task per process, not per connection.
-
-        It subscribes to the pattern rather than to a channel per open document:
-        a single subscription needs no coordination with the reader, whereas
-        subscribing while that reader is blocked on the same connection does.
-        The cost is that a worker receives traffic for documents it holds no
-        connections for and discards it -- fine at a few workers, and the point
-        at which it stops being fine is the point to move to a dedicated
-        subscriber connection per document, or to Redis streams.
-        """
+        """One pattern subscription per process: subscribing per document would
+        need coordinating with the blocked reader. Workers discard traffic for
+        documents they do not hold."""
         while True:
             try:
                 async with self._redis.pubsub(ignore_subscribe_messages=True) as pubsub:

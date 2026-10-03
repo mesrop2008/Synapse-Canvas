@@ -30,8 +30,7 @@ export function listMembers(workspaceId: string): Promise<Member[]> {
   return request<Member[]>('GET', `/workspaces/${workspaceId}/members`);
 }
 
-/** By email, not id: the inviter knows an address, not an internal id -- and
- *  the API refuses an address that has not confirmed itself yet. */
+/** By email; the API refuses an unconfirmed address. */
 export function addMember(
   workspaceId: string,
   email: string,

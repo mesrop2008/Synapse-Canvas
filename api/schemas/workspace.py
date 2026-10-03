@@ -15,8 +15,7 @@ class WorkspaceCreate(BaseModel):
 
 
 class WorkspaceUpdate(BaseModel):
-    """Handlers use `model_dump(exclude_unset=True)`, so an explicit `null` and
-    an omitted key stay distinguishable."""
+    """Dumped with exclude_unset, so `null` and an omitted key differ."""
 
     name: NonEmptyName | None = None
 
@@ -31,8 +30,6 @@ class WorkspaceRead(BaseModel):
 
 
 class WorkspaceWithRole(WorkspaceRead):
-    """The caller's role is already resolved by the access dependency, so the
-    client can render permissions without a round trip per workspace."""
 
     role: WorkspaceRole
 

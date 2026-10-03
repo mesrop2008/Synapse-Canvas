@@ -16,8 +16,7 @@ if TYPE_CHECKING:
 
 
 class WorkspaceMember(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """The owner gets a row too, so the permission check is one lookup with no
-    special case."""
+    """The owner has a row too, so a permission check is one lookup."""
 
     __tablename__ = "workspace_members"
     __table_args__ = (

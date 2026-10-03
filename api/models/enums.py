@@ -1,13 +1,10 @@
-"""Enumerations shared by the ORM and the API schemas."""
-
 from __future__ import annotations
 
 from enum import StrEnum
 
 
 class WorkspaceRole(StrEnum):
-    """Totally ordered owner > editor > viewer, so the permission dependency can
-    require "at least editor"."""
+    """Ordered owner > editor > viewer, for "at least editor" checks."""
 
     OWNER = "owner"
     EDITOR = "editor"

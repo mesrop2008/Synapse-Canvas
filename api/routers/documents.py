@@ -1,6 +1,3 @@
-"""Translation only; the logic is in `api.services.documents`, which the
-WebSocket handlers share."""
-
 from __future__ import annotations
 
 import uuid
@@ -105,10 +102,8 @@ async def update_document(
         content=payload.content,
     )
 
-    # A PATCH consumes a version like any other edit, so anyone with the
-    # document open has to hear about it or their next edit is rejected for a
-    # change they were never shown. No origin: the caller has no socket here,
-    # and if they also have one open it should see this like any other peer's.
+    # A PATCH consumes a version, so open editors must hear of it or their
+    # next edit is refused. No origin: even the caller's own socket should see it.
     await request.app.state.hub.publish(
         document_id,
         {
@@ -132,9 +127,7 @@ async def delete_document(
 ) -> None:
     await document_service.delete_document(db, ctx.workspace.id, document_id)
 
-    # Without this, anyone with the document open is told nothing at all until
-    # their next edit is refused -- and then only by a socket that closes and a
-    # reconnect that can never succeed.
+    # Otherwise open editors learn of the deletion only when an edit fails.
     await request.app.state.hub.publish(
         document_id, {"type": "deleted", "user_id": str(ctx.user.id)}
     )

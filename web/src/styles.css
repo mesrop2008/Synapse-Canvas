@@ -1,6 +1,4 @@
-/* Design tokens and components for the whole app.
-   Both themes are defined here; `data-theme` on <html> selects one, set before
-   first paint by the bootstrap script in index.html. */
+/* `data-theme` on <html> picks the theme, set before first paint in index.html. */
 
 :root {
   --bg: #fbfbfd;
@@ -424,14 +422,12 @@ a:hover {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-/* Six digits, read back against an email: spaced and monospaced so a
-   transposed pair stands out. */
 .input-code {
   height: 52px;
   font-family: var(--font-mono);
   font-size: 24px;
   letter-spacing: 0.4em;
-  /* Balances the spacing letter-spacing leaves after the last digit. */
+  /* Offsets the trailing letter-spacing so the digits stay centred. */
   text-indent: 0.4em;
   text-align: center;
 }
@@ -464,13 +460,10 @@ a:hover {
   height: 44px;
 }
 
-/* Three controls rather than two, so the email still has room to breathe. */
 .composer-wide {
   max-width: 720px;
 }
 
-/* Native select, restyled to match .input -- a custom listbox would be a lot
-   of markup for three options that never change. */
 .select {
   width: auto;
   min-width: 132px;
@@ -517,7 +510,6 @@ a:hover {
   font-size: 15px;
 }
 
-/* The chip is a link now; it should not look like one. */
 a.user-chip {
   text-decoration: none;
   color: inherit;
@@ -536,7 +528,6 @@ a.user-chip:hover {
 
 /* --- members -------------------------------------------------------------- */
 
-/* Shared by any block that follows the main content of a page. */
 .page-section {
   margin-top: 44px;
 }
@@ -556,9 +547,8 @@ a.user-chip:hover {
   margin-bottom: 16px;
 }
 
-/* Only the hint that sits under the add form is pulled up against it. An
-   unqualified rule here lands on any .hint in the section -- including one
-   directly under a heading, which it then overlaps. */
+/* Only the hint right under the add form: a bare .hint rule would also pull
+   up one under a heading and overlap it. */
 .members .composer + .hint {
   margin: -14px 0 20px;
 }
@@ -633,7 +623,6 @@ a.user-chip:hover {
   box-shadow: var(--shadow-sm);
 }
 
-/* Letters need more room than a 16px icon. */
 .segmented-text {
   width: auto;
   padding: 0 9px;
@@ -666,9 +655,6 @@ a.user-chip:hover {
 
 /* --- panels and lists ----------------------------------------------------- */
 
-/* A grid of tiles rather than full-width rows: at 1200px a row leaves its badge
-   stranded against the right edge with nothing between, which is most of what
-   made these pages look empty. */
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -741,8 +727,7 @@ a.user-chip:hover {
 }
 
 .row-title::after {
-  /* Stretches the link over the whole tile without nesting it around the
-     trailing button, which would make the delete control part of the link. */
+  /* Covers the tile without wrapping the delete button inside the link. */
   content: '';
   position: absolute;
   inset: 0;
@@ -806,10 +791,8 @@ a.user-chip:hover {
   position: relative;
   min-height: 100%;
   display: grid;
-  /* A fixed-width track, not place-items: center. Centring the *item* makes it
-     shrink to its content, so the card's own max-width never applies and every
-     control inside it collapses to fit the longest word. Centring the track
-     instead lets the card fill it. */
+  /* A centred track, not place-items: center, which would shrink the card to
+     its content. */
   grid-template-columns: minmax(0, 440px);
   justify-content: center;
   align-content: center;
@@ -886,9 +869,7 @@ a.user-chip:hover {
   color: var(--text-3);
 }
 
-/* Flex, not a bare block: two inline-flex controls side by side align on their
-   text baselines, and the icon-only theme toggle has none, so it sat a couple
-   of pixels off the EN/RU one -- and they touched. Matches .topbar-group. */
+/* Flex: as inline-flex, the icon-only toggle (no baseline) sat off the text one. */
 .auth-theme {
   position: absolute;
   top: 20px;
@@ -1021,7 +1002,6 @@ a.user-chip:hover {
 .peer-list {
   display: inline-flex;
   align-items: center;
-  /* Overlapped, so a crowded document stays the width of a few avatars. */
   padding-left: 8px;
 }
 
@@ -1039,12 +1019,11 @@ a.user-chip:hover {
   font-size: 11px;
   font-weight: 680;
   letter-spacing: 0.02em;
-  /* The palette is mid-tone on purpose, but a white label on it still needs
-     help against the lighter end. */
+  /* Helps white labels on the lighter palette colours. */
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
 }
 
-/* A zero-width widget, so it sits between characters without moving them. */
+/* Zero-width, so it sits between characters without moving them. */
 .remote-cursor {
   position: relative;
   display: inline-block;
@@ -1068,8 +1047,7 @@ a.user-chip:hover {
   font-weight: 620;
   line-height: 1.5;
   white-space: nowrap;
-  /* Out of the way until the caret matters; hovering the paragraph is not the
-     trigger, a moving cursor is. */
+  /* Shown while the cursor moves, not on hover. */
   opacity: 0;
   transition: opacity 0.2s ease 1.2s;
 }

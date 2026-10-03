@@ -1,11 +1,5 @@
-/**
- * One folder per language, one JSON file per section of the site. The folder is
- * `rus`, but the locale code is `ru` -- the BCP-47 tag, which is what
- * `<html lang>` and Intl's plural rules expect.
- *
- * No React here: the fetch client and the error formatter need translations and
- * neither can call a hook.
- */
+/** One folder per language, one JSON per section. The `rus` folder holds the
+ *  BCP-47 locale `ru`. React-free, for the fetch client and error formatter. */
 
 import enAccount from './en/account.json';
 import enCommon from './en/common.json';
@@ -49,8 +43,7 @@ const english = {
   errors: enErrors,
 };
 
-/** The reference shape; every other pack is typed against it, so a missing key
- *  is a compile error rather than a blank label found in production. */
+/** The reference shape: a key missing from another pack is a compile error. */
 export type Messages = typeof english;
 
 export const MESSAGES: Record<Locale, Messages> = {
@@ -83,13 +76,7 @@ export function isLocale(value: unknown): value is Locale {
   return typeof value === 'string' && (LOCALES as readonly string[]).includes(value);
 }
 
-/**
- * Walk a dotted path, or null if the pack has no string there.
- *
- * Takes a plain string rather than a `MessageKey`, because API error codes
- * arrive at runtime and cannot be checked at compile time. Everything else
- * should go through `template`, which is typed.
- */
+/** Untyped key, for API error codes that arrive at runtime. */
 export function lookup(locale: Locale, key: string): string | null {
   let node: unknown = MESSAGES[locale];
   for (const segment of key.split('.')) {
@@ -101,8 +88,6 @@ export function lookup(locale: Locale, key: string): string | null {
 
 /** The raw template, before interpolation. */
 export function template(locale: Locale, key: MessageKey): string {
-  // Falls back to the key so a gap looks wrong rather than taking the page
-  // down; `MessageKey` keeps that hypothetical.
   return lookup(locale, key) ?? key;
 }
 
@@ -126,8 +111,7 @@ export function getActiveLocale(): Locale {
   return activeLocale;
 }
 
-/** For code outside the component tree; components use `useI18n`, which
- *  re-renders on a language change. */
+/** Outside components; components use `useI18n` to re-render on change. */
 export function translate(key: MessageKey, params?: MessageParams): string {
   return interpolate(template(activeLocale, key), params);
 }

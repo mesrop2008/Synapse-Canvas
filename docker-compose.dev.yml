@@ -7,13 +7,8 @@
 #   COMPOSE_PATH_SEPARATOR=:
 #   COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml
 #
-# Not part of the default stack because each published port is one more thing
-# that can already be taken on someone's machine, and the app itself needs none
-# of them. Bound to 127.0.0.1: the database has a default password, and nothing
-# outside this machine should be able to reach it.
-#
-# A port already in use? Set POSTGRES_PORT / REDIS_PORT / API_PORT in .env, and
-# update DATABASE_URL / TEST_DATABASE_URL / REDIS_URL to the same port.
+# Bound to 127.0.0.1: the database has a default password. A port in use? Set
+# POSTGRES_PORT / REDIS_PORT / API_PORT, and match the URLs in .env.
 
 services:
   postgres:

@@ -1,6 +1,3 @@
-"""Every `/{workspace_id}` route gets its workspace from a WorkspaceAccess
-dependency, so no handler re-fetches it or re-checks permissions."""
-
 from __future__ import annotations
 
 import uuid
@@ -92,9 +89,7 @@ async def update_workspace(
 async def delete_workspace(
     ctx: RequireOwner, db: DbSession, request: Request
 ) -> None:
-    # Listed before the delete, because the rows are gone after it. Deleting a
-    # workspace deletes its documents by cascade, and someone with one of them
-    # open has to hear the same thing as if it had been deleted on its own.
+    # Listed first: the cascade deletes them, and open editors must be told.
     documents = await document_service.list_documents(db, ctx.workspace.id)
 
     await workspace_service.delete_workspace(db, ctx.workspace)

@@ -1,5 +1,3 @@
-"""Shared field types used across request schemas."""
-
 from __future__ import annotations
 
 from typing import Annotated
@@ -10,8 +8,7 @@ from api.core.security import BCRYPT_MAX_BYTES
 
 
 def _within_bcrypt_limit(value: str) -> str:
-    # bcrypt silently discards everything past 72 bytes, so a longer password
-    # would look stronger than it is.
+    # bcrypt ignores everything past 72 bytes.
     if len(value.encode("utf-8")) > BCRYPT_MAX_BYTES:
         raise ValueError(
             f"Password must be at most {BCRYPT_MAX_BYTES} bytes when UTF-8 encoded"
@@ -25,8 +22,7 @@ Password = Annotated[
     AfterValidator(_within_bcrypt_limit),
 ]
 
-# StringConstraints, not Field: Pydantic v2 silently ignores strip_whitespace
-# on Field, which would let a name of "   " through min_length.
+# StringConstraints, not Field: Field silently ignores strip_whitespace.
 NonEmptyName = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
 ]

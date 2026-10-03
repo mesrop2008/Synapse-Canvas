@@ -45,9 +45,7 @@ export function useDeleteWorkspace() {
   return useMutation({
     mutationFn: (workspaceId: string) => deleteWorkspace(workspaceId),
     onSuccess: (_result, workspaceId) => {
-      // Removed rather than invalidated: the workspace and every document
-      // under it are gone, so refetching them would only produce 404s. The
-      // detail key is a prefix of the document keys, so this clears both.
+      // Removed, not invalidated: refetching would 404. Clears documents too.
       queryClient.removeQueries({ queryKey: workspaceKeys.detail(workspaceId) });
       return queryClient.invalidateQueries({
         queryKey: workspaceKeys.all,
@@ -69,9 +67,7 @@ export function useRenameWorkspace(workspaceId: string) {
   return useMutation({
     mutationFn: (name: string) => renameWorkspace(workspaceId, name),
     onSuccess: (renamed) => {
-      // Written straight in rather than refetched: the response is the row.
-      // `exact` throughout, because the detail key is a prefix of the member
-      // and document keys and a name change says nothing about either.
+      // The response is the row. `exact`: the key prefixes member/document keys.
       queryClient.setQueryData(workspaceKeys.detail(workspaceId), renamed);
       return queryClient.invalidateQueries({
         queryKey: workspaceKeys.all,

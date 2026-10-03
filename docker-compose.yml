@@ -1,33 +1,15 @@
-# Local stack: PostgreSQL, Redis, a one-shot migration job, the API, and the
-# client.
+# `docker compose up -d --build`, then open http://localhost:5173 (WEB_PORT).
 #
-# `docker compose up -d --build` brings the whole thing up in order:
-#   postgres + redis (healthchecks) -> migrate -> api (healthcheck) -> web
-#
-# Open http://localhost:5173. The web container serves the built client and
-# proxies /api to the API on the same origin, so the browser never makes a
-# cross-origin request and the API's address is not baked into the bundle.
-#
-# That is the only port published to the host. Postgres, Redis and the API talk
-# over the compose network, so the stack starts on a machine that already runs
-# its own Postgres, Redis or anything else on 5432/5433/6379/8000. Taken, 5173
-# itself moves with WEB_PORT in .env.
-#
-# Running tests, migrations or the Vite dev server from the host needs those
-# services reachable from it -- docker-compose.dev.yml publishes them, on
-# localhost only. See the comment at the top of that file.
+# Only the web port is published, so the stack starts even when the host
+# already uses 5432/6379/8000. docker-compose.dev.yml publishes the rest for
+# host-side tests and tools.
 
-# Shared by `migrate` and `api` so the two cannot drift apart.
 x-app-environment: &app-environment
-  # Overrides whatever .env says: inside the network the database is
-  # `postgres:5432`, never localhost.
   DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-synapse}:${POSTGRES_PASSWORD:-synapse}@postgres:5432/${POSTGRES_DB:-synapse_canvas}
   REDIS_URL: redis://redis:6379/0
   ENVIRONMENT: ${ENVIRONMENT:-local}
   DEBUG: ${DEBUG:-false}
-  # Left empty on purpose: the entrypoint generates and persists a key for
-  # local/test on first run, so the stack needs no setup. Any other
-  # ENVIRONMENT refuses to start without one.
+  # Empty: the entrypoint generates one for local/test.
   JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
   PREVIOUS_JWT_SECRET_KEYS: ${PREVIOUS_JWT_SECRET_KEYS:-}
   ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
@@ -55,9 +37,6 @@ x-app-build: &app-build
 
 services:
   postgres:
-    # Pulled through the same mirror as the API base image, for the same
-    # reason. Override POSTGRES_IMAGE to track a different major version or to
-    # pull direct from Docker Hub.
     image: ${POSTGRES_IMAGE:-mirror.gcr.io/library/postgres:15-alpine}
     container_name: synapse_canvas_postgres
     restart: unless-stopped
@@ -73,10 +52,7 @@ services:
       timeout: 5s
       retries: 10
 
-  # Presence, handshake tickets and the pub/sub channel that joins the
-  # workers' connection registries. Nothing here needs to survive a restart --
-  # every key is a live session or a 30-second ticket -- so there is no volume
-  # and persistence is off.
+  # Holds nothing durable, so no volume and no persistence.
   redis:
     image: ${REDIS_IMAGE:-mirror.gcr.io/library/redis:7-alpine}
     container_name: synapse_canvas_redis
@@ -88,10 +64,7 @@ services:
       timeout: 3s
       retries: 10
 
-  # Runs to completion, then exits 0. `api` waits on that exit rather than
-  # running migrations itself: with more than one replica, every one of them
-  # would race the same ALTERs on boot. Seeing this container as "Exited (0)"
-  # after startup is the success case, not a crash.
+  # One-shot; "Exited (0)" is success. Separate so replicas never race migrations.
   migrate:
     build: *app-build
     image: synapse-canvas-api:local
@@ -121,26 +94,19 @@ services:
         condition: service_completed_successfully
     environment: *app-environment
     volumes:
-      # Development convenience: edit on the host, uvicorn reloads in the
-      # container. Drop both mounts and --reload for a real deployment, where
-      # the image should be immutable.
+      # Dev only: live reload. Drop these mounts and --reload in production.
       - ./api:/app/api:ro
       - ./alembic:/app/alembic:ro
       - jwt_secret:/var/lib/synapse
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
-  # Static build behind nginx, not the Vite dev server: one command should give
-  # a working app, and HMR is better served by running `npm run dev` on the host
-  # against this same API. Rebuild with `docker compose up -d --build web` after
-  # changing client source -- there is no bind mount, on purpose, because the
-  # image contains compiled output rather than source.
+  # A static build: rebuild with `docker compose up -d --build web`.
   web:
     build:
       context: ./web
       args:
         NODE_IMAGE: ${NODE_IMAGE:-mirror.gcr.io/library/node:22-alpine}
         NGINX_IMAGE: ${NGINX_IMAGE:-mirror.gcr.io/library/nginx:1.27-alpine}
-        # Same-origin path handled by the container's own nginx.
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
     image: synapse-canvas-web:local
     container_name: synapse_canvas_web
@@ -153,6 +119,4 @@ services:
 
 volumes:
   postgres_data:
-  # Holds the development signing key so it survives restarts and both
-  # services see the same one.
   jwt_secret:

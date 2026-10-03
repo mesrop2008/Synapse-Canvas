@@ -19,8 +19,7 @@ import { WorkspacesPage } from './pages/WorkspacesPage';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Retrying a 4xx repeats the same answer; 401 is already handled by
-      // refresh-and-replay inside the client.
+      // A 4xx repeats on retry; the client already handles 401.
       retry: (failureCount, error) =>
         error instanceof ApiError && error.status < 500 ? false : failureCount < 2,
       // A refetch on tab-back would replace content being typed.
@@ -56,9 +55,7 @@ const router = createBrowserRouter([
 
 export function App() {
   return (
-    // I18nProvider outermost: the fetch client translates its errors, so the
-    // language must be settled before anything can fail. AuthProvider needs the
-    // query client (it clears the cache on sign-out) and the router needs it.
+    // I18n outermost: the fetch client translates its errors.
     <I18nProvider>
       <ThemeProvider>
         <QueryClientProvider client={queryClient}>

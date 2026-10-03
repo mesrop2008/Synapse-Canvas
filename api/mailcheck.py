@@ -2,9 +2,7 @@
 
     docker compose exec api python -m api.mailcheck you@example.com
 
-Exits 0 once the message has been accepted by the server, 1 otherwise, with the
-reason and what to change. Run it after editing the SMTP_* settings, before
-relying on registration to tell you whether they work.
+Exits 0 once the server accepts it, otherwise 1 with what to change.
 """
 
 from __future__ import annotations

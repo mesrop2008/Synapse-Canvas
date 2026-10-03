@@ -1,5 +1,3 @@
-"""Translation only; the logic is in `api.services.auth_service`."""
-
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, status
@@ -76,8 +74,7 @@ async def verify_email(payload: VerifyEmailRequest, db: DbSession) -> UserRead:
 async def resend_verification(
     payload: ResendVerificationRequest, db: DbSession
 ) -> AcceptedResponse:
-    # Always 202: unknown, already-verified and sent look identical. The 429
-    # is applied to every address alike, so it is no signal either.
+    # Always 202, and the 429 applies to every address alike.
     await auth_service.resend_verification(db, payload.email)
     return AcceptedResponse(
         detail="If that address needs verifying, a new code is on its way."
@@ -130,7 +127,7 @@ async def me(current_user: CurrentUser) -> UserRead:
     summary="End the session the refresh token belongs to",
 )
 async def logout(payload: RefreshRequest, db: DbSession) -> None:
-    # Always 204, even for an unknown/revoked token: logout is not an oracle.
+    # Always 204: logout is not an oracle.
     await auth_service.revoke_refresh_token(db, payload.refresh_token)
 
 
@@ -141,6 +138,5 @@ async def logout(payload: RefreshRequest, db: DbSession) -> None:
     responses={401: {"description": "Missing or invalid access token"}},
 )
 async def logout_all(current_user: CurrentUser, db: DbSession) -> None:
-    # After a password change/compromise. Existing access tokens live out their
-    # 30 min; revocation bites at the refresh boundary (see README).
+    # Access tokens already issued live out their 30 minutes.
     await auth_service.revoke_all_for_user(db, current_user.id)

@@ -20,8 +20,7 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-/** Null until the user picks. "Follow the system" is the starting state, not a
- *  third button. */
+/** Null until the user picks, meaning follow the system. */
 function readStoredTheme(): Theme | null {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);

@@ -9,9 +9,7 @@ from api.db.base import Base, UUIDPrimaryKeyMixin
 
 
 class RateLimitBucket(UUIDPrimaryKeyMixin, Base):
-    """In PostgreSQL, not process memory: an in-memory counter is per-worker
-    (N workers = N x allowance) and clears on restart. Redis is the usual choice
-    at volume; this is fine for low-rate auth endpoints."""
+    """In PostgreSQL so all workers share one count."""
 
     __tablename__ = "rate_limit_buckets"
     __table_args__ = (
@@ -21,7 +19,7 @@ class RateLimitBucket(UUIDPrimaryKeyMixin, Base):
         Index("ix_rate_limit_buckets_window_start", "window_start"),
     )
 
-    # Caller-composed, e.g. "login:ip:203.0.113.4" or "login:account:<sha256>".
+    # e.g. "login:ip:203.0.113.4" or "login:account:<sha256>".
     bucket_key: Mapped[str] = mapped_column(String(255), nullable=False)
     window_start: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

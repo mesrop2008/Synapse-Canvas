@@ -1,11 +1,5 @@
-"""No FastAPI imports: the WebSocket handlers call these same functions, and a
-handler cannot raise an HTTPException usefully. Failures are the domain
-exceptions from `api.core.exceptions`.
-
-`apply_change` is the only way document content changes -- the WebSocket edit
-handler and the HTTP PATCH both go through it, so there are not two write paths
-to keep in step.
-"""
+"""FastAPI-free, since the WebSocket handlers share it. `apply_change` is the
+only write path for both WebSocket edits and HTTP PATCH."""
 
 from __future__ import annotations
 
@@ -29,7 +23,6 @@ EMPTY_DOCUMENT: Final[dict[str, Any]] = {"type": "doc", "content": []}
 
 @dataclass(frozen=True, slots=True)
 class DocumentSummary:
-    """A document without its body, for list responses."""
 
     id: uuid.UUID
     workspace_id: uuid.UUID
@@ -42,7 +35,6 @@ class DocumentSummary:
 
 @dataclass(frozen=True, slots=True)
 class DocumentSnapshot(DocumentSummary):
-    """A document's full state, detached from any session."""
 
     content: dict[str, Any]
 
@@ -62,8 +54,6 @@ def snapshot(document: Document) -> DocumentSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class AppliedChange:
-    """One accepted edit: the log row that was written and the snapshot it
-    produced."""
 
     document: DocumentSnapshot
     change_id: uuid.UUID
@@ -77,12 +67,8 @@ class AppliedChange:
 
 
 class StaleDocumentVersionError(ConflictError):
-    """Carries the stored state so the caller can re-sync the client.
-
-    A snapshot rather than the ORM row because this exception outlives the
-    session: the transaction is rolled back as it unwinds, expiring every object
-    loaded in it, and an attached row would then raise DetachedInstanceError.
-    """
+    """Carries a snapshot, not the ORM row: the rollback as this unwinds would
+    expire an attached row."""
 
     detail = "Document has been modified since you loaded it"
     code = ErrorCode.DOCUMENT_STALE
@@ -107,10 +93,9 @@ async def create_document(
         content=EMPTY_DOCUMENT if content is None else content,
     )
     db.add(document)
-    await db.flush()  # the UUID default lands here, and the log row needs it
+    await db.flush()  # the log row needs the id
 
-    # Version 1 is a log entry too, from a base of 0. Without it the log would
-    # start mid-history and could not be replayed from nothing.
+    # Version 1 is logged too, so the log replays from nothing.
     db.add(
         DocumentChange(
             document_id=document.id,
@@ -129,7 +114,6 @@ async def create_document(
 async def list_documents(
     db: AsyncSession, workspace_id: uuid.UUID
 ) -> list[DocumentSummary]:
-    """Newest-edited first, without content -- a list view renders none of it."""
     result = await db.execute(
         select(
             Document.id,
@@ -141,7 +125,7 @@ async def list_documents(
             Document.updated_at,
         )
         .where(Document.workspace_id == workspace_id)
-        # id breaks ties so the order is total, which pagination will need.
+        # id breaks ties, for a total order.
         .order_by(Document.updated_at.desc(), Document.id.desc())
     )
     return [DocumentSummary(*row) for row in result.all()]
@@ -150,8 +134,7 @@ async def list_documents(
 async def find_document(
     db: AsyncSession, workspace_id: uuid.UUID, document_id: uuid.UUID
 ) -> Document | None:
-    """Scoped by workspace as well as id, so an id from one workspace cannot be
-    read through another the caller belongs to."""
+    """Scoped by workspace too, so an id cannot be read through another one."""
     result = await db.execute(
         select(Document)
         .where(Document.id == document_id, Document.workspace_id == workspace_id)
@@ -183,21 +166,12 @@ async def apply_change(
     content: dict[str, Any] | None = None,
     title: str | None = None,
 ) -> AppliedChange:
-    """Append `operation` to the log and materialise its result, or raise
+    """Append `operation` to the log and store the state it produces, or raise
     `StaleDocumentVersionError` if `base_version` is no longer the head.
 
-    `operation` is what peers replay and what the log keeps; `content`/`title`
-    are the state it produces, computed by the caller. The client is trusted for
-    that only because `base_version` had to match exactly -- it derived the
-    result from the same bytes this row holds.
-
-    The `FOR UPDATE` is the load-bearing decision in the whole feature. It
-    serialises every writer of *this* document from the read of its version to
-    the commit that moves it, which is what makes "exactly one of two
-    simultaneous edits wins" true rather than likely. Locks are per row, so
-    edits to different documents never wait on each other -- concurrency is
-    bounded by how many people are in one document, not by how busy the
-    deployment is.
+    The client-computed `content` is trusted only because `base_version` had to
+    match exactly. `FOR UPDATE` serialises the writers of this one document, so
+    of two simultaneous edits exactly one wins; other documents never wait.
     """
     document = (
         await db.execute(
@@ -248,13 +222,8 @@ async def apply_change(
 def patch_operation(
     title: str | None, content: dict[str, Any] | None
 ) -> dict[str, Any]:
-    """The log entry for an HTTP PATCH.
-
-    A PATCH replaces rather than transforms, so it cannot be expressed as steps.
-    Peers receiving `replace` swap their whole document for it; peers receiving
-    `title` only relabel. Both still consume a version, which is what keeps the
-    log a complete history of the row.
-    """
+    """A PATCH replaces rather than transforms, so it is logged as `replace` or
+    `title`; either still consumes a version."""
     operation: dict[str, Any] = {}
     if content is not None:
         operation["replace"] = content
@@ -273,11 +242,7 @@ async def update_document(
     title: str | None = None,
     content: dict[str, Any] | None = None,
 ) -> AppliedChange:
-    """The HTTP PATCH path. Onto the same lock, and into the same log, as an
-    edit arriving over a WebSocket.
-
-    `None` means "leave alone"; neither column is nullable, so nothing is lost.
-    """
+    """`None` leaves a field alone."""
     if title is None and content is None:
         raise ValueError("update_document requires a title or content")
 
@@ -296,12 +261,8 @@ async def update_document(
 async def get_document_for_user(
     db: AsyncSession, document_id: uuid.UUID, user_id: uuid.UUID
 ) -> tuple[Document, WorkspaceRole]:
-    """Resolve a document by id alone, plus the caller's role in the workspace
-    that owns it -- the WebSocket routes are not workspace-scoped.
-
-    The inner join means a document in a workspace the caller is not a member of
-    reads exactly like a document that does not exist.
-    """
+    """By id alone, for the WebSocket routes. A document in someone else's
+    workspace reads exactly like one that does not exist."""
     row = (
         await db.execute(
             select(Document, WorkspaceMember.role)

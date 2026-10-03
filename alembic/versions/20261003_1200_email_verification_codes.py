@@ -1,10 +1,7 @@
 """email verification codes
 
-Replaces the emailed link tokens with six-digit codes: one row per user,
-holding an HMAC of the code, its expiry and the wrong attempts made against it.
-
-Outstanding links stop working. They were single-use and short-lived, and an
-affected user requests a code from the verification page.
+Replaces the emailed link tokens with six-digit codes. Outstanding links stop
+working; affected users request a code from the verification page.
 
 Revision ID: 3f2a9c1d7e44
 Revises: d65cb3ba5854

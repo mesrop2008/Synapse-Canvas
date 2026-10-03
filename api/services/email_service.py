@@ -1,14 +1,5 @@
-"""Outgoing mail: a `Protocol` seam with a console sender for development and
-an SMTP sender for everything else.
-
-SMTP rather than a provider's HTTP API, so any mailbox works -- Gmail, Yandex,
-Mail.ru, or a relay of your own -- with nothing but credentials.
-
-Messages are sent in the background. A request never waits on the mail server,
-which keeps SMTP latency out of the response time; that matters for more than
-speed, since registration answers identically for new and existing addresses,
-and a timing gap between "sent a code" and "sent a notice" would undo that.
-"""
+"""Outgoing mail over plain SMTP, sent in the background: besides speed, SMTP
+latency in the response would tell a new registration from an existing one."""
 
 from __future__ import annotations
 
@@ -35,8 +26,7 @@ class EmailSender(Protocol):
 
 
 class ConsoleEmailSender:
-    """Writes the message to the log. Settings refuse it outside local/test,
-    since every verification code would land in the logs."""
+    """Settings refuse this outside local/test: codes would land in the logs."""
 
     async def send(
         self, *, to: str, subject: str, body: str, html_body: str | None = None
@@ -45,12 +35,11 @@ class ConsoleEmailSender:
 
 
 class SmtpDeliveryError(Exception):
-    """The server refused the message, or could not be reached in time."""
+    pass
 
 
 class SmtpEmailSender:
-    # Connection trouble and 4xx replies are worth another try; a 5xx is the
-    # server's final answer and retrying only repeats it.
+    # Connection errors and 4xx are retried; a 5xx is final.
     _attempts = 3
     _backoff_seconds = 2.0
 
@@ -82,19 +71,13 @@ class SmtpEmailSender:
             "hostname": settings.smtp_host,
             "port": settings.smtp_port,
             "timeout": settings.smtp_timeout_seconds,
-            # Explicit on both: aiosmtplib's default is opportunistic STARTTLS,
-            # which a stripping middlebox can quietly downgrade.
+            # Explicit: aiosmtplib defaults to opportunistic, downgradable STARTTLS.
             "use_tls": settings.smtp_security == "tls",
             "start_tls": settings.smtp_security == "starttls",
         }
 
     async def check_connection(self) -> None:
-        """Connect, negotiate TLS and log in, without sending anything.
-
-        Raises SmtpDeliveryError with a sentence a person can act on, so a
-        wrong password shows up at startup rather than as a code that never
-        arrives.
-        """
+        """Log in without sending; raises SmtpDeliveryError with a fix."""
         settings = self._settings
         client = aiosmtplib.SMTP(**self._connection_options())
         try:
@@ -144,7 +127,6 @@ class SmtpEmailSender:
 
 
 def explain_smtp_failure(exc: BaseException, settings: Settings) -> str:
-    """Turn what aiosmtplib raised into what to change in .env."""
     where = f"{settings.smtp_host}:{settings.smtp_port}"
 
     if isinstance(exc, aiosmtplib.SMTPAuthenticationError):
@@ -179,11 +161,7 @@ def explain_smtp_failure(exc: BaseException, settings: Settings) -> str:
 
 
 async def report_delivery_status() -> None:
-    """Say at startup, in the log, whether verification codes really go out.
-
-    Never raises: a mail problem should not stop the API from serving, but it
-    should be the first thing an operator reads.
-    """
+    """Log at startup whether codes really go out. Never raises."""
     settings = get_settings()
     if settings.email_backend == "console":
         logger.warning(
@@ -221,16 +199,11 @@ def get_email_sender() -> EmailSender:
     return ConsoleEmailSender()
 
 
-# --- background dispatch --------------------------------------------------
-
-# Strong references: the event loop only holds weak ones, so an unreferenced
-# task can be garbage-collected mid-send.
+# The loop holds tasks weakly; without this, one can be collected mid-send.
 _pending: set[asyncio.Task[None]] = set()
 
 
 def _redact(address: str) -> str:
-    # Enough to tell deliveries apart in a log, without the log becoming a list
-    # of every address that registered.
     local, _, domain = address.partition("@")
     return f"{local[:1]}***@{domain}"
 
@@ -239,13 +212,11 @@ async def _deliver(to: str, send: Coroutine[Any, Any, None]) -> None:
     try:
         await send
     except Exception:
-        # Nothing to tell the caller -- they already have their 202. The user
-        # recovers by requesting another code once the cooldown passes.
+        # The caller already has its 202; the user can request another code.
         logger.exception("Email delivery to %s failed", _redact(to))
 
 
 def dispatch(*, to: str, subject: str, body: str, html_body: str | None = None) -> None:
-    """Queue a message and return at once. Failures are logged, not raised."""
     send = get_email_sender().send(
         to=to, subject=subject, body=body, html_body=html_body
     )
@@ -255,8 +226,7 @@ def dispatch(*, to: str, subject: str, body: str, html_body: str | None = None) 
 
 
 async def drain(timeout: float | None = None) -> None:
-    """Wait for queued messages. On shutdown, so a deploy does not drop the
-    codes it was in the middle of sending; in tests, before reading the outbox."""
+    """Wait for queued messages: at shutdown, and in tests."""
     if not _pending:
         return
     done, still_pending = await asyncio.wait(set(_pending), timeout=timeout)
@@ -264,9 +234,6 @@ async def drain(timeout: float | None = None) -> None:
         task.cancel()
     if still_pending:
         logger.warning("Abandoned %d undelivered email(s) at shutdown", len(still_pending))
-
-
-# --- messages ---------------------------------------------------------------
 
 
 def _ttl_phrase(seconds: int) -> str:

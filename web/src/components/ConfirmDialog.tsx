@@ -8,16 +8,14 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   destructive?: boolean;
-  /** Require this typed back before confirming. For actions that take other
-   *  people's work with them, where a misplaced click is not recoverable. */
+  /** Must be typed back to confirm, for destructive actions. */
   confirmPhrase?: string;
   confirmPhraseLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-/** Not window.confirm: that blocks the event loop, so an autosave in flight
- *  when the dialog opened could not settle underneath it. */
+/** Not window.confirm, which would block an autosave in flight. */
 export function ConfirmDialog({
   title,
   message,
@@ -36,8 +34,6 @@ export function ConfirmDialog({
   const locked = confirmPhrase !== undefined && typed.trim() !== confirmPhrase;
 
   useEffect(() => {
-    // Focus the field when there is one: focusing a button the user cannot
-    // press yet tells them nothing about what to do next.
     (phraseInput.current ?? confirmButton.current)?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onCancel();

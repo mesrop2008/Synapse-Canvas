@@ -28,8 +28,7 @@ from api.services import auth_service, rate_limit_service, workspace_service
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
-# auto_error=False so a missing header raises our own AuthenticationError, and
-# the body shape matches every other failure.
+# auto_error=False, so a missing header gets our usual error body.
 _bearer_scheme = HTTPBearer(auto_error=False, description="JWT access token")
 
 
@@ -57,8 +56,6 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 
 @dataclass(frozen=True, slots=True)
 class WorkspaceContext:
-    """Everything a workspace route needs, resolved once by the dependency."""
-
     workspace: Workspace
     role: WorkspaceRole
     user: User
@@ -145,8 +142,7 @@ register_ip_rate_limit = IPRateLimit(
 refresh_ip_rate_limit = IPRateLimit(
     "refresh", "refresh_rate_limit_per_ip", "refresh_rate_limit_per_ip_window_seconds"
 )
-# Alongside the per-code and per-address limits in auth_service, which bound
-# guesses at one account; this bounds one client spraying guesses across many.
+# Bounds one client guessing across many accounts; auth_service bounds each one.
 verify_email_ip_rate_limit = IPRateLimit(
     "verify-email",
     "verify_email_rate_limit_per_ip",

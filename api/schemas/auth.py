@@ -13,8 +13,7 @@ class RegisterRequest(BaseModel):
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    # Not `Password`: login must not reveal the policy, and a password that
-    # predates a policy change must still authenticate.
+    # Not `Password`: older passwords must still work, and the policy stays hidden.
     password: str
 
 
@@ -44,7 +43,6 @@ class ResendVerificationRequest(BaseModel):
 
 
 class AcceptedResponse(BaseModel):
-    """Returned by registration and resend alike, whatever happened, so it cannot
-    be used to test whether an address is registered."""
+    """The same whatever happened, so it reveals no registration."""
 
     detail: str

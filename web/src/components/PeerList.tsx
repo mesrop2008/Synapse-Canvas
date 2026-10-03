@@ -1,8 +1,6 @@
 import { useI18n } from '../hooks/useI18n';
 import type { PeerPresence } from '../types/api';
 
-/** First letter of each of the first two words, so "Ada Lovelace" reads AL and
- *  a one-word name still gets something. */
 function initials(name: string): string {
   const letters = name
     .trim()

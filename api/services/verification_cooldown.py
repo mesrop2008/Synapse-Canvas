@@ -1,14 +1,8 @@
 """One verification email per address per cooldown.
 
-Redis, not the Postgres rate-limit buckets: those are fixed windows, and a
-window of 60 seconds with a limit of one lets two sends through a second apart
-when they straddle the boundary. `SET NX EX` is a true sliding cooldown --
-the key exists for exactly the cooldown after the send that set it -- and it
-is atomic across workers.
-
-Keyed on the address alone, never on whether an account exists, so a refused
-request means the same thing for every address.
-"""
+Redis `SET NX EX` rather than the fixed-window buckets, which let two sends
+through a second apart across a window boundary. Keyed on the address, never
+on whether an account exists."""
 
 from __future__ import annotations
 
@@ -20,16 +14,13 @@ _KEY_PREFIX = "email-verification-cooldown:"
 
 
 def _key(email: str) -> str:
-    # Hashed, like the rate-limit account keys: the keyspace should not be a
-    # list of every address anyone asked about.
+    # Hashed, so the keyspace is not a list of addresses.
     digest = hashlib.sha256(email.strip().lower().encode("utf-8")).hexdigest()
     return _KEY_PREFIX + digest
 
 
 async def claim(redis: Redis, email: str, cooldown_seconds: int) -> int:
-    """Start the cooldown for `email`. Returns 0 if it was free and is now
-    claimed, otherwise the seconds left on the cooldown already running.
-    A cooldown of 0 or less disables the check."""
+    """0 if the cooldown was free and is now taken, else the seconds left."""
     if cooldown_seconds <= 0:
         return 0
 
@@ -38,8 +29,7 @@ async def claim(redis: Redis, email: str, cooldown_seconds: int) -> int:
         return 0
 
     remaining = await redis.ttl(key)
-    # -2: it expired between the SET and the TTL. -1 cannot happen (we always
-    # set an expiry), but a key without one must not lock an address forever.
+    # -2: expired between SET and TTL. -1 (no expiry) must not lock forever.
     if remaining == -2:
         return 0 if await redis.set(key, "1", nx=True, ex=cooldown_seconds) else 1
     if remaining == -1:

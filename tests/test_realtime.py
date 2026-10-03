@@ -1,9 +1,5 @@
-"""Live collaboration over the WebSocket endpoint.
-
-Synchronous, unlike the rest of the suite: Starlette's WebSocket test client
-drives the app from its own event loop on a worker thread. See `websocket_app`
-in conftest for what that costs and why the fixtures here commit their data.
-"""
+"""Live collaboration over the WebSocket endpoint. Synchronous; see
+`websocket_app` in conftest."""
 
 from __future__ import annotations
 
@@ -196,9 +192,7 @@ async def _logged_versions(document_id: uuid.UUID) -> list[int]:
         await engine.dispose()
 
 
-# --------------------------------------------------------------------------- #
-# Tickets
-# --------------------------------------------------------------------------- #
+# --- Tickets ---
 
 
 def test_a_ticket_opens_the_socket_once(live: Fixture) -> None:
@@ -262,9 +256,7 @@ def test_a_non_member_cannot_mint_a_ticket(live: Fixture) -> None:
         assert response.status_code == 401
 
 
-# --------------------------------------------------------------------------- #
-# Edits
-# --------------------------------------------------------------------------- #
+# --- Edits ---
 
 
 def test_an_edit_is_acked_logged_and_broadcast(live: Fixture) -> None:
@@ -340,9 +332,7 @@ def test_a_stale_edit_is_rejected_and_writes_nothing(live: Fixture) -> None:
 
 
 def test_two_edits_at_the_same_version_leave_one_winner(live: Fixture) -> None:
-    """Both sockets are told version 1 and both write against it. One is
-    acknowledged, the other is rejected, and the log holds one row per
-    version -- which the unique constraint would refuse to let it not."""
+    """Both write against version 1: one is acknowledged, one rejected."""
     with websocket_app() as client:
         first = ticket_for(client, live, live.owner_token)
         second = ticket_for(client, live, live.editor_token)
@@ -480,9 +470,7 @@ def test_deleting_a_document_takes_its_change_log_with_it(live: Fixture) -> None
     assert asyncio.run(_logged_versions(live.document_id)) == []
 
 
-# --------------------------------------------------------------------------- #
-# Presence
-# --------------------------------------------------------------------------- #
+# --- Presence ---
 
 
 def test_presence_arrives_on_connect_and_clears_on_disconnect(live: Fixture) -> None:
@@ -571,25 +559,15 @@ def test_a_lapsed_entry_is_swept_and_announced(live: Fixture) -> None:
             } in received
 
 
-# --------------------------------------------------------------------------- #
-# Across workers
-# --------------------------------------------------------------------------- #
+# --- Across workers ---
 
 
 def test_a_write_on_one_worker_reaches_a_connection_on_another(
     live: Fixture,
 ) -> None:
-    """The thing Redis is there for.
-
-    Two apps, each with its own hub and its own Redis client -- so two
-    independent registries and two independent connections to the server, which
-    is what separates one Uvicorn worker from the next. The socket is held by
-    the first; the write goes to the second, which has never heard of it.
-
-    Both run on one event loop here, because the test client owns it. What is
-    being proved is that the registries are separate and the message crossed
-    between them through Redis, and that part is unaffected.
-    """
+    """Two apps stand in for two workers: separate hubs and Redis clients. The
+    socket is on the first, the write goes to the second, and the message must
+    cross through Redis."""
     with websocket_app() as worker_a:
         worker_b = create_app()
         redis_b = new_redis()
@@ -622,9 +600,7 @@ def test_a_write_on_one_worker_reaches_a_connection_on_another(
         worker_a.portal.call(redis_b.aclose)
 
 
-# --------------------------------------------------------------------------- #
-# Hygiene
-# --------------------------------------------------------------------------- #
+# --- Hygiene ---
 
 
 def test_an_oversized_message_closes_the_socket(live: Fixture) -> None:

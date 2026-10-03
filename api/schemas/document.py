@@ -35,15 +35,13 @@ class DocumentUpdate(BaseModel):
 
     @model_validator(mode="after")
     def _require_a_change(self) -> "DocumentUpdate":
-        # Or a body of only `version` bumps it and invalidates every other
-        # client's for no edit at all.
+        # Otherwise a body of only `version` would bump it for no edit.
         if self.title is None and self.content is None:
             raise ValueError("Provide title, content, or both")
         return self
 
 
 class DocumentSummaryRead(BaseModel):
-    """List representation: no content body."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -61,8 +59,7 @@ class DocumentRead(DocumentSummaryRead):
 
 
 class DocumentVersionConflict(BaseModel):
-    """409 body. `current` is the server's row, so a client that lost the race
-    can re-sync without a second request."""
+    """`current` lets the losing client re-sync without another request."""
 
     code: str
     detail: str

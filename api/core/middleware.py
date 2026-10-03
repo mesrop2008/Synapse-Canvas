@@ -1,5 +1,3 @@
-"""Transport-level hardening applied to every response."""
-
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
@@ -16,11 +14,10 @@ _CSP_EXEMPT_PATHS = frozenset({"/docs", "/redoc", "/openapi.json", "/docs/oauth2
 _STATIC_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
-    "Referrer-Policy": "no-referrer",  # API paths carry workspace/user ids
+    "Referrer-Policy": "no-referrer",
     "Cross-Origin-Opener-Policy": "same-origin",
     "Cross-Origin-Resource-Policy": "same-origin",
     "Permissions-Policy": "accelerometer=(), camera=(), geolocation=(), microphone=()",
-    # Inert over plaintext; takes effect once served over TLS.
     "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
 }
 
@@ -42,9 +39,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 class BodySizeLimitMiddleware(BaseHTTPMiddleware):
-    """Rejects on Content-Length before the body is buffered. A chunked request
-    without that header slips past -- counting streamed bytes belongs in the
-    reverse proxy; this is the backstop when there is none."""
+    """Checks Content-Length only; a chunked body slips past, so the reverse
+    proxy should cap size too."""
 
     def __init__(self, app: object, max_bytes: int) -> None:
         super().__init__(app)  # type: ignore[arg-type]

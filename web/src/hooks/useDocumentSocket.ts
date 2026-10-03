@@ -10,11 +10,7 @@ import type {
   WorkspaceRole,
 } from '../types/api';
 
-/**
- * `deleted` and `unavailable` are terminal: retrying cannot fix either, so the
- * hook stops rather than leaving the user watching a document that is gone
- * promise to reconnect forever.
- */
+/** `deleted` and `unavailable` are terminal: the hook stops retrying. */
 export type ConnectionState =
   | 'connecting'
   | 'live'
@@ -23,23 +19,17 @@ export type ConnectionState =
   | 'deleted'
   | 'unavailable';
 
-/**
- * Why local state was thrown away. `rejected`: someone else's edit reached the
- * server first. `diverged`: a peer's edit could not be replayed on this copy --
- * either it landed while local work was still outstanding, or its steps did not
- * apply. Both need operational transform to do better than reload.
- */
+/** Why local state was dropped. `rejected`: another edit won the race.
+ *  `diverged`: a peer's steps could not be replayed on this copy. */
 export type ReloadReason = 'rejected' | 'diverged';
 
 export interface DocumentSocketCallbacks {
   onInit: (init: InitMessage) => void;
-  /** Replay a peer's steps. Return false if they do not apply, which forces a
-   *  resync rather than leaving two copies quietly different. */
+  /** False if the steps do not apply, which forces a resync. */
   onRemoteSteps: (steps: unknown[]) => boolean;
   onRemoteContent: (content: ProseMirrorDoc) => void;
   onRemoteTitle: (title: string) => void;
-  /** Tell the user their text was replaced. Content follows, from `init` in the
-   *  `diverged` case and from `onRemoteContent` in the `rejected` one. */
+  /** Tell the user their text was replaced; the content follows separately. */
   onReloaded: (reason: ReloadReason) => void;
 }
 
@@ -57,36 +47,26 @@ export interface DocumentSocket {
 
 const SEND_DEBOUNCE_MS = 250;
 const HEARTBEAT_MS = 10_000;
-// Three missed heartbeats, and shorter than the server's own idle timeout, so
-// a merely slow socket is not torn down from both ends at once.
+// Three missed heartbeats; shorter than the server's idle timeout.
 const SILENCE_LIMIT_MS = 35_000;
 const BASE_RETRY_MS = 500;
 const MAX_RETRY_MS = 15_000;
-// After this many consecutive failures the connection is called offline rather
-// than reconnecting: it is still retrying, but the user should stop waiting.
+// Consecutive failures before showing offline (retries continue).
 const OFFLINE_AFTER_ATTEMPTS = 3;
 
-/** Half the delay plus up to half again, so a crowd that lost the same server
- *  does not come back in lockstep. */
+/** Jittered, so clients that lost the same server do not return in lockstep. */
 function backoff(attempt: number): number {
   const ceiling = Math.min(MAX_RETRY_MS, BASE_RETRY_MS * 2 ** attempt);
   return ceiling * (0.5 + Math.random() * 0.5);
 }
 
 /**
- * Owns one WebSocket for one document.
+ * One WebSocket for one document.
  *
- * Outbound edits are batched and sent one at a time. The server accepts an edit
- * only against the exact version it holds, so a second one on the wire would be
- * based on a version the first is about to replace, and rejected on arrival.
- *
- * Inbound steps are replayed only when nothing local is outstanding. A peer's
- * steps carry positions computed against the version they were based on;
- * replaying them over unsent local changes would leave this copy agreeing with
- * neither the server nor the peers. When that happens the hook reconnects and
- * takes the server's document instead -- the same trade the server makes when
- * it rejects an edit, and the same cost: those keystrokes are gone.
- * Operational transform is what removes it.
+ * Edits go one at a time: the server accepts only the exact version it holds,
+ * so a second edit in flight would be rejected. A peer's steps are replayed
+ * only when nothing local is outstanding; otherwise the hook resyncs, losing
+ * those local keystrokes (no operational transform).
  */
 export function useDocumentSocket(
   documentId: string,
@@ -97,8 +77,7 @@ export function useDocumentSocket(
   const [self, setSelf] = useState<InitMessage['you'] | null>(null);
   const [peers, setPeers] = useState<PeerPresence[]>([]);
 
-  // Everything the socket touches lives in a ref: the connection outlives any
-  // one render, and re-running its effect would drop it.
+  // Refs: the connection outlives renders.
   const handlers = useRef(callbacks);
   handlers.current = callbacks;
 
@@ -112,8 +91,7 @@ export function useDocumentSocket(
   const lastMessageAt = useRef(0);
   const attempts = useRef(0);
   const closed = useRef(false);
-  // Bumped on every connect, so a reply from a socket that has been replaced
-  // cannot move the state of the one that replaced it.
+  // Bumped per connect, so a replaced socket's replies are ignored.
   const generation = useRef(0);
   const connect = useRef<() => void>(() => {});
 
@@ -202,8 +180,7 @@ export function useDocumentSocket(
     );
   }, []);
 
-  /** A resync is a reconnect: `init` is the one message carrying a whole
-   *  document, so recovery has one path rather than two. */
+  /** A resync is a reconnect: only `init` carries a whole document. */
   const resync = useCallback(() => {
     pending.current = null;
     dropSocket();
@@ -284,8 +261,7 @@ export function useDocumentSocket(
           stop('deleted');
           return;
         case 'error':
-          // Retrying fixes none of these: a viewer's edit, or a frame this
-          // client should not have sent in the first place.
+          // Not retryable.
           console.warn('[synapse] the server refused a message', message);
           return;
         case 'pong':
@@ -306,8 +282,7 @@ export function useDocumentSocket(
     const attempt = (generation.current += 1);
     setState((current) => (current === 'live' ? 'reconnecting' : current));
 
-    // A fresh ticket every time: the last one was spent on the socket that just
-    // died, and would not be accepted twice.
+    // Tickets are single-use.
     createWsTicket(documentId)
       .then((issued) => {
         if (closed.current || attempt !== generation.current) return;
@@ -347,9 +322,7 @@ export function useDocumentSocket(
       })
       .catch((error: unknown) => {
         if (closed.current || attempt !== generation.current) return;
-        // 404 covers both "no such document" and "you are not a member" -- the
-        // API does not distinguish them on purpose. Either way, waiting will
-        // not help.
+        // 404: no such document, or not a member. Either way, terminal.
         if (error instanceof ApiError && [403, 404].includes(error.status)) {
           stop('unavailable');
           return;

@@ -10,11 +10,7 @@ export async function login(email: string, password: string): Promise<TokenPair>
   return tokens;
 }
 
-/**
- * Answers 202 whether or not the address was already taken -- the backend will
- * not say, so the UI cannot either. The account stays inactive until the
- * emailed code is redeemed with `verifyEmail`.
- */
+/** 202 whether or not the address was taken; the backend will not say. */
 export function register(
   email: string,
   password: string,
@@ -26,8 +22,6 @@ export function register(
   });
 }
 
-/** Every failure -- wrong, expired, used up, unknown address -- is the same
- *  401, by design; five wrong codes wipe the code outright. */
 export function verifyEmail(email: string, code: string): Promise<User> {
   return request<User>('POST', '/auth/verify-email', {
     body: { email, code },
@@ -63,10 +57,7 @@ export async function logout(): Promise<void> {
   clearSession();
 }
 
-/**
- * Revokes every refresh token this account has, on every device. This tab's
- * own session is included, so the caller has to sign out locally too.
- */
+/** Includes this tab's session, so the caller must sign out locally too. */
 export function logoutEverywhere(): Promise<void> {
   return request<void>('POST', '/auth/logout-all');
 }

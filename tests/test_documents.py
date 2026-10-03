@@ -1,6 +1,5 @@
-"""The 409 tests are the point of the file: a stale PATCH must be refused *and*
-leave the row alone, and two simultaneous PATCHes against one version must not
-both be applied."""
+"""Above all: a stale PATCH is refused and changes nothing, and of two
+simultaneous PATCHes against one version only one applies."""
 
 from __future__ import annotations
 
@@ -31,9 +30,7 @@ def docs_url(workspace: dict[str, Any], document_id: str | None = None) -> str:
     return base if document_id is None else "%s/%s" % (base, document_id)
 
 
-# --------------------------------------------------------------------------- #
-# CRUD
-# --------------------------------------------------------------------------- #
+# --- CRUD ---
 
 
 async def test_create_document_defaults_to_an_empty_prosemirror_doc(
@@ -251,9 +248,7 @@ async def test_deleting_a_workspace_deletes_its_documents(
     assert remaining is None
 
 
-# --------------------------------------------------------------------------- #
-# Permission boundaries
-# --------------------------------------------------------------------------- #
+# --- Permission boundaries ---
 
 
 async def test_viewer_can_read(
@@ -385,9 +380,7 @@ async def test_unauthenticated_requests_are_401(
     assert response.status_code == 401
 
 
-# --------------------------------------------------------------------------- #
-# Optimistic concurrency (the 409 path)
-# --------------------------------------------------------------------------- #
+# --- Optimistic concurrency (the 409 path) ---
 
 
 async def test_stale_version_is_409_with_the_servers_state(
@@ -494,9 +487,8 @@ async def test_a_version_ahead_of_the_server_is_also_409(
 
 
 async def test_concurrent_patches_cannot_both_be_applied() -> None:
-    """Owns its data rather than using the shared fixtures: those live in an
-    uncommitted transaction a second connection cannot see, and the race is only
-    real across connections. Rows are committed for real, hence the cleanup."""
+    """Commits its own data: the race needs two connections, and a second one
+    cannot see the shared fixtures' uncommitted transaction."""
     engine = create_async_engine(_TEST_DATABASE_URL, poolclass=NullPool)
     email = "race-%s@example.com" % uuid.uuid4().hex[:12]
 
@@ -531,9 +523,7 @@ async def test_concurrent_patches_cannot_both_be_applied() -> None:
                 except document_service.StaleDocumentVersionError as exc:
                     caught = exc
 
-            # After the session closes: in a request the 409 is serialised
-            # during unwinding, once the transaction is rolled back, and an
-            # attached row would raise DetachedInstanceError right here.
+            # After close, as in a request: an attached row would raise here.
             assert caught.current.content is not None
             return "stale", caught.current.version
 
@@ -556,9 +546,7 @@ async def test_concurrent_patches_cannot_both_be_applied() -> None:
         await engine.dispose()
 
 
-# --------------------------------------------------------------------------- #
-# Request validation
-# --------------------------------------------------------------------------- #
+# --- Request validation ---
 
 
 @pytest.mark.parametrize(

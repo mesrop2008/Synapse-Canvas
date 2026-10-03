@@ -1,8 +1,4 @@
-"""Refresh token rotation, reuse detection and logout.
-
-These cover the property a stateless token cannot have: that a session can be
-ended before its token expires.
-"""
+"""Refresh token rotation, reuse detection and logout."""
 
 from __future__ import annotations
 
@@ -59,12 +55,8 @@ async def test_rotated_token_cannot_be_reused(
 async def test_reuse_revokes_the_whole_family(
     client: AsyncClient, owner: TestUser
 ) -> None:
-    """The core anti-theft property.
-
-    If a stolen token is replayed after the legitimate client has rotated,
-    the server cannot tell victim from attacker -- so it ends the session for
-    both rather than letting the thief ride along silently.
-    """
+    """A replayed rotated token cannot be told from theft, so the session ends
+    for both parties."""
     rotated = (await _refresh(client, owner.refresh_token)).json()["refresh_token"]
 
     replayed = await _refresh(client, owner.refresh_token)
@@ -184,14 +176,8 @@ async def test_logout_does_not_affect_other_users(
 async def test_access_token_survives_logout_until_it_expires(
     client: AsyncClient, owner: TestUser
 ) -> None:
-    """Deliberate, and worth pinning down so it is not mistaken for a bug.
-
-    Revocation is checked at the refresh boundary. Verifying every access
-    token against the database would make each request a read and throw away
-    the point of stateless access tokens, so the exposure is bounded by the
-    30-minute access lifetime instead. Anything needing instant cutoff needs
-    a shorter access lifetime or a per-request check.
-    """
+    """Deliberate: revocation bites at refresh, so access tokens already issued
+    live out their 30 minutes instead of costing a database read per request."""
     await client.post("/auth/logout-all", headers=owner.headers)
 
     still_valid = await client.get("/auth/me", headers=owner.headers)

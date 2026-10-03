@@ -50,8 +50,7 @@ function readStoredLocale(): Locale {
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => {
     const initial = readStoredLocale();
-    // Published here rather than in an effect, so a module calling translate()
-    // during the first render does not get English by accident.
+    // Not in an effect, so translate() during the first render is correct.
     setActiveLocale(initial);
     return initial;
   });

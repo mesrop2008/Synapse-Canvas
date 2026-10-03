@@ -4,8 +4,7 @@ import type { ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useI18n } from '../hooks/useI18n';
 
-/** 'loading' is what stops a reload bouncing a signed-in user to /login --
- *  restoring the session takes a round trip. */
+/** 'loading' keeps a reload from bouncing a signed-in user to /login. */
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const { status } = useAuth();
   const { t } = useI18n();

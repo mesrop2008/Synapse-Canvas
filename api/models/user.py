@@ -20,13 +20,11 @@ if TYPE_CHECKING:
 class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "users"
 
-    # 320 = max addr-spec (RFC 5321). Lowercased in the service layer, so a
-    # plain unique index suffices.
+    # 320: max address length. Lowercased by the service, so unique holds.
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    # Login and workspace invitations both require this.
     email_verified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -35,9 +33,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     def is_email_verified(self) -> bool:
         return self.email_verified_at is not None
 
-    # Registration is complete -- the address is proven -- once this is true.
-    # Derived rather than stored, so it cannot drift from email_verified_at;
-    # as a hybrid it also works in queries (`where(User.is_active)`).
+    # Derived, so it cannot drift from email_verified_at; works in queries too.
     @hybrid_property
     def is_active(self) -> bool:
         return self.email_verified_at is not None

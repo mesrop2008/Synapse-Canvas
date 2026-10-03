@@ -1,9 +1,5 @@
-"""The per-socket loop: read a frame, act on it, keep the connection honest.
-
-Everything with a lifetime shorter than the connection -- database sessions,
-Redis entries, the registry slot -- is acquired here and released in `_cleanup`,
-which runs on every exit path including an exception.
-"""
+"""The per-socket loop. Everything it acquires is released in `_cleanup`, on
+every exit path."""
 
 from __future__ import annotations
 
@@ -36,8 +32,7 @@ from api.services import documents as document_service
 
 logger = logging.getLogger(__name__)
 
-# 4000-4999 is the range reserved for the application, so these do not collide
-# with anything the protocol or a proxy might send.
+# 4000-4999 is the application's range.
 CLOSE_INVALID_TICKET = 4401
 CLOSE_FORBIDDEN = 4403
 CLOSE_NOT_FOUND = 4404
@@ -50,8 +45,7 @@ _CLEANUP_TIMEOUT_SECONDS = 5
 
 
 class _EditBudget:
-    """Fixed window per connection. In memory, not Redis: the thing being
-    limited is one socket, and it only exists in this process."""
+    """Per connection, in memory: a socket lives in one process."""
 
     def __init__(self, limit: int, window_seconds: int) -> None:
         self._limit = limit
@@ -71,8 +65,6 @@ class _EditBudget:
 
 
 class EditorSession:
-    """One open WebSocket on one document."""
-
     def __init__(
         self,
         *,
@@ -123,16 +115,10 @@ class EditorSession:
         except Exception:
             logger.exception("Socket on document %s failed", self._document_id)
         finally:
-            # A dropped connection cancels this task, and every `await` in a
-            # cancelled scope raises on the spot -- so an unshielded cleanup
-            # gets as far as its first await and leaves the peer in the
-            # document until its presence entry ages out. The deadline is there
-            # because shielding an unreachable Redis would hang the shutdown
-            # rather than delay it.
+            # Shielded: in a cancelled scope the first await would abort cleanup
+            # and leave a ghost peer. The deadline stops a dead Redis hanging it.
             with anyio.move_on_after(_CLEANUP_TIMEOUT_SECONDS, shield=True):
                 await self._cleanup()
-
-    # --- outbound ---------------------------------------------------------- #
 
     async def _send(self, payload: dict[str, Any]) -> None:
         if self._websocket.client_state is WebSocketState.CONNECTED:
@@ -146,8 +132,7 @@ class EditorSession:
             await self._websocket.close(code=code, reason=reason)
 
     async def _send_init(self) -> bool:
-        """Full state, every time. A client that has just reconnected cannot be
-        assumed to have anything worth catching up from."""
+        """Full state every time: a reconnecting client may have nothing."""
         async with get_sessionmaker()() as db:
             document = await document_service.find_document(
                 db, self._workspace_id, self._document_id
@@ -168,8 +153,6 @@ class EditorSession:
                 "content": document.content,
                 "title": document.title,
                 "peers": peers,
-                # So the client can tell its own presence echo from a peer's,
-                # and knows whether to put the editor in read-only.
                 "you": {
                     "user_id": str(self._user.id),
                     "name": self._user.name,
@@ -180,8 +163,6 @@ class EditorSession:
         )
         return True
 
-    # --- inbound ----------------------------------------------------------- #
-
     async def _receive_loop(self) -> None:
         timeout = self._settings.ws_idle_timeout_seconds
         max_bytes = self._settings.ws_max_message_bytes
@@ -190,8 +171,7 @@ class EditorSession:
             try:
                 frame = await asyncio.wait_for(self._websocket.receive(), timeout)
             except asyncio.TimeoutError:
-                # The client pings several times per timeout, so silence this
-                # long means the socket is dead in a way TCP has not noticed.
+                # Several missed pings: dead in a way TCP has not noticed.
                 await self._close(CLOSE_IDLE, "No heartbeat")
                 return
 
@@ -203,9 +183,7 @@ class EditorSession:
                 await self._close(CLOSE_UNSUPPORTED_FRAME, "Text frames only")
                 return
 
-            # The real cap belongs in the ASGI server (uvicorn's --ws-max-size)
-            # and the proxy; this is the backstop, and the only one that knows
-            # the application's own limit.
+            # Backstop; uvicorn's --ws-max-size and the proxy should cap too.
             if len(raw.encode("utf-8")) > max_bytes:
                 await self._close(CLOSE_TOO_LARGE, "Message too large")
                 return
@@ -214,7 +192,6 @@ class EditorSession:
                 return
 
     async def _dispatch(self, raw: str) -> bool:
-        """False to close the connection."""
         try:
             message = CLIENT_MESSAGE_ADAPTER.validate_python(json.loads(raw))
         except (json.JSONDecodeError, ValidationError) as exc:
@@ -235,8 +212,6 @@ class EditorSession:
         await self._send({"type": "pong"})
 
     async def _handle_cursor(self, message: CursorMessage) -> None:
-        # Viewers get cursors: being able to see where someone is reading is
-        # most of the value of having them in the document at all.
         self._peer = presence.Peer(
             user_id=self._peer.user_id,
             name=self._peer.name,
@@ -271,16 +246,8 @@ class EditorSession:
                     content=message.operation.doc,
                 )
             except document_service.StaleDocumentVersionError as exc:
-                # Reject and rebase, not operational transform. The client
-                # throws away whatever it had in flight and adopts the server's
-                # document wholesale, which means a few keystrokes typed in the
-                # moment between two people saving are simply lost -- they were
-                # never rebased onto the version that won.
-                #
-                # OT (or a CRDT) is the follow-up: transform the losing steps
-                # against the winning ones and apply them, so both edits
-                # survive. It is a larger piece of work than it looks, because
-                # the transform has to run identically on both sides.
+                # Reject and resync, not OT: the losing client adopts the
+                # server's document, so its in-flight keystrokes are lost.
                 await self._send(
                     {
                         "type": "rejected",
@@ -306,8 +273,6 @@ class EditorSession:
         )
         return True
 
-    # --- presence ---------------------------------------------------------- #
-
     async def _touch_presence(self) -> None:
         await presence.touch(self._redis, self._document_id, self._peer)
         await self._hub.publish(
@@ -320,11 +285,8 @@ class EditorSession:
                 self._document_id, {"type": "peer_left", "user_id": str(user_id)}
             )
 
-    # --- teardown ---------------------------------------------------------- #
-
     async def _cleanup(self) -> None:
-        """Every step is independent: a failure in one must not skip the rest,
-        or a crash leaves a phantom peer in the document for good."""
+        """Each step runs even if another fails, or a crash leaves a ghost peer."""
         if self._joined:
             try:
                 await self._hub.leave(self._connection)

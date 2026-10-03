@@ -1,7 +1,6 @@
-"""Every test runs in an outer transaction that is never committed.
-join_transaction_mode="create_savepoint" turns the app's own commit() into a
-savepoint release, so the real commit path runs -- IntegrityError against a live
-unique index included -- while teardown discards everything in one ROLLBACK."""
+"""Each test runs in an outer transaction that is rolled back. With
+join_transaction_mode="create_savepoint" the app's own commits become savepoint
+releases, so the real commit path (unique-index errors included) still runs."""
 
 from __future__ import annotations
 
@@ -28,10 +27,7 @@ if not _TEST_DATABASE_URL:
         "at a throwaway database -- the suite drops every table in it."
     )
 
-# Optional. Unset, the suite runs against an in-process fake, which behaves the
-# same for everything here -- hashes with TTLs, GETDEL, pub/sub -- and means the
-# tests need no second service. Set it to prove the real client against the real
-# server; the database it names is flushed between tests.
+# Optional: unset, the suite uses fakeredis. The database it names is flushed.
 _TEST_REDIS_URL = os.environ.get("TEST_REDIS_URL")
 
 # Point the app at the test database so no test can reach development data.
@@ -41,9 +37,7 @@ os.environ["BCRYPT_ROUNDS"] = "4"  # 12 would make the suite KDF-bound
 os.environ.setdefault(
     "JWT_SECRET_KEY", "test-only-secret-key-not-used-anywhere-real-0123456789"
 )
-# Throttling off by default: every test shares one client address, so a per-IP
-# limit would make unrelated tests throttle each other. The throttling tests
-# switch it on via the `rate_limits` fixture.
+# Off by default: every test shares one client address. See `rate_limits`.
 for _limit_var in (
     "LOGIN_RATE_LIMIT_PER_IP",
     "LOGIN_RATE_LIMIT_PER_ACCOUNT",
@@ -94,9 +88,8 @@ async def _reset_schema(url: str) -> None:
     engine = create_async_engine(url, poolclass=NullPool)
     try:
         async with engine.begin() as conn:
-            # The whole schema, not metadata.drop_all: that only knows the
-            # current models, and a table a later change removed would keep
-            # its foreign keys into `users` and block the drop.
+            # Not drop_all: a table since removed from the models would keep its
+            # foreign keys into `users` and block the drop.
             await conn.execute(text("DROP SCHEMA public CASCADE"))
             await conn.execute(text("CREATE SCHEMA public"))
             await conn.run_sync(Base.metadata.create_all)
@@ -137,12 +130,8 @@ _fake_redis_server: Any = None
 
 
 def new_redis() -> Redis:
-    """A client for the test Redis, or an in-process stand-in for it.
-
-    Every fake shares one server object, so two clients see each other's keys
-    and each other's published messages -- which is what the two-worker test
-    needs and what a real Redis gives for free.
-    """
+    """Fakes share one server object, so two clients see each other's keys and
+    messages, as the two-worker test needs."""
     if _TEST_REDIS_URL:
         return Redis.from_url(_TEST_REDIS_URL, decode_responses=True)
 
@@ -159,9 +148,7 @@ def new_redis() -> Redis:
 
 @pytest_asyncio.fixture
 async def redis_client() -> Any:
-    """One client per test. redis-py binds its pool to the event loop that
-    first used it, and every test here gets a fresh loop -- a cached client
-    would reach into a closed one on the second test that touched it."""
+    """Per test: redis-py binds its pool to the first event loop that uses it."""
     client = new_redis()
     use_redis(client)
     try:
@@ -231,13 +218,8 @@ async def pending_verification_code(db_session: AsyncSession, email: str) -> Any
 
 @pytest_asyncio.fixture
 async def make_user(client: AsyncClient, db_session: AsyncSession) -> UserFactory:
-    """Register, verify and log in through the real endpoints, so a break in
-    either fails every dependent test. Verification is mirrored rather than
-    redeemed (the raw code is unknowable here); the redemption path itself is
-    covered in test_email_verification.
-
-    Pass `verified=False` for an account that has registered but not verified.
-    """
+    """Registers and logs in through the real endpoints. Verification is set
+    directly (the code is unknowable here); `verified=False` skips it."""
     from datetime import datetime, timezone
 
     from sqlalchemy import select
@@ -382,18 +364,10 @@ def rate_limits() -> Any:
 
 @contextmanager
 def websocket_app() -> Iterator[TestClient]:
-    """A TestClient over a fresh app, for the WebSocket tests.
-
-    These are synchronous, unlike the rest of the suite. Starlette's WebSocket
-    test client runs the app on its own event loop in a worker thread, so the
-    async fixtures cannot reach into it -- and the transaction-per-test trick
-    does not work either, because the app opens its own sessions there and
-    would never see uncommitted rows. The realtime tests commit their data for
-    real and clean it up afterwards.
-
-    Both caches are cleared on the way out: an engine and a Redis pool bind to
-    the loop that first used them, and the next test gets a different one.
-    """
+    """For the WebSocket tests, which are synchronous: Starlette's test client
+    runs the app on its own loop in a thread, out of reach of the async fixtures
+    and their transaction, so those tests commit real data and clean it up.
+    Engine and Redis caches are cleared after, being bound to that loop."""
     redis = new_redis()
     use_redis(redis)  # before create_app(), which hands the hub a client
     app = create_app()

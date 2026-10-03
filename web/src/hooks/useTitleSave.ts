@@ -22,19 +22,11 @@ export interface TitleSave {
   clearError: () => void;
 }
 
-// A title conflict is worth retrying, unlike a content one: the PATCH carries
-// no content, so replaying it against the newer version cannot overwrite
-// anyone's text. It only ever loses to another rename.
+// Unlike content, a title conflict is safe to retry: it overwrites no text.
 const MAX_ATTEMPTS = 3;
 
-/**
- * Debounced rename over HTTP, while the body goes over the WebSocket.
- *
- * Both land in the same row-locked service function on the server and both
- * consume a version, so they cannot race -- and the socket hears about this
- * one like any other edit, which is how the version the next keystroke is
- * based on stays current.
- */
+/** Debounced rename over HTTP. It consumes a version like a socket edit, and
+ *  the socket hears of it, so the editor's version stays current. */
 export function useTitleSave({
   workspaceId,
   documentId,

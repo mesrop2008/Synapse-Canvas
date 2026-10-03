@@ -1,14 +1,8 @@
-"""Single-use handshake tickets for the WebSocket endpoint.
+"""Single-use WebSocket handshake tickets.
 
-A browser cannot set an `Authorization` header on a WebSocket, and the usual
-workaround -- putting the access token in the query string -- writes a
-thirty-minute credential into every access log, proxy trace and `Referer` along
-the way. A ticket is minted by an authenticated HTTP call, lives about thirty
-seconds, is redeemed once, and grants nothing but "open this one document".
-
-Redis rather than Postgres because the rows are worthless the moment they
-expire, and `GETDEL` gives the single-use guarantee for free.
-"""
+A browser cannot set `Authorization` on a WebSocket, and an access token in the
+query string ends up in access logs. A ticket lives seconds, is redeemed once
+(GETDEL is atomic) and opens one document."""
 
 from __future__ import annotations
 
@@ -31,15 +25,13 @@ class Ticket:
 
 
 def _key(raw_token: str) -> str:
-    # Hashed: whoever can list the keyspace should not come away with anything
-    # redeemable.
+    # Hashed, so the keyspace holds nothing redeemable.
     return _KEY_PREFIX + hash_url_token(raw_token)
 
 
 async def issue(
     redis: Redis, *, user_id: uuid.UUID, document_id: uuid.UUID
 ) -> tuple[str, int]:
-    """Return the raw ticket and its lifetime in seconds."""
     ttl = get_settings().ws_ticket_ttl_seconds
     raw_token = generate_url_token()
     await redis.set(
@@ -51,12 +43,7 @@ async def issue(
 
 
 async def redeem(redis: Redis, raw_token: str) -> Ticket | None:
-    """Spend a ticket. `None` covers every failure the caller can act on the
-    same way: never issued, already redeemed, or expired.
-
-    GETDEL is atomic, so two sockets racing the same ticket cannot both be let
-    in -- the loser sees a miss.
-    """
+    """`None` for never issued, already redeemed or expired."""
     if not raw_token:
         return None
 

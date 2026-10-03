@@ -7,25 +7,15 @@ from enum import StrEnum
 
 
 class ErrorCode(StrEnum):
-    """Stable identifiers for client-facing failures.
+    """Part of the API contract: the client translates these, and renaming one
+    drops released clients back to the English `detail`."""
 
-    The client maps these to its own language packs, so translations live with
-    the client and adding a language changes nothing here. `detail` stays
-    English alongside them: it is what a non-browser caller reads, and what a
-    client that has not learned a new code yet falls back to.
-
-    The values are part of the API contract. Renaming one silently drops every
-    released client back to the English sentence.
-    """
-
-    # Generic
     SERVER_ERROR = "server.error"
     REQUEST_INVALID = "request.invalid"
     REQUEST_TOO_LARGE = "request.too_large"
     REQUEST_MALFORMED_LENGTH = "request.malformed_length"
     RATE_LIMITED = "rate_limit.exceeded"
 
-    # Authentication and tokens
     NOT_AUTHENTICATED = "auth.not_authenticated"
     INVALID_TOKEN = "auth.invalid_token"
     TOKEN_EXPIRED = "auth.token_expired"
@@ -38,7 +28,6 @@ class ErrorCode(StrEnum):
     REFRESH_REVOKED = "auth.refresh_revoked"
     REFRESH_EXPIRED = "auth.refresh_expired"
 
-    # Workspaces and membership
     WORKSPACE_NOT_FOUND = "workspace.not_found"
     ROLE_TOO_LOW = "workspace.role_too_low"
     MEMBER_UNKNOWN_EMAIL = "member.unknown_email"
@@ -47,14 +36,11 @@ class ErrorCode(StrEnum):
     MEMBER_ABSENT = "member.absent"
     MEMBER_IS_OWNER = "member.is_owner"
 
-    # Documents
     DOCUMENT_NOT_FOUND = "document.not_found"
     DOCUMENT_STALE = "document.stale"
 
 
 class AppError(Exception):
-    """Base class for expected, client-facing failures."""
-
     status_code: int = 500
     detail: str = "Internal server error"
     code: ErrorCode = ErrorCode.SERVER_ERROR
@@ -67,10 +53,8 @@ class AppError(Exception):
         code: ErrorCode | None = None,
     ) -> None:
         self.detail = detail or self.__class__.detail
-        # Keyword-only, so a raise site that does not care gets its exception
-        # class's default rather than accidentally passing headers as a code.
         self.code = code or self.__class__.code
-        self.headers = headers  # e.g. Retry-After on a 429
+        self.headers = headers
         super().__init__(self.detail)
 
 
@@ -110,8 +94,7 @@ class RateLimitExceededError(AppError):
 
 
 class EmailNotVerifiedError(AppError):
-    # Raised only after the password verifies, so it is not an enumeration
-    # signal.
+    # Raised only after the password verifies, so it reveals no account.
     status_code = 403
     detail = "Email address has not been verified"
     code = ErrorCode.EMAIL_UNVERIFIED

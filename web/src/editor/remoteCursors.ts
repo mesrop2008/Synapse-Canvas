@@ -7,8 +7,7 @@ import type { PeerPresence } from '../types/api';
 
 const key = new PluginKey<DecorationSet>('remoteCursors');
 
-/** Peers arrive through a transaction rather than a React prop: decorations are
- *  ProseMirror state, and the view is the only thing that can change it. */
+/** Peers arrive via a transaction: decorations are ProseMirror state. */
 const PEERS = 'remoteCursors:peers';
 
 function caret(peer: PeerPresence): HTMLElement {
@@ -32,9 +31,7 @@ function decorationsFor(
   for (const peer of peers) {
     if (peer.anchor === null || peer.head === null) continue;
 
-    // Positions were computed against the peer's copy of the document, which
-    // may be a version ahead or behind this one. Clamping keeps a stale cursor
-    // from throwing rather than just sitting in the wrong place for a moment.
+    // Clamped: the peer's position may be from another version of the doc.
     const anchor = Math.min(Math.max(peer.anchor, 0), docSize);
     const head = Math.min(Math.max(peer.head, 0), docSize);
 
@@ -79,8 +76,7 @@ export const RemoteCursors = Extension.create({
                 decorationsFor(peers, state.doc.content.size),
               );
             }
-            // Not a peer update: carry the decorations through whatever the
-            // document did, so a cursor does not lag a keystroke behind.
+            // Map through local edits so cursors do not lag a keystroke.
             return current.map(transaction.mapping, transaction.doc);
           },
         },

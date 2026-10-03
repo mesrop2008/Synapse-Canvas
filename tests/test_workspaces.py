@@ -30,11 +30,7 @@ async def test_create_workspace_makes_the_caller_owner(
 async def test_create_workspace_also_creates_the_owner_membership(
     client: AsyncClient, owner: TestUser, db_session: AsyncSession
 ) -> None:
-    """The owner must exist in workspace_members, not just via owner_id.
-
-    Checked in the database rather than through the API, because it is the
-    membership row that every permission decision depends on.
-    """
+    """Every permission check reads the membership row, so the owner needs one."""
     response = await client.post(
         "/workspaces", json={"name": "Ribosomes"}, headers=owner.headers
     )

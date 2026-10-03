@@ -1,5 +1,5 @@
-"""Depend on `get_settings()` rather than a module-level singleton, so tests can
-override the environment before first access."""
+"""Read through `get_settings()`, not a module-level instance, so tests can set
+the environment before first access. Each setting is documented in .env.example."""
 
 from __future__ import annotations
 
@@ -12,8 +12,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["local", "test", "staging", "production"]
 EmailBackend = Literal["console", "smtp"]
-# starttls: plain connect, then upgrade (port 587). tls: TLS from the first
-# byte (port 465). none: no encryption -- a relay on the same host only.
 SmtpSecurity = Literal["starttls", "tls", "none"]
 
 
@@ -30,7 +28,6 @@ class Settings(BaseSettings):
     debug: bool = False
 
     database_url: str
-    # Separate database: the suite drops and recreates every table in it.
     test_database_url: str | None = None
 
     redis_url: str = "redis://localhost:6379/0"
@@ -39,35 +36,20 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
-
-    # Retired keys, comma-separated: their tokens still verify, so the active
-    # key rotates without logging everyone out.
     previous_jwt_secret_keys_raw: str = Field(
         default="", alias="PREVIOUS_JWT_SECRET_KEYS"
     )
-
     jwt_issuer: str = "synapse-canvas"
     jwt_audience: str = "synapse-canvas-api"
 
-    # --- email verification ----------------------------------------------
-    # A six-digit code has a million values, so its safety is entirely in how
-    # few guesses each one allows: lifetime, attempts per code, how often a new
-    # code can be had, and a per-address budget of wrong guesses across codes.
     email_verification_code_ttl_seconds: int = 300
     email_verification_max_attempts: int = 5
-    # One code per address per cooldown, whether or not the address has an
-    # account -- so a 429 here says nothing about who is registered.
     email_verification_resend_cooldown_seconds: int = 60
     email_verification_send_limit: int = 5
     email_verification_send_limit_window_seconds: int = 3600
-    # Bounds an attacker who keeps requesting fresh codes: without it, five
-    # guesses per code times a code a minute is 7,200 guesses a day.
     email_verification_failure_limit: int = 20
     email_verification_failure_limit_window_seconds: int = 86400
 
-    # --- outgoing mail ---------------------------------------------------
-    # console writes messages to the log, codes included, so it is refused
-    # outside local/test.
     email_backend: EmailBackend = "console"
     smtp_host: str = ""
     smtp_port: int = 587
@@ -78,11 +60,8 @@ class Settings(BaseSettings):
     mail_from_address: str = ""
     mail_from_name: str = "Synapse Canvas"
 
-    # The suite lowers this to 4 so tests are not KDF-bound.
     bcrypt_rounds: int = 12
 
-    # Throttling, not lockout: a lockout keyed on an account lets anyone lock
-    # its owner out.
     login_rate_limit_per_ip: int = 10
     login_rate_limit_per_ip_window_seconds: int = 300
     login_rate_limit_per_account: int = 5
@@ -93,31 +72,21 @@ class Settings(BaseSettings):
     refresh_rate_limit_per_ip_window_seconds: int = 300
     verify_email_rate_limit_per_ip: int = 30
     verify_email_rate_limit_per_ip_window_seconds: int = 300
-
-    # Only behind a proxy you control; the header is client-spoofable.
     trust_proxy_headers: bool = False
 
-    # --- real-time collaboration -------------------------------------------
-    # Long enough for the browser to open the socket, short enough that a
-    # ticket leaked through a log or Referer is already dead.
     ws_ticket_ttl_seconds: int = 30
-    # The client pings on this interval; the server drops a socket that has
-    # said nothing for the timeout. The timeout is the larger of the two by
-    # several pings, so one lost packet does not close a healthy connection.
     ws_heartbeat_interval_seconds: int = 10
     ws_idle_timeout_seconds: int = 45
-    # An edit carries the resulting document, so the cap scales with document
-    # size rather than keystroke size.
     ws_max_message_bytes: int = 262_144
     ws_edit_rate_limit: int = 60
     ws_edit_rate_limit_window_seconds: int = 10
-    # Presence entries outlive a dropped socket by this much before a peer
-    # sweeps them; a few seconds of a ghost cursor beats flickering peers.
     presence_ttl_seconds: int = 30
 
-    # str, not list[str]: pydantic-settings JSON-decodes complex types before
-    # validators run, which makes CSV env vars awkward.
+    # Comma-separated str, not list[str]: pydantic-settings JSON-decodes list
+    # types before validators run.
     cors_origins_raw: str = Field(default="", alias="CORS_ORIGINS")
+
+    max_request_body_bytes: int = 1_048_576
 
     @field_validator("database_url", "test_database_url")
     @classmethod
@@ -131,9 +100,6 @@ class Settings(BaseSettings):
             )
         return v
 
-    # Refused before the body is read; a proxy should also cap this.
-    max_request_body_bytes: int = 1_048_576
-
     @model_validator(mode="after")
     def _check_mail_settings(self) -> "Settings":
         if self.email_backend == "console":
@@ -145,8 +111,7 @@ class Settings(BaseSettings):
                 )
             return self
 
-        # Gmail, Yandex and Mail.ru only send as the mailbox you log in as, so
-        # that is the right sender unless told otherwise.
+        # Gmail, Yandex and Mail.ru only send as the mailbox you log in as.
         if not self.mail_from_address and "@" in self.smtp_username:
             self.mail_from_address = self.smtp_username
         if not self.smtp_host or not self.mail_from_address:
@@ -183,6 +148,6 @@ def get_settings() -> Settings:
 
 
 def _configure_third_party_logging() -> None:
-    # passlib probes bcrypt.__about__, removed in 4.1, and logs a traceback on
-    # first use. Hashing is unaffected.
+    # passlib probes bcrypt.__about__ (gone since 4.1) and logs a harmless
+    # traceback on first use.
     logging.getLogger("passlib.handlers.bcrypt").setLevel(logging.CRITICAL)

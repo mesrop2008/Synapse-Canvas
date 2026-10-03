@@ -25,8 +25,6 @@ export function AccountPage() {
     setError(null);
     try {
       await logoutEverywhere();
-      // Every refresh token is revoked, this tab's included, so the only
-      // honest next step is the login page.
       await signOut();
       navigate('/login', { replace: true });
     } catch (caught) {

@@ -14,16 +14,9 @@ if TYPE_CHECKING:
 
 
 class EmailVerificationCode(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """The one outstanding verification code for a user.
-
-    `user_id` is unique, so issuing a code replaces the previous one in the
-    same row: there is never a second live code to guess at, whatever order
-    concurrent requests land in. The row is deleted when the code is redeemed,
-    expires on use, or runs out of attempts.
-
-    Only an HMAC of the code is stored (see `api.core.security.hash_otp`).
-    `created_at` is reset on every reissue, so it is the issue time.
-    """
+    """A user's one outstanding code. Unique user_id means a reissue replaces
+    it in place, so there is never a second live code. Stores only an HMAC;
+    `created_at` is reset on reissue."""
 
     __tablename__ = "email_verification_codes"
     __table_args__ = (

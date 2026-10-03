@@ -1,9 +1,4 @@
-"""Alembic environment, driven by the application's own settings.
-
-The engine is async (asyncpg), same as the app, so there is no second driver
-to install or keep in sync. `connection.run_sync` bridges Alembic's
-synchronous migration API onto the async connection.
-"""
+"""Alembic on the app's own settings and async driver, via `run_sync`."""
 
 from __future__ import annotations
 
@@ -17,9 +12,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from api.core.config import get_settings
 
-# Importing the models package registers every table on Base.metadata.
-# Without it, autogenerate would cheerfully emit a migration dropping
-# everything it could not see.
+# Registers every table; otherwise autogenerate would drop what it cannot see.
 from api.models import Base
 
 config = context.config

@@ -1,6 +1,4 @@
-"""Email verification: the code flow, the limits that make a six-digit code
-safe to use, the login gate, and the enumeration-resistance properties.
-"""
+"""Email verification: the code flow, its limits, and enumeration resistance."""
 
 from __future__ import annotations
 

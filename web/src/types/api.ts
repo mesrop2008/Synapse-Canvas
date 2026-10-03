@@ -1,8 +1,4 @@
-/**
- * Hand-written mirrors of the schemas in `api/schemas/`. Nothing checks these
- * against the backend, so field names must stay byte-identical to the Python,
- * snake_case included.
- */
+/** Hand-written mirrors of `api/schemas/`; keep the field names identical. */
 
 /** ISO 8601, as FastAPI serialises `datetime`. */
 export type Timestamp = string;
@@ -50,11 +46,7 @@ export interface Member {
   user: User;
 }
 
-/**
- * Structural rather than a union of node types: Tiptap owns the schema. Shaped
- * to stay assignable to Tiptap's `JSONContent` so content crosses that boundary
- * without a cast.
- */
+/** Structural, and assignable to Tiptap's `JSONContent` without a cast. */
 export interface ProseMirrorNode {
   type?: string;
   attrs?: Record<string, unknown>;
@@ -93,15 +85,12 @@ export interface DocumentVersionConflict {
 }
 
 export interface ErrorBody {
-  /** Stable identifier; see api/core/exceptions.py. Absent on responses the
-   *  API did not generate itself. */
+  /** See api/core/exceptions.py. */
   code?: string;
   detail: unknown;
 }
 
-/* --- real-time protocol ---------------------------------------------------
-   Mirrors api/schemas/realtime.py and the frames assembled in
-   api/realtime/session.py. */
+/* Real-time protocol: mirrors api/schemas/realtime.py and api/realtime/session.py. */
 
 export interface WsTicket {
   ticket: string;
@@ -117,10 +106,7 @@ export interface PeerPresence {
   head: number | null;
 }
 
-/**
- * What one accepted version did. `steps` come from a live editor; `replace` and
- * `title` from an HTTP PATCH, which cannot be expressed as steps.
- */
+/** `steps` come from an editor; `replace` and `title` from an HTTP PATCH. */
 export interface DocumentOperation {
   steps?: unknown[];
   replace?: ProseMirrorDoc;
@@ -156,8 +142,7 @@ export type ClientMessage =
   | {
       type: 'edit';
       base_version: number;
-      /** The steps peers replay, and the document they produced -- the server
-       *  cannot run ProseMirror to derive one from the other. */
+      /** Both, since the server cannot run ProseMirror. */
       operation: { steps: unknown[]; doc: ProseMirrorDoc };
     }
   | { type: 'cursor'; anchor: number; head: number }

@@ -1,13 +1,6 @@
 #!/bin/sh
-# Generate a JWT signing key on first run so the stack starts with no setup.
-#
-# Only in local/test. In any other environment a missing key is a hard error:
-# each replica would otherwise invent its own, and tokens minted by one would
-# be rejected by the rest -- an intermittent failure that looks like anything
-# except a configuration mistake.
-#
-# The key is written to a named volume shared by the migrate and api services,
-# so it survives restarts and both containers agree on it.
+# Generates a JWT signing key on first run, in local/test only: replicas each
+# inventing one would reject each other's tokens. Kept on a shared volume.
 set -e
 
 SECRET_FILE="${JWT_SECRET_FILE:-/var/lib/synapse/jwt_secret}"

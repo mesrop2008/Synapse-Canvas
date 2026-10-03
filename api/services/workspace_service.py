@@ -1,5 +1,3 @@
-"""Workspace and membership business logic."""
-
 from __future__ import annotations
 
 import uuid
@@ -20,10 +18,9 @@ from api.services import auth_service
 async def create_workspace(
     db: AsyncSession, owner: User, name: str
 ) -> tuple[Workspace, WorkspaceRole]:
-    """Create a workspace and its owner membership in one transaction."""
     workspace = Workspace(name=name, owner_id=owner.id)
     db.add(workspace)
-    # The UUID default lands at flush, and the membership row needs the id.
+    # Flush for the id, which the membership row needs.
     await db.flush()
 
     db.add(
@@ -41,8 +38,7 @@ async def create_workspace(
 async def get_workspace_with_role(
     db: AsyncSession, workspace_id: uuid.UUID, user_id: uuid.UUID
 ) -> tuple[Workspace, WorkspaceRole] | None:
-    """The inner join makes a nonexistent workspace and a non-member both return
-    no row, so callers cannot tell them apart."""
+    """No such workspace and not a member both return None, indistinguishably."""
     result = await db.execute(
         select(Workspace, WorkspaceMember.role)
         .join(WorkspaceMember, WorkspaceMember.workspace_id == Workspace.id)
@@ -75,7 +71,6 @@ async def update_workspace(
 
 
 async def delete_workspace(db: AsyncSession, workspace: Workspace) -> None:
-    # Membership rows go with it via ON DELETE CASCADE.
     await db.delete(workspace)
     await db.commit()
 
@@ -97,14 +92,12 @@ async def add_member(
 ) -> WorkspaceMember:
     user = await auth_service.get_user_by_email(db, email)
     if user is None:
-        # Not the 404-existence case: the caller is a proven owner here.
         raise NotFoundError(
             "No user with that email address", code=ErrorCode.MEMBER_UNKNOWN_EMAIL
         )
 
     if not user.is_email_verified:
-        # Membership is by address, so an unverified account lets a squatter
-        # inherit an invitation meant for its real owner.
+        # Membership is by address: an unverified account could be a squatter.
         raise ConflictError(
             "That user has not verified their email address yet",
             code=ErrorCode.MEMBER_UNVERIFIED,
@@ -127,8 +120,7 @@ async def add_member(
         user_id=user.id,
         role=role,
     )
-    # The response serialises member.user, and a lazy load after commit raises
-    # MissingGreenlet.
+    # Eager: a lazy load of member.user after commit raises MissingGreenlet.
     member.user = user
     db.add(member)
 
@@ -149,7 +141,6 @@ async def remove_member(
     db: AsyncSession, workspace: Workspace, user_id: uuid.UUID
 ) -> None:
     if user_id == workspace.owner_id:
-        # An ownerless workspace is unadministrable; transfer is separate.
         raise ConflictError(
             "The workspace owner cannot be removed. Transfer ownership first.",
             code=ErrorCode.MEMBER_IS_OWNER,

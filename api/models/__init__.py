@@ -1,5 +1,4 @@
-"""Import every model here so it is registered on Base.metadata before Alembic
-inspects it; a missed one vanishes from migrations."""
+"""Every model must be imported here, or Alembic never sees it."""
 
 from api.db.base import Base
 from api.models.document import Document

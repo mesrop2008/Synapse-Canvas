@@ -14,9 +14,8 @@ if TYPE_CHECKING:
 
 
 class RefreshToken(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """Stores only the jti -- the signature already proves authenticity -- so a
-    leaked database yields no credentials. Tokens from one login share a
-    family_id, and presenting a used one revokes the whole family."""
+    """Only the jti is stored, so a leaked database yields no credentials.
+    Reusing a rotated token revokes its whole family (one login)."""
 
     __tablename__ = "refresh_tokens"
     __table_args__ = (

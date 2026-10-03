@@ -125,11 +125,7 @@ async def test_non_member_gets_404_on_every_workspace_route(
     suffix: str,
     body: dict[str, Any] | None,
 ) -> None:
-    """Existence must not leak through any route.
-
-    A 403 anywhere here would tell an outsider that this workspace id is real,
-    turning the id space into something worth probing.
-    """
+    """A 403 anywhere would tell an outsider the workspace id is real."""
     url = "/workspaces/%s%s" % (shared_workspace["id"], suffix)
 
     response = await client.request(

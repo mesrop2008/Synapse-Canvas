@@ -40,13 +40,9 @@ export function WorkspacePage() {
 
   const [title, setTitle] = useState('');
   const [pendingDelete, setPendingDelete] = useState<DocumentSummary | null>(null);
-  // Null unless a rename is in progress, so the heading is not an input the
-  // rest of the time and cannot be edited by a stray click.
   const [draftName, setDraftName] = useState<string | null>(null);
   const current = workspace.data?.name ?? '';
 
-  // The server enforces this; hiding the controls just avoids offering a viewer
-  // a button that can only fail.
   const writable = workspace.data ? canEdit(workspace.data.role) : false;
 
   async function handleRename(event: React.FormEvent) {

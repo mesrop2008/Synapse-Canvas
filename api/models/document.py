@@ -18,21 +18,14 @@ if TYPE_CHECKING:
 
 
 class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """ProseMirror/Tiptap JSON rather than HTML: edits are applied at the node
-    level and Part 5 walks the tree to chunk it, neither of which is tractable
-    against a serialised string. JSONB so they can query into it server-side.
-
-    `content` and `version` are a materialised snapshot of `changes`, kept in
-    the same transaction that appends to it."""
+    """`content` is ProseMirror JSON. It and `version` are the materialised head
+    of `changes`, written in the same transaction that appends to it."""
 
     __tablename__ = "documents"
-    # `updated_at` is computed by the database on every UPDATE, so without this
-    # the ORM expires the attribute and reloads it on next access -- which, in
-    # an async session, is an await in whatever code happens to touch it.
-    # RETURNING fetches it in the same statement instead.
+    # RETURNING the database-computed updated_at; a lazy reload would be an
+    # implicit await in an async session.
     __mapper_args__ = {"eager_defaults": True}
     __table_args__ = (
-        # Serves the filter and the sort of the list query at once.
         Index(
             "ix_documents_workspace_id_updated_at",
             "workspace_id",
@@ -47,22 +40,17 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
-    # Concurrency token as well as the head of the change log: every accepted
-    # edit produces exactly one version.
+    # Concurrency token and head of the change log.
     version: Mapped[int] = mapped_column(
         Integer, nullable=False, default=1, server_default="1"
     )
 
-    # SET NULL, hence nullable: deleting an account must not delete documents it
-    # contributed to a workspace that outlives it.
+    # SET NULL: deleting an account keeps its documents.
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
-    # clock_timestamp() on update because now() is the *transaction* timestamp:
-    # two writes in one transaction would record the same instant and leave the
-    # list order arbitrary. The default stays now() so a new row matches
-    # created_at.
+    # clock_timestamp(): now() is per transaction, so two writes in one would tie.
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

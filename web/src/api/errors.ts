@@ -1,14 +1,7 @@
 import { getActiveLocale, lookup, translate, type MessageKey } from '../../i18n';
 import { ApiError } from './client';
 
-/**
- * A failure held for later display.
- *
- * What failed, not what to say about it: the wording is chosen at render time,
- * so switching language reaches an error that is already on screen. Storing the
- * translated string instead would freeze it in whichever language was active
- * when the request failed.
- */
+/** Worded at render time, so a language switch reaches errors on screen. */
 export interface FailedRequest {
   cause: unknown;
   fallback: MessageKey;
@@ -25,12 +18,8 @@ export function describeFailure(failure: FailedRequest): string {
   return errorMessage(failure.cause, failure.fallback);
 }
 
-/**
- * The API sends a stable `code` and an English `detail`. The code is what gets
- * translated; the detail is the fallback for a failure this client has no
- * wording for yet -- a newer server, or a response from something in front of
- * it. Showing the English sentence beats showing a raw identifier.
- */
+/** Translates `code`; the English `detail` is the fallback for a code this
+ *  client does not know yet. */
 export function errorMessage(
   error: unknown,
   fallback: MessageKey = 'errors.generic',
