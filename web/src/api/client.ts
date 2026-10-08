@@ -88,21 +88,33 @@ interface RequestOptions {
 
 type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
+interface SendOptions {
+  body?: unknown;
+  headers?: Record<string, string>;
+  signal?: AbortSignal;
+  keepalive?: boolean;
+}
+
 async function send(
   method: Method,
   path: string,
-  body: unknown,
   token: string | null,
+  options: SendOptions = {},
 ): Promise<Response> {
   // Any email this request triggers is written in the active language.
-  const headers: Record<string, string> = { 'Accept-Language': getActiveLocale() };
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const headers: Record<string, string> = {
+    'Accept-Language': getActiveLocale(),
+    ...options.headers,
+  };
+  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
 
   return fetch(`${API_BASE_URL}${path}`, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    signal: options.signal,
+    keepalive: options.keepalive,
   });
 }
 
@@ -154,18 +166,15 @@ async function performRefresh(): Promise<string> {
   return tokens.access_token;
 }
 
-export async function request<T>(
+/** Sends, and on a 401 refreshes once and replays. */
+async function sendWithSession(
   method: Method,
   path: string,
-  options: RequestOptions & { body?: unknown } = {},
-): Promise<T> {
-  const {
-    body,
-    authenticated = true,
-    refreshOnUnauthorized = true,
-  } = options;
+  options: RequestOptions & SendOptions,
+): Promise<Response> {
+  const { authenticated = true, refreshOnUnauthorized = true } = options;
 
-  let response = await send(method, path, body, authenticated ? accessToken : null);
+  let response = await send(method, path, authenticated ? accessToken : null, options);
 
   if (
     response.status === 401 &&
@@ -176,23 +185,52 @@ export async function request<T>(
     try {
       const fresh = await refreshAccessToken();
       // Once only: a second 401 means the token was not the problem.
-      response = await send(method, path, body, fresh);
+      response = await send(method, path, fresh, options);
     } catch {
       // Spent or revoked; nothing here can recover it.
       clearSession({ notify: true });
       throw new ApiError(401, translate('errors.sessionExpired'), null);
     }
   }
+  return response;
+}
 
+async function failure(response: Response): Promise<ApiError> {
   const parsed = await readBody(response);
-  if (!response.ok) {
-    throw new ApiError(
-      response.status,
-      describe(response.status, parsed),
-      parsed,
-      errorCode(parsed),
-      retryAfterSeconds(response),
-    );
-  }
-  return parsed as T;
+  return new ApiError(
+    response.status,
+    describe(response.status, parsed),
+    parsed,
+    errorCode(parsed),
+    retryAfterSeconds(response),
+  );
+}
+
+export async function request<T>(
+  method: Method,
+  path: string,
+  options: RequestOptions & { body?: unknown } = {},
+): Promise<T> {
+  const response = await sendWithSession(method, path, options);
+  if (!response.ok) throw await failure(response);
+  return (await readBody(response)) as T;
+}
+
+/** For server-sent events: `request`'s auth and refresh, with the body left
+ *  for the caller to read as it arrives. */
+export async function openStream(
+  path: string,
+  options: { headers?: Record<string, string>; signal?: AbortSignal } = {},
+): Promise<Response> {
+  const response = await sendWithSession('GET', path, {
+    ...options,
+    headers: { Accept: 'text/event-stream', ...options.headers },
+  });
+  if (!response.ok) throw await failure(response);
+  return response;
+}
+
+/** Outlives the page, for `pagehide`. No refresh: there is no time for one. */
+export function sendOnUnload(method: Method, path: string): void {
+  send(method, path, accessToken, { keepalive: true }).catch(() => {});
 }
