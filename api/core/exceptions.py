@@ -47,6 +47,9 @@ class ErrorCode(StrEnum):
     AI_UPSTREAM_UNAVAILABLE = "ai.upstream_unavailable"
     AI_INVALID_KEY = "ai.invalid_key"
     AI_SELECTION_INVALID = "ai.selection_invalid"
+    AI_DAILY_LIMIT = "ai.daily_limit"
+    AI_CONCURRENCY_LIMIT = "ai.concurrency_limit"
+    AI_TIMEOUT = "ai.timeout"
 
 
 class AppError(Exception):

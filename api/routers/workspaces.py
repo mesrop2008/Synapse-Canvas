@@ -5,6 +5,7 @@ import uuid
 from fastapi import APIRouter, Request, status
 
 from api.dependencies import CurrentUser, DbSession, RequireOwner, RequireViewer
+from api.schemas.ai import WorkspaceUsageRead
 from api.schemas.workspace import (
     MemberAdd,
     MemberRead,
@@ -13,8 +14,8 @@ from api.schemas.workspace import (
     WorkspaceWithRole,
     workspace_with_role,
 )
+from api.services import ai_usage, workspace_service
 from api.services import documents as document_service
-from api.services import workspace_service
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
@@ -98,6 +99,16 @@ async def delete_workspace(
         await request.app.state.hub.publish(
             document.id, {"type": "deleted", "user_id": str(ctx.user.id)}
         )
+
+
+@router.get(
+    "/{workspace_id}/usage",
+    response_model=WorkspaceUsageRead,
+    summary="Today's AI token use and the workspace's limits",
+    responses=_MEMBERSHIP_RESPONSES,
+)
+async def get_usage(ctx: RequireViewer, db: DbSession) -> WorkspaceUsageRead:
+    return WorkspaceUsageRead.of(await ai_usage.get_usage(db, ctx.workspace.id))
 
 
 @router.get(
