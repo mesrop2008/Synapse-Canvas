@@ -52,6 +52,9 @@ os.environ["EMAIL_CHECK_DELIVERABILITY"] = "false"
 # Forced, not defaulted: .env may hold real SMTP credentials, and the suite
 # registers hundreds of fake addresses.
 os.environ["EMAIL_BACKEND"] = "console"
+# Likewise a real GEMINI_API_KEY: no test may spend money.
+os.environ["LLM_PROVIDER"] = "fake"
+os.environ["GEMINI_API_KEY"] = ""
 
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from redis.asyncio import Redis  # noqa: E402
