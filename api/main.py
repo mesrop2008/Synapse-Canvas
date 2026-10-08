@@ -27,6 +27,7 @@ from api.realtime.hub import DocumentHub
 from api.routers import auth, documents, realtime, workspaces
 from api.schemas.document import DocumentRead, DocumentVersionConflict
 from api.services import email_service
+from api.services.ai_runner import GenerationRunner
 from api.services.documents import StaleDocumentVersionError
 
 logger = logging.getLogger(__name__)
@@ -36,13 +37,14 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Background: an unreachable mail server takes the full timeout to fail.
     mail_check = asyncio.create_task(email_service.report_delivery_status())
-    llm.report_status(app.state.llm)
+    llm.report_status(app.state.ai.provider)
     yield
     mail_check.cancel()
     # First, so a code queued just before shutdown still goes out.
     await email_service.drain(timeout=10)
     await app.state.hub.aclose()
-    await app.state.llm.aclose()
+    # Ends running generations and closes the provider's client.
+    await app.state.ai.aclose()
     await close_redis()
     await get_engine().dispose()  # close pooled connections on shutdown
 
@@ -138,7 +140,7 @@ def create_app() -> FastAPI:
 
     # Per app, not per module: one per worker, and tests can run two.
     app.state.hub = DocumentHub(get_redis())
-    app.state.llm = llm.build_provider(settings)
+    app.state.ai = GenerationRunner(llm.build_provider(settings), get_redis())
 
     app.include_router(auth.router)
     app.include_router(workspaces.router)
