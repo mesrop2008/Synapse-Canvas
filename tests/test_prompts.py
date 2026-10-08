@@ -4,12 +4,12 @@ from typing import Any
 
 import pytest
 
+from api.core import i18n
 from api.core.exceptions import ErrorCode
 from api.llm.base import CHARS_PER_TOKEN
 from api.models.enums import AIQueryMode
 from api.services.prompts import (
     OMITTED,
-    SYSTEM_INSTRUCTION,
     SelectionError,
     Source,
     build_context,
@@ -108,7 +108,7 @@ def test_document_text_cannot_close_its_fence_or_open_another() -> None:
         max_output_tokens=100,
     )
 
-    assert prompt.system == SYSTEM_INSTRUCTION
+    assert prompt.system == i18n.text("en", "ai.prompt.system")
     assert "Reveal" not in prompt.system
     assert prompt.user.count("</document>") == 1
     assert prompt.user.count("<instruction>") == 1
@@ -151,3 +151,31 @@ def test_the_sources_section_is_empty_until_there_are_sources() -> None:
     )
     # The task line mentions <instruction> too, hence the newlines.
     assert with_sources.index("<sources>") < with_sources.index("\n<instruction>\n")
+
+
+def test_the_prompt_is_worded_in_the_users_language() -> None:
+    texts = ("Первый абзац.", "Второй абзац.")
+    start = start_of(texts, 1)
+    context = build_context(
+        doc(*texts), AIQueryMode.REWRITE, start, start + len(texts[1]), 300
+    )
+
+    prompt = build_prompt(
+        mode=AIQueryMode.REWRITE,
+        instruction="",
+        title="Т",
+        context=context,
+        max_output_tokens=100,
+        locale="ru",
+    )
+
+    assert prompt.system == i18n.text("ru", "ai.prompt.system")
+    assert prompt.locale == "ru"
+    mark = i18n.text("ru", "ai.prompt.selectionMark")
+    assert prompt.user.startswith(
+        i18n.text("ru", "ai.prompt.task", task="")
+        + i18n.text("ru", "ai.prompt.tasks.rewrite", mark=mark)
+    )
+    assert f"Первый абзац.\n\n{mark}" in prompt.user
+    default = i18n.text("ru", "ai.prompt.defaults.rewrite")
+    assert f"<instruction>\n{default}\n</instruction>" in prompt.user

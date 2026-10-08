@@ -16,7 +16,7 @@ from fastapi.responses import StreamingResponse
 
 from api.core.exceptions import AppError, ErrorCode
 from api.core.redis import get_redis
-from api.dependencies import DbSession, DocumentEditor, DocumentViewer
+from api.dependencies import DbSession, DocumentEditor, DocumentViewer, RequestLocale
 from api.models.enums import AIQueryStatus
 from api.schemas.ai import AIQueryApply, AIQueryCreate, AIQueryPage, AIQueryRead
 from api.schemas.document import DocumentRead, DocumentVersionConflict
@@ -64,7 +64,11 @@ def _decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
     },
 )
 async def create_query(
-    payload: AIQueryCreate, scope: DocumentEditor, db: DbSession, request: Request
+    payload: AIQueryCreate,
+    scope: DocumentEditor,
+    db: DbSession,
+    request: Request,
+    locale: RequestLocale,
 ) -> AIQueryRead:
     query, llm_request = await ai_queries.create_query(
         db,
@@ -74,6 +78,7 @@ async def create_query(
         instruction=payload.instruction,
         selection_from=payload.selection_from,
         selection_to=payload.selection_to,
+        locale=locale,
     )
     await request.app.state.ai.start(query.id, llm_request)
     return AIQueryRead.model_validate(query)

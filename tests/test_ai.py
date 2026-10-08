@@ -20,6 +20,7 @@ from httpx import ASGITransport, AsyncClient, Response
 from redis.asyncio import Redis
 from sqlalchemy import delete, func, select
 
+from api.core import i18n
 from api.core.config import get_settings
 from api.core.security import create_access_token
 from api.db.session import get_engine, get_sessionmaker
@@ -797,3 +798,21 @@ async def test_cancel_reaches_geminis_http_connection(
     assert stub.closed_early == 1
     assert stub.served < 200
     assert stream.last == ("cancelled", {})
+
+
+# --- Language ---
+
+
+async def test_a_russian_client_gets_russian_wording(
+    app: FastAPI, http: AsyncClient, live: Live
+) -> None:
+    provider = FakeProvider()
+    app.state.ai.provider = provider
+    headers = {**live.auth(), "Accept-Language": "ru"}
+
+    created = await http.post(live.base, json={"mode": "summarize"}, headers=headers)
+    query = created.json()
+    stream = await read_stream(app, f"{live.base}/{query['id']}/stream", live.auth())
+
+    assert provider.requests[0].system == i18n.text("ru", "ai.prompt.system")
+    assert stream.text == i18n.text("ru", "ai.fake.reply")

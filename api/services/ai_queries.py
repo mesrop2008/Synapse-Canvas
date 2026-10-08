@@ -12,6 +12,7 @@ from typing import Any
 from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.core import i18n
 from api.core.config import get_settings
 from api.core.exceptions import ConflictError, ErrorCode, NotFoundError
 from api.llm.base import LLMRequest, Usage, estimate_tokens
@@ -65,6 +66,7 @@ async def create_query(
     instruction: str,
     selection_from: int | None,
     selection_to: int | None,
+    locale: i18n.Locale = i18n.DEFAULT_LOCALE,
 ) -> tuple[AIQuery, LLMRequest]:
     """The prompt is built now, against the document as the user sees it, and
     handed to the runner in memory; only the instruction is stored."""
@@ -100,6 +102,7 @@ async def create_query(
         title=document.title,
         context=context,
         max_output_tokens=settings.ai_max_output_tokens,
+        locale=locale,
     )
 
     await ai_usage.lock_workspace(db, document.workspace_id)
