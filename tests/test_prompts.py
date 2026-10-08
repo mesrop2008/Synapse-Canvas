@@ -151,3 +151,31 @@ def test_the_sources_section_is_empty_until_there_are_sources() -> None:
     )
     # The task line mentions <instruction> too, hence the newlines.
     assert with_sources.index("<sources>") < with_sources.index("\n<instruction>\n")
+
+
+def test_the_prompt_is_worded_in_the_users_language() -> None:
+    texts = ("Первый абзац.", "Второй абзац.")
+    start = start_of(texts, 1)
+    context = build_context(
+        doc(*texts), AIQueryMode.REWRITE, start, start + len(texts[1]), 300
+    )
+
+    prompt = build_prompt(
+        mode=AIQueryMode.REWRITE,
+        instruction="",
+        title="Т",
+        context=context,
+        max_output_tokens=100,
+        locale="ru",
+    )
+
+    assert prompt.system == i18n.text("ru", "ai.prompt.system")
+    assert prompt.locale == "ru"
+    mark = i18n.text("ru", "ai.prompt.selectionMark")
+    assert prompt.user.startswith(
+        i18n.text("ru", "ai.prompt.task", task="")
+        + i18n.text("ru", "ai.prompt.tasks.rewrite", mark=mark)
+    )
+    assert f"Первый абзац.\n\n{mark}" in prompt.user
+    default = i18n.text("ru", "ai.prompt.defaults.rewrite")
+    assert f"<instruction>\n{default}\n</instruction>" in prompt.user
