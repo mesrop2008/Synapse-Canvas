@@ -22,10 +22,12 @@ from api.core.exceptions import (
 )
 from api.core.security import ACCESS_TOKEN, decode_token, subject_uuid
 from api.db.session import get_db
+from api.models.document import Document
 from api.models.enums import WorkspaceRole
 from api.models.user import User
 from api.models.workspace import Workspace
 from api.services import auth_service, rate_limit_service, workspace_service
+from api.services import documents as document_service
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
@@ -110,6 +112,42 @@ class WorkspaceAccess:
 RequireViewer = Annotated[WorkspaceContext, Depends(WorkspaceAccess(WorkspaceRole.VIEWER))]
 RequireEditor = Annotated[WorkspaceContext, Depends(WorkspaceAccess(WorkspaceRole.EDITOR))]
 RequireOwner = Annotated[WorkspaceContext, Depends(WorkspaceAccess(WorkspaceRole.OWNER))]
+
+
+@dataclass(frozen=True, slots=True)
+class DocumentScope:
+    document: Document
+    role: WorkspaceRole
+    user: User
+
+
+class DocumentAccess:
+    """`WorkspaceAccess` for routes addressed by `{document_id}` alone, with
+    the same 404-then-403 rules."""
+
+    def __init__(self, minimum_role: WorkspaceRole) -> None:
+        self.minimum_role = minimum_role
+
+    async def __call__(
+        self,
+        document_id: uuid.UUID,
+        db: DbSession,
+        current_user: CurrentUser,
+    ) -> DocumentScope:
+        document, role = await document_service.get_document_for_user(
+            db, document_id, current_user.id
+        )
+        if not role.satisfies(self.minimum_role):
+            raise PermissionDeniedError(
+                f"This action requires the '{self.minimum_role}' role or higher; "
+                f"your role is '{role}'.",
+                code=ErrorCode.ROLE_TOO_LOW,
+            )
+        return DocumentScope(document=document, role=role, user=current_user)
+
+
+DocumentViewer = Annotated[DocumentScope, Depends(DocumentAccess(WorkspaceRole.VIEWER))]
+DocumentEditor = Annotated[DocumentScope, Depends(DocumentAccess(WorkspaceRole.EDITOR))]
 
 
 def client_ip(request: Request) -> str:

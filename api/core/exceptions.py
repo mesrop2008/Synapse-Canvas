@@ -46,6 +46,13 @@ class ErrorCode(StrEnum):
     AI_CONTENT_FILTERED = "ai.content_filtered"
     AI_UPSTREAM_UNAVAILABLE = "ai.upstream_unavailable"
     AI_INVALID_KEY = "ai.invalid_key"
+    AI_SELECTION_INVALID = "ai.selection_invalid"
+    AI_DAILY_LIMIT = "ai.daily_limit"
+    AI_CONCURRENCY_LIMIT = "ai.concurrency_limit"
+    AI_TIMEOUT = "ai.timeout"
+    AI_INTERRUPTED = "ai.interrupted"
+    AI_QUERY_NOT_FOUND = "ai.query_not_found"
+    AI_QUERY_NOT_COMPLETED = "ai.query_not_completed"
 
 
 class AppError(Exception):
