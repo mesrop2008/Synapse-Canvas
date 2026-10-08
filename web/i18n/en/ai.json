@@ -1,0 +1,53 @@
+{
+  "title": "AI assistant",
+  "modeLabel": "What the AI should do",
+  "modes": {
+    "continue": "Continue",
+    "rewrite": "Rewrite",
+    "summarize": "Summarize",
+    "ask": "Ask"
+  },
+  "hints": {
+    "continue": "Writes on from your cursor, in the document's style.",
+    "rewrite": "Rewrites the text you have selected.",
+    "summarize": "Summarizes the whole document.",
+    "ask": "Answers a question about the document."
+  },
+  "instructionLabel": "Instruction",
+  "placeholders": {
+    "continue": "Optional — e.g. “add an example”",
+    "rewrite": "Optional — e.g. “more formal”",
+    "summarize": "Optional — e.g. “three short points”",
+    "ask": "What do you want to know?"
+  },
+  "selected": "Selected: “{text}”",
+  "selectFirst": "Select text in the document to rewrite it.",
+  "generate": "Generate",
+  "stop": "Stop",
+  "writing": "Writing…",
+  "stopped": "Stopped. Nothing was added to the document.",
+  "empty": "The response came back empty.",
+  "original": "Original",
+  "proposed": "Proposed",
+  "insert": "Insert",
+  "inserting": "Inserting…",
+  "discard": "Discard",
+  "inserted": "Inserted into the document.",
+  "insertWhere": {
+    "rewrite": "Insert replaces the original text.",
+    "other": "Insert adds it after the paragraph with your cursor."
+  },
+  "used": "{tokens} tokens · {model}",
+  "budget": {
+    "label": "Today's AI budget",
+    "left": "{left} of {limit} tokens left",
+    "unlimited": "No daily token limit",
+    "resets": "Resets at {time}"
+  },
+  "insertErrors": {
+    "stale": "Someone edited the document just now. Try Insert again.",
+    "lost": "The document was reloaded, so the original text can no longer be found. Select it and rewrite again.",
+    "busy": "Pause typing for a moment, then Insert.",
+    "offline": "Insert is paused until the document reconnects."
+  }
+}

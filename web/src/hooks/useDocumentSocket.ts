@@ -42,6 +42,10 @@ export interface DocumentSocket {
   peers: PeerPresence[];
   /** Hand over what changed locally; the hook decides when it goes out. */
   queueEdit: (steps: unknown[], doc: ProseMirrorDoc) => void;
+  /** True when every local edit has been acknowledged, so the editor shows
+   *  exactly the server's document at `currentVersion()`. */
+  isSettled: () => boolean;
+  currentVersion: () => number;
   sendCursor: (anchor: number, head: number) => void;
 }
 
@@ -136,6 +140,12 @@ export function useDocumentSocket(
     (anchor: number, head: number) => send({ type: 'cursor', anchor, head }),
     [send],
   );
+
+  const isSettled = useCallback(
+    () => pending.current === null && !awaitingAck.current,
+    [],
+  );
+  const currentVersion = useCallback(() => versionRef.current, []);
 
   const dropSocket = useCallback(() => {
     const live = socket.current;
@@ -362,5 +372,7 @@ export function useDocumentSocket(
     peers,
     queueEdit,
     sendCursor,
+    isSettled,
+    currentVersion,
   };
 }

@@ -7,6 +7,7 @@ import { Placeholder } from '@tiptap/extensions';
 import { Step } from '@tiptap/pm/transform';
 
 import { describeFailure, errorMessage } from '../api/errors';
+import { AIPanel } from '../components/AIPanel';
 import { Alert } from '../components/Alert';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ConnectionIndicator } from '../components/ConnectionIndicator';
@@ -214,73 +215,88 @@ function DocumentEditor({
   }
 
   return (
-    <main className="container container-reading">
-      <nav className="crumbs">
-        <Link to="/workspaces">{t('layout.workspaces')}</Link>
-        <ChevronRightIcon size={14} />
-        <Link to={`/workspaces/${workspaceId}`}>{workspaceName}</Link>
-      </nav>
+    <main className={writable ? 'container doc-layout' : 'container container-reading'}>
+      <div className="doc-main">
+        <nav className="crumbs">
+          <Link to="/workspaces">{t('layout.workspaces')}</Link>
+          <ChevronRightIcon size={14} />
+          <Link to={`/workspaces/${workspaceId}`}>{workspaceName}</Link>
+        </nav>
 
-      {reloaded && (
-        <Alert kind="warn" onDismiss={() => setReloaded(null)}>
-          {t(
-            reloaded === 'rejected'
-              ? 'document.reloaded.rejected'
-              : 'document.reloaded.diverged',
-          )}
-        </Alert>
-      )}
+        {reloaded && (
+          <Alert kind="warn" onDismiss={() => setReloaded(null)}>
+            {t(
+              reloaded === 'rejected'
+                ? 'document.reloaded.rejected'
+                : 'document.reloaded.diverged',
+            )}
+          </Alert>
+        )}
 
-      {gone && (
-        <Alert>
-          {t(
-            socket.state === 'deleted'
-              ? 'document.gone.deleted'
-              : 'document.gone.unavailable',
-          )}{' '}
-          <Link to={`/workspaces/${workspaceId}`}>
-            {t('document.backToWorkspace')}
-          </Link>
-        </Alert>
-      )}
+        {gone && (
+          <Alert>
+            {t(
+              socket.state === 'deleted'
+                ? 'document.gone.deleted'
+                : 'document.gone.unavailable',
+            )}{' '}
+            <Link to={`/workspaces/${workspaceId}`}>
+              {t('document.backToWorkspace')}
+            </Link>
+          </Alert>
+        )}
 
-      {writable && !live && !gone && (
-        <Alert kind="warn">
-          {t(
-            socket.state === 'offline'
-              ? 'document.offline.stalled'
-              : 'document.offline.connecting',
-          )}
-        </Alert>
-      )}
+        {writable && !live && !gone && (
+          <Alert kind="warn">
+            {t(
+              socket.state === 'offline'
+                ? 'document.offline.stalled'
+                : 'document.offline.connecting',
+            )}
+          </Alert>
+        )}
 
-      {titleSave.error && (
-        <Alert onDismiss={titleSave.clearError}>
-          {describeFailure(titleSave.error)}
-        </Alert>
-      )}
+        {titleSave.error && (
+          <Alert onDismiss={titleSave.clearError}>
+            {describeFailure(titleSave.error)}
+          </Alert>
+        )}
 
-      <div className="doc-head">
-        <input
-          className="doc-title"
-          aria-label={t('document.titleLabel')}
-          value={title}
-          maxLength={255}
-          readOnly={!writable || !live}
-          onChange={(event) => handleTitleChange(event.target.value)}
-        />
-        <div className="doc-status">
-          <PeerList peers={socket.peers} />
-          {!writable && <span className="badge">{t('document.readOnly')}</span>}
-          <ConnectionIndicator state={socket.state} version={socket.version} />
+        <div className="doc-head">
+          <input
+            className="doc-title"
+            aria-label={t('document.titleLabel')}
+            value={title}
+            maxLength={255}
+            readOnly={!writable || !live}
+            onChange={(event) => handleTitleChange(event.target.value)}
+          />
+          <div className="doc-status">
+            <PeerList peers={socket.peers} />
+            {!writable && <span className="badge">{t('document.readOnly')}</span>}
+            <ConnectionIndicator state={socket.state} version={socket.version} />
+          </div>
+        </div>
+
+        {writable && editor && <Toolbar editor={editor} disabled={!live} />}
+
+        <div className="paper">
+          <EditorContent editor={editor} />
         </div>
       </div>
 
-      {writable && editor && <Toolbar editor={editor} disabled={!live} />}
-
-      <div className="paper">
-        <EditorContent editor={editor} />
-      </div>
+      {writable && editor && (
+        <AIPanel
+          editor={editor}
+          documentId={loaded.id}
+          workspaceId={workspaceId}
+          socket={{
+            live,
+            isSettled: socket.isSettled,
+            currentVersion: socket.currentVersion,
+          }}
+        />
+      )}
 
       {blocker.state === 'blocked' && (
         <ConfirmDialog

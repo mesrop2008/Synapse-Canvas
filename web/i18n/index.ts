@@ -2,6 +2,7 @@
  *  BCP-47 locale `ru`. React-free, for the fetch client and error formatter. */
 
 import enAccount from './en/account.json';
+import enAi from './en/ai.json';
 import enCommon from './en/common.json';
 import enDocument from './en/document.json';
 import enErrors from './en/errors.json';
@@ -14,6 +15,7 @@ import enWorkspace from './en/workspace.json';
 import enWorkspaces from './en/workspaces.json';
 
 import ruAccount from './rus/account.json';
+import ruAi from './rus/ai.json';
 import ruCommon from './rus/common.json';
 import ruDocument from './rus/document.json';
 import ruErrors from './rus/errors.json';
@@ -40,6 +42,7 @@ const english = {
   workspaces: enWorkspaces,
   workspace: enWorkspace,
   document: enDocument,
+  ai: enAi,
   errors: enErrors,
 };
 
@@ -59,6 +62,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     workspaces: ruWorkspaces,
     workspace: ruWorkspace,
     document: ruDocument,
+    ai: ruAi,
     errors: ruErrors,
   },
 };

@@ -160,3 +160,61 @@ export const ROLE_RANK: Record<WorkspaceRole, number> = {
 export function canEdit(role: WorkspaceRole): boolean {
   return ROLE_RANK[role] >= ROLE_RANK.editor;
 }
+
+/* AI assistant: mirrors api/schemas/ai.py and the events in api/services/ai_runner.py. */
+
+export type AIQueryMode = 'continue' | 'rewrite' | 'summarize' | 'ask';
+
+export type AIQueryStatus = 'streaming' | 'completed' | 'cancelled' | 'failed';
+
+export interface AIQuery {
+  id: string;
+  document_id: string;
+  workspace_id: string;
+  user_id: string | null;
+  /** The user's instruction, not the assembled prompt. */
+  prompt: string;
+  mode: AIQueryMode;
+  /** ProseMirror positions. For rewrite, snapped by the server to what apply replaces. */
+  selection_from: number | null;
+  selection_to: number | null;
+  status: AIQueryStatus;
+  response: string | null;
+  error_code: string | null;
+  model: string | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  created_at: Timestamp;
+  completed_at: Timestamp | null;
+}
+
+export interface AIQueryInput {
+  mode: AIQueryMode;
+  instruction: string;
+  selection_from?: number;
+  selection_to?: number;
+}
+
+export interface AIUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  model: string | null;
+}
+
+export type AIStreamEvent =
+  | { type: 'token'; text: string }
+  /** `response` is the whole text, authoritative over the tokens. */
+  | { type: 'done'; response: string; usage: AIUsage }
+  | { type: 'error'; code: string; detail: string }
+  | { type: 'cancelled' };
+
+export interface WorkspaceUsage {
+  day: string;
+  tokens_used: number;
+  tokens_remaining: number;
+  /** 0 means no daily limit. */
+  daily_token_limit: number;
+  streaming_queries: number;
+  max_concurrent_queries: number;
+  resets_at: Timestamp;
+}
