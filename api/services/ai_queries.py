@@ -3,6 +3,7 @@ history, and the one write that records how a generation ended."""
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -140,6 +141,17 @@ async def list_queries(
         )
     rows = list((await db.scalars(statement)).all())
     return rows[:limit], len(rows) > limit
+
+
+async def wait_until_ended(
+    db: AsyncSession, query: AIQuery, timeout_seconds: float
+) -> AIQuery:
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout_seconds
+    while query.status is AIQueryStatus.STREAMING and loop.time() < deadline:
+        await asyncio.sleep(0.05)
+        await db.refresh(query)
+    return query
 
 
 async def finish(db: AsyncSession, query_id: uuid.UUID, outcome: Outcome) -> bool:
