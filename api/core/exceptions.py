@@ -40,6 +40,13 @@ class ErrorCode(StrEnum):
     DOCUMENT_NOT_FOUND = "document.not_found"
     DOCUMENT_STALE = "document.stale"
 
+    AI_FAILED = "ai.failed"
+    AI_RATE_LIMITED = "ai.rate_limited"
+    AI_CONTEXT_TOO_LONG = "ai.context_too_long"
+    AI_CONTENT_FILTERED = "ai.content_filtered"
+    AI_UPSTREAM_UNAVAILABLE = "ai.upstream_unavailable"
+    AI_INVALID_KEY = "ai.invalid_key"
+
 
 class AppError(Exception):
     status_code: int = 500
