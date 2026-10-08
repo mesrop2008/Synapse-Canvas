@@ -55,6 +55,18 @@ class AIQueryRead(BaseModel):
     completed_at: datetime | None
 
 
+class AIQueryApply(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: int = Field(ge=1, description="The document version the client sees.")
+    selection_from: int | None = Field(
+        default=None,
+        ge=0,
+        description="The stored range, mapped through edits since; omit to use it as is.",
+    )
+    selection_to: int | None = Field(default=None, ge=0)
+
+
 class AIQueryPage(BaseModel):
     items: list[AIQueryRead]
     next_cursor: str | None = Field(

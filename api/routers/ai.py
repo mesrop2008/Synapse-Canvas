@@ -18,7 +18,8 @@ from api.core.exceptions import AppError, ErrorCode
 from api.core.redis import get_redis
 from api.dependencies import DbSession, DocumentEditor, DocumentViewer
 from api.models.enums import AIQueryStatus
-from api.schemas.ai import AIQueryCreate, AIQueryPage, AIQueryRead
+from api.schemas.ai import AIQueryApply, AIQueryCreate, AIQueryPage, AIQueryRead
+from api.schemas.document import DocumentRead, DocumentVersionConflict
 from api.services import ai_buffer, ai_queries, ai_stream
 
 router = APIRouter(prefix="/documents/{document_id}/ai/queries", tags=["ai"])
@@ -142,6 +143,49 @@ async def cancel_query(
         await ai_buffer.request_cancel(get_redis(), query.id)
         query = await ai_queries.wait_until_ended(db, query, CANCEL_WAIT_SECONDS)
     return AIQueryRead.model_validate(query)
+
+
+@router.post(
+    "/{query_id}/apply",
+    response_model=DocumentRead,
+    summary="Insert a completed response into the document (editor or owner)",
+    responses={
+        **_RESPONSES,
+        403: {"description": "Caller is only a viewer"},
+        409: {
+            "description": "Stale version, or the query has no completed response",
+            "model": DocumentVersionConflict,
+        },
+    },
+)
+async def apply_query(
+    query_id: uuid.UUID,
+    payload: AIQueryApply,
+    scope: DocumentEditor,
+    db: DbSession,
+    request: Request,
+) -> DocumentRead:
+    query = await ai_queries.get_query(db, scope.document.id, query_id, scope.user.id)
+    applied = await ai_queries.apply_query(
+        db,
+        query,
+        user_id=scope.user.id,
+        version=payload.version,
+        selection_from=payload.selection_from,
+        selection_to=payload.selection_to,
+    )
+    # As PATCH does, with no origin: the caller's own editor takes the change
+    # from its socket like everyone else's.
+    await request.app.state.hub.publish(
+        scope.document.id,
+        {
+            "type": "edit",
+            "version": applied.version,
+            "operation": applied.operation,
+            "user_id": str(scope.user.id),
+        },
+    )
+    return DocumentRead.model_validate(applied.document)
 
 
 @router.get(
