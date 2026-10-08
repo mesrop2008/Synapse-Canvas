@@ -418,3 +418,204 @@ async def test_a_finished_query_is_replayed_from_its_row_once_redis_forgets_it(
     assert len(replay.events) == 1
     assert replay.last[0] == "done"
     assert replay.last[1]["response"] == "".join(WORDS)
+
+
+# --- Access ---
+
+
+async def test_a_viewer_cannot_start_a_query(http: AsyncClient, live: Live) -> None:
+    refused = await create(http, live, WorkspaceRole.VIEWER)
+
+    assert refused.status_code == 403
+    assert refused.json()["code"] == "workspace.role_too_low"
+    async with get_sessionmaker()() as db:
+        count = await db.scalar(
+            select(func.count()).where(AIQuery.document_id == live.document_id)
+        )
+    assert count == 0
+
+
+async def test_a_non_member_cannot_see_the_document(
+    http: AsyncClient, live: Live
+) -> None:
+    stranger = {"Authorization": "Bearer " + create_access_token(uuid.uuid4())}
+    response = await http.post(live.base, json={"mode": "summarize"}, headers=stranger)
+    assert response.status_code == 401
+
+    async with get_sessionmaker()() as db:
+        outsider = User(
+            email=f"outsider-{uuid.uuid4().hex[:12]}@example.com",
+            hashed_password="not-a-real-hash",
+            name="Outsider",
+        )
+        db.add(outsider)
+        await db.commit()
+    try:
+        headers = {"Authorization": "Bearer " + create_access_token(outsider.id)}
+        response = await http.post(live.base, json={"mode": "summarize"}, headers=headers)
+        assert response.status_code == 404
+    finally:
+        async with get_sessionmaker()() as db:
+            await db.execute(delete(User).where(User.id == outsider.id))
+            await db.commit()
+
+
+async def test_a_query_is_visible_only_to_its_author(
+    app: FastAPI, http: AsyncClient, live: Live
+) -> None:
+    query = (await create(http, live)).json()
+    owner = live.auth(WorkspaceRole.OWNER)
+
+    cancel = await http.post(f"{live.base}/{query['id']}/cancel", headers=owner)
+    assert cancel.status_code == 404
+    history = await http.get(live.base, headers=owner)
+    assert history.json()["items"] == []
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"mode": "ask"},
+        {"mode": "rewrite", "instruction": "Shorter"},
+        {"mode": "rewrite", "selection_from": 5, "selection_to": 5},
+        {"mode": "rewrite", "selection_from": 9, "selection_to": 5},
+        {"mode": "continue", "selection_to": 10_000},
+        {"mode": "summarize", "instruction": "x" * 2001},
+    ],
+)
+async def test_an_impossible_request_is_refused_before_it_costs_anything(
+    app: FastAPI, http: AsyncClient, live: Live, body: dict[str, Any]
+) -> None:
+    response = await http.post(live.base, json=body, headers=live.auth())
+
+    assert response.status_code == 422, response.text
+    assert app.state.ai.provider.started == 0
+
+
+# --- Limits ---
+
+
+async def test_the_daily_token_ceiling_returns_429(
+    app: FastAPI, http: AsyncClient, live: Live, ai_settings: Any
+) -> None:
+    ai_settings(ai_daily_token_limit=50)
+
+    refused = await create(http, live)
+
+    assert refused.status_code == 429
+    assert refused.json()["code"] == "ai.daily_limit"
+    assert "50" in refused.json()["detail"]
+    assert int(refused.headers["Retry-After"]) > 0
+    assert app.state.ai.provider.started == 0
+
+
+async def test_usage_is_recorded_when_a_query_ends_and_counts_against_the_day(
+    app: FastAPI, http: AsyncClient, live: Live, ai_settings: Any
+) -> None:
+    query = (await create(http, live)).json()
+    await read_stream(app, f"{live.base}/{query['id']}/stream", live.auth())
+    row = await load_query(query["id"])
+    spent = (row.prompt_tokens or 0) + (row.completion_tokens or 0)
+
+    usage = await http.get(
+        f"/workspaces/{live.workspace_id}/usage", headers=live.auth(WorkspaceRole.VIEWER)
+    )
+    assert usage.status_code == 200
+    assert usage.json()["tokens_used"] == spent
+    assert usage.json()["tokens_remaining"] == 200_000 - spent
+
+    # Room for less than another prompt of the same size.
+    ai_settings(ai_daily_token_limit=spent + 10)
+    refused = await create(http, live)
+    assert refused.status_code == 429
+    assert refused.json()["code"] == "ai.daily_limit"
+
+
+async def test_concurrent_generations_are_capped_per_workspace(
+    app: FastAPI, http: AsyncClient, live: Live, ai_settings: Any
+) -> None:
+    ai_settings(ai_max_concurrent_queries=1)
+    slow_provider(app)
+    first = (await create(http, live)).json()
+
+    refused = await create(http, live, WorkspaceRole.OWNER)
+    assert refused.status_code == 429
+    assert refused.json()["code"] == "ai.concurrency_limit"
+
+    await http.post(f"{live.base}/{first['id']}/cancel", headers=live.auth())
+    assert (await create(http, live, WorkspaceRole.OWNER)).status_code == 201
+
+
+async def test_two_requests_cannot_both_take_the_last_slot(
+    app: FastAPI, http: AsyncClient, live: Live, ai_settings: Any
+) -> None:
+    ai_settings(ai_max_concurrent_queries=1)
+    slow_provider(app)
+
+    responses = await asyncio.gather(*(create(http, live) for _ in range(4)))
+
+    assert sorted(r.status_code for r in responses) == [201, 429, 429, 429]
+
+
+# --- History ---
+
+
+async def test_history_pages_newest_first(
+    app: FastAPI, http: AsyncClient, live: Live, ai_settings: Any
+) -> None:
+    ai_settings(ai_max_concurrent_queries=0)
+    ids = [(await create(http, live, instruction=f"q{i}")).json()["id"] for i in range(3)]
+
+    first = (await http.get(live.base, params={"limit": 2}, headers=live.auth())).json()
+    second = (
+        await http.get(
+            live.base,
+            params={"limit": 2, "cursor": first["next_cursor"]},
+            headers=live.auth(),
+        )
+    ).json()
+
+    assert [item["id"] for item in first["items"]] == ids[:0:-1]
+    assert [item["id"] for item in second["items"]] == ids[:1]
+    assert second["next_cursor"] is None
+
+    bad = await http.get(live.base, params={"cursor": "nonsense"}, headers=live.auth())
+    assert bad.status_code == 422
+
+
+# --- Prompt assembly through the API ---
+
+
+async def test_a_long_document_is_cut_from_the_middle_keeping_the_selection(
+    app: FastAPI, http: AsyncClient, live: Live, ai_settings: Any
+) -> None:
+    ai_settings(ai_context_token_limit=200)
+    selected = "Keep every word of this sentence."
+    content = doc("The opening line.", "filler " * 2000, selected, "trailing " * 2000)
+    async with get_sessionmaker()() as db:
+        await document_service.update_document(
+            db,
+            workspace_id=live.workspace_id,
+            document_id=live.document_id,
+            expected_version=1,
+            content=content,
+        )
+    start = (len("The opening line.") + 2) + (len("filler " * 2000) + 2) + 1
+    provider: FakeProvider = app.state.ai.provider
+
+    created = await create(
+        http,
+        live,
+        mode="rewrite",
+        instruction="Tighten it",
+        selection_from=start,
+        selection_to=start + len(selected),
+    )
+
+    assert created.status_code == 201, created.text
+    await started(provider)
+    prompt = provider.requests[0].user
+    assert f"<selection>\n{selected}\n</selection>" in prompt
+    assert "The opening line." in prompt
+    assert "[…]" in prompt
+    assert len(prompt) < 200 * 3 + 1000
