@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { cancelQuery, cancelQueryOnUnload, createQuery, streamQuery } from '../api/ai';
 import { ApiError } from '../api/client';
+import { translate } from '../../i18n';
 import type { AIQuery, AIQueryInput, AIUsage } from '../types/api';
 
 export type AIStreamStatus = 'idle' | 'streaming' | 'done' | 'cancelled' | 'error';
@@ -140,7 +141,12 @@ export function useAIStream(documentId: string): AIStream {
         if (state.outcome !== null || signal.aborted) break;
 
         if (resumes >= MAX_RESUMES) {
-          failure = new ApiError(0, 'Lost the connection to the response', null, 'ai.stream_lost');
+          failure = new ApiError(
+            0,
+            translate('errors.api.ai.stream_lost'),
+            null,
+            'ai.stream_lost',
+          );
           state.outcome = 'error';
           break;
         }
