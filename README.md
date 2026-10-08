@@ -3,9 +3,9 @@
 A real-time collaborative workspace where teams write documents together, upload source
 material, and query an LLM that answers with citations from those sources.
 
-**Part 3 of 6** — auth, workspaces, and documents edited live over a WebSocket, with an
-append-only change log, Redis presence and remote cursors. English and Russian.
-161 backend tests.
+**Part 4 of 6** — auth, workspaces, documents edited live over a WebSocket, and an
+AI assistant whose responses stream over server-sent events and are inserted as
+ordinary versioned edits. English and Russian. 280 backend tests.
 
 ## Stack
 
@@ -21,6 +21,7 @@ append-only change log, Redis presence and remote cursors. English and Russian.
 | Routing | React Router |
 | Server state | TanStack Query |
 | Editor | Tiptap 3 |
+| LLM | Gemini via `google-genai`, or a scripted fake |
 | Tests | pytest, httpx |
 
 ## Quick start
@@ -89,10 +90,64 @@ Settings are commented in [`.env.example`](.env.example).
 | Tests | `pytest` |
 
 
+## AI assistant
+
+Beside the editor, editors and owners get a panel with four modes: **continue**
+from the cursor, **rewrite** the selection, **summarize** the document, or
+**ask** about it. Tokens render as they arrive; the finished response is a
+preview, and nothing enters the document until **Insert**.
+
+### Running without a key
+
+Nothing to do: `LLM_PROVIDER` defaults to `fake`, which streams a scripted reply
+word by word (`FAKE_LLM_DELAY_SECONDS` apart) with no key and no network. The
+whole feature — streaming, cancel, insert, budgets — works against it, and every
+test uses it. It is refused outside `ENVIRONMENT=local` or `test`, so a
+deployment cannot ship it by accident.
+
+### Using Gemini
+
+```bash
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=...        # https://aistudio.google.com/apikey
+GEMINI_MODEL=gemini-2.5-flash
+```
+
+Without a key the app still starts; it logs a warning and each query fails with
+`ai.invalid_key`. The key is a `SecretStr` and is never logged.
+
+### Providers
+
+[`api/llm/base.py`](api/llm/base.py) defines `LLMProvider`: one `stream()`
+method yielding text chunks and then a single `Usage` (prompt tokens,
+completion tokens, model). [`GeminiProvider`](api/llm/gemini.py) and
+[`FakeProvider`](api/llm/fake.py) implement it, and `LLM_PROVIDER` picks one at
+startup. SDK failures are mapped onto our own errors in
+[`api/llm/errors.py`](api/llm/errors.py) — rate limited, context too long,
+content filtered, upstream unavailable, invalid key — each carrying the error
+code the client translates, so no SDK exception reaches a router. A second
+provider is one more class and one more branch in `build_provider`.
+
+### Budgets
+
+Per workspace, enforced when a query is created (429 with its own code and
+message) and counted when it ends:
+
+| Setting | Default | |
+|---|---|---|
+| `AI_DAILY_TOKEN_LIMIT` | 200000 | Prompt + completion tokens per UTC day; 0 turns it off |
+| `AI_MAX_CONCURRENT_QUERIES` | 2 | Generations streaming at once; 0 turns it off |
+| `AI_CONTEXT_TOKEN_LIMIT` | 6000 | Document text sent with one query |
+| `AI_MAX_OUTPUT_TOKENS` | 1024 | Per response |
+| `AI_RECONNECT_GRACE_SECONDS` | 10 | How long a generation survives with no reader |
+
+`GET /workspaces/{id}/usage` returns the day's use, and the panel shows what is
+left. A stopped generation still counts, at an estimate: the provider reports
+usage only at the end, but the prompt and partial output were billed.
+
 ## Roadmap
 
 | Part | |
 |---|---|
-| 4 | AI responses streamed over SSE |
 | 5 | File upload and pgvector retrieval |
 | 6 | Hardening and deployment |
