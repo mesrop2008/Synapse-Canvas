@@ -36,6 +36,8 @@ from api.main import create_app
 from api.models import AIQuery, DocumentChange, User, Workspace, WorkspaceMember
 from api.models.enums import AIQueryStatus, WorkspaceRole
 from api.services import documents as document_service
+from tests.test_ai_gemini import GeminiStub
+from tests.test_ai_gemini import chunk as gemini_chunk
 
 WORDS = ["Alpha ", "beta ", "gamma ", "delta ", "epsilon."]
 
@@ -767,3 +769,31 @@ async def test_a_viewer_cannot_apply(
 
     assert refused.status_code == 403
     assert await change_count(live.document_id) == 1
+
+
+# --- Through the real SDK ---
+
+
+async def test_cancel_reaches_geminis_http_connection(
+    app: FastAPI, http: AsyncClient, live: Live
+) -> None:
+    """The runner cancels the task awaiting the SDK, which is what closes the
+    response; closing the SDK's stream alone would leave it to the GC."""
+    stub = GeminiStub([gemini_chunk(f"w{i} ") for i in range(200)], delay=0.02)
+    app.state.ai.provider = stub.provider()
+    query = (await create(http, live)).json()
+    reader = asyncio.create_task(
+        read_stream(app, f"{live.base}/{query['id']}/stream", live.auth())
+    )
+    for _ in range(200):
+        if stub.served >= 3:
+            break
+        await asyncio.sleep(0.01)
+
+    cancelled = await http.post(f"{live.base}/{query['id']}/cancel", headers=live.auth())
+    stream = await reader
+
+    assert cancelled.json()["status"] == "cancelled"
+    assert stub.closed_early == 1
+    assert stub.served < 200
+    assert stream.last == ("cancelled", {})
