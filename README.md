@@ -5,7 +5,7 @@ material, and query an LLM that answers with citations from those sources.
 
 **Part 4 of 6** — auth, workspaces, documents edited live over a WebSocket, and an
 AI assistant whose responses stream over server-sent events and are inserted as
-ordinary versioned edits. English and Russian. 280 backend tests.
+ordinary versioned edits. English and Russian. 299 backend tests.
 
 ## Stack
 
@@ -168,7 +168,8 @@ usage only at the end, but the prompt and partial output were billed.
 - **Prompts** ([`api/services/prompts.py`](api/services/prompts.py)): rewrite
   sends the selection and its surroundings, continue the text before the
   cursor, summarize and ask the whole document. Over the ceiling the text is
-  cut from the middle, keeping the opening and never the selection. Document
+  cut from the middle, keeping the opening and never the selection. The
+  wording is in `api/i18n/{en,rus}/ai.json`, in the user's language. Document
   text is fenced in tags the system instruction calls data, which mitigates
   prompt injection but does not solve it. `sources_section()` is empty until
   Part 5 passes retrieved sources in.
