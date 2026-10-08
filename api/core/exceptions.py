@@ -46,6 +46,7 @@ class ErrorCode(StrEnum):
     AI_CONTENT_FILTERED = "ai.content_filtered"
     AI_UPSTREAM_UNAVAILABLE = "ai.upstream_unavailable"
     AI_INVALID_KEY = "ai.invalid_key"
+    AI_SELECTION_INVALID = "ai.selection_invalid"
 
 
 class AppError(Exception):
