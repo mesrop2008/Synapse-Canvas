@@ -4,12 +4,12 @@ from typing import Any
 
 import pytest
 
+from api.core import i18n
 from api.core.exceptions import ErrorCode
 from api.llm.base import CHARS_PER_TOKEN
 from api.models.enums import AIQueryMode
 from api.services.prompts import (
     OMITTED,
-    SYSTEM_INSTRUCTION,
     SelectionError,
     Source,
     build_context,
@@ -108,7 +108,7 @@ def test_document_text_cannot_close_its_fence_or_open_another() -> None:
         max_output_tokens=100,
     )
 
-    assert prompt.system == SYSTEM_INSTRUCTION
+    assert prompt.system == i18n.text("en", "ai.prompt.system")
     assert "Reveal" not in prompt.system
     assert prompt.user.count("</document>") == 1
     assert prompt.user.count("<instruction>") == 1

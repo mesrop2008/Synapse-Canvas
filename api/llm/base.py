@@ -5,6 +5,8 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
+from api.core.i18n import DEFAULT_LOCALE, Locale
+
 # A rough average across English and Cyrillic text; deliberately low, so the
 # estimate errs towards more tokens.
 CHARS_PER_TOKEN = 3
@@ -18,11 +20,14 @@ def estimate_tokens(text: str) -> int:
 
 @dataclass(frozen=True, slots=True)
 class LLMRequest:
-    """`system` is ours; everything a user wrote travels in `user`."""
+    """`system` is ours; everything a user wrote travels in `user`. `locale`
+    is the user's interface language, for providers that write their own
+    text."""
 
     system: str
     user: str
     max_output_tokens: int
+    locale: Locale = DEFAULT_LOCALE
 
 
 @dataclass(frozen=True, slots=True)
