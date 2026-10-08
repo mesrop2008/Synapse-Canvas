@@ -5,6 +5,22 @@
   "notSignedIn": "Not signed in",
   "status": "Request failed with status {status}",
   "api": {
+    "ai": {
+      "failed": "The AI could not complete this request. Try again.",
+      "rate_limited": "The AI provider is handling too many requests right now. Wait a minute and try again.",
+      "context_too_long": "That is more text than the AI can take at once. Select a shorter passage.",
+      "content_filtered": "The AI provider declined to respond to this content.",
+      "upstream_unavailable": "The AI provider is not responding. Try again in a few minutes.",
+      "invalid_key": "AI is not set up on this server: its API key is missing or was rejected. Ask whoever runs it to check GEMINI_API_KEY.",
+      "selection_invalid": "Select the text you want rewritten first.",
+      "daily_limit": "This workspace has used up today's AI budget. It resets at midnight UTC.",
+      "concurrency_limit": "This workspace already has as many AI responses in progress as it is allowed. Wait for one to finish.",
+      "timeout": "The response took too long and was stopped.",
+      "interrupted": "The server restarted while writing this response. Try again.",
+      "query_not_found": "That AI response no longer exists.",
+      "query_not_completed": "Only a finished response can be inserted.",
+      "stream_lost": "Lost the connection to the response. Check your network and try again."
+    },
     "auth": {
       "email_undeliverable": "That email domain does not exist or cannot receive mail. Check the address for typos.",
       "email_unverified": "Confirm your email address before signing in.",
