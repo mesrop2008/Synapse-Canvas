@@ -25,3 +25,6 @@ pyjwt>=2.9
 
 # Outgoing mail over plain SMTP -- any mailbox or relay, no provider SDK.
 aiosmtplib>=3.0
+
+# Gemini, the first LLM provider. Only api/llm/gemini.py imports it.
+google-genai>=2.0,<3
