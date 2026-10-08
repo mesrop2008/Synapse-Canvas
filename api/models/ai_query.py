@@ -22,6 +22,8 @@ class AIQuery(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     flight live in Redis (`services.ai_buffer`)."""
 
     __tablename__ = "ai_queries"
+    # created_at comes back with the INSERT, for the create response.
+    __mapper_args__ = {"eager_defaults": True}
     __table_args__ = (
         Index(
             "ix_ai_queries_document_id_user_id_created_at",

@@ -50,6 +50,8 @@ class ErrorCode(StrEnum):
     AI_DAILY_LIMIT = "ai.daily_limit"
     AI_CONCURRENCY_LIMIT = "ai.concurrency_limit"
     AI_TIMEOUT = "ai.timeout"
+    AI_INTERRUPTED = "ai.interrupted"
+    AI_QUERY_NOT_FOUND = "ai.query_not_found"
 
 
 class AppError(Exception):
