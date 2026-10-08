@@ -13,6 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 Environment = Literal["local", "test", "staging", "production"]
 EmailBackend = Literal["console", "smtp"]
 SmtpSecurity = Literal["starttls", "tls", "none"]
+LLMProviderName = Literal["fake", "gemini"]
 
 
 class Settings(BaseSettings):
@@ -84,6 +85,24 @@ class Settings(BaseSettings):
     ws_edit_rate_limit_window_seconds: int = 10
     presence_ttl_seconds: int = 30
 
+    llm_provider: LLMProviderName = "fake"
+    # SecretStr keeps the key out of reprs, tracebacks and settings dumps.
+    gemini_api_key: SecretStr = SecretStr("")
+    gemini_model: str = "gemini-2.5-flash"
+    # 0 turns thinking off on Flash models; -1 lets the model decide.
+    gemini_thinking_budget: int = 0
+    llm_timeout_seconds: float = 60.0
+    fake_llm_delay_seconds: float = 0.04
+
+    ai_max_output_tokens: int = 1024
+    ai_context_token_limit: int = 6000
+    ai_daily_token_limit: int = 200_000
+    ai_max_concurrent_queries: int = 2
+    ai_stream_keepalive_seconds: float = 15.0
+    ai_reconnect_grace_seconds: float = 10.0
+    ai_buffer_ttl_seconds: int = 600
+    ai_query_timeout_seconds: int = 300
+
     # Comma-separated str, not list[str]: pydantic-settings JSON-decodes list
     # types before validators run.
     cors_origins_raw: str = Field(default="", alias="CORS_ORIGINS")
@@ -101,6 +120,16 @@ class Settings(BaseSettings):
                 f"e.g. postgresql+asyncpg://user:pass@host:5432/db (got: {v!r})"
             )
         return v
+
+    @model_validator(mode="after")
+    def _check_llm_provider(self) -> "Settings":
+        if self.llm_provider == "fake" and self.environment not in ("local", "test"):
+            raise ValueError(
+                "LLM_PROVIDER=fake returns scripted text and is only allowed when "
+                "ENVIRONMENT is local or test. Set LLM_PROVIDER=gemini and "
+                "GEMINI_API_KEY."
+            )
+        return self
 
     @model_validator(mode="after")
     def _check_mail_settings(self) -> "Settings":

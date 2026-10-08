@@ -442,6 +442,7 @@ def _smtp_settings(**overrides: Any) -> Settings:
         "smtp_password": "app-password",
         "mail_from_address": "mailer@example.com",
         "mail_from_name": "Synapse Canvas",
+        "llm_provider": "gemini",
     }
     values.update(overrides)
     return Settings(_env_file=None, **values)  # type: ignore[call-arg]
