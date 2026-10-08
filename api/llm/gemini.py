@@ -1,11 +1,8 @@
 """Gemini through the official google-genai SDK.
 
-On cancellation: the SDK's stream is several nested async generators, and only
-the innermost closes the HTTP response, in a `finally`. Calling `aclose()` on
-the outer one does not reach it; the inner generators are left to the garbage
-collector. What does reach it is cancelling the task while it awaits the next
-chunk: the CancelledError unwinds through every frame. The runner relies on
-that, and tests/test_ai_gemini.py checks it against a mock transport."""
+`aclose()` on the SDK's stream does not close its HTTP response -- that waits
+for the garbage collector. Cancelling the task awaiting the next chunk does.
+The runner relies on this; tests/test_ai_gemini.py checks it."""
 
 from __future__ import annotations
 
