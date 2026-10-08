@@ -52,6 +52,7 @@ class ErrorCode(StrEnum):
     AI_TIMEOUT = "ai.timeout"
     AI_INTERRUPTED = "ai.interrupted"
     AI_QUERY_NOT_FOUND = "ai.query_not_found"
+    AI_QUERY_NOT_COMPLETED = "ai.query_not_completed"
 
 
 class AppError(Exception):

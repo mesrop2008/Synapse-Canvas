@@ -7,23 +7,37 @@ import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.config import get_settings
-from api.core.exceptions import ErrorCode, NotFoundError
+from api.core.exceptions import ConflictError, ErrorCode, NotFoundError
 from api.llm.base import LLMRequest, Usage, estimate_tokens
 from api.models.ai_query import AIQuery
 from api.models.document import Document
 from api.models.enums import AIQueryMode, AIQueryStatus
 from api.services import ai_usage, prompts
-from api.services.prosemirror import content_size
+from api.services import documents as document_service
+from api.services.documents import AppliedChange, StaleDocumentVersionError, snapshot
+from api.services.prosemirror import (
+    Edit,
+    content_size,
+    insert_after,
+    replace_selection,
+    snap_selection,
+)
 
 
 class QueryNotFoundError(NotFoundError):
     detail = "AI query not found"
     code = ErrorCode.AI_QUERY_NOT_FOUND
+
+
+class QueryNotCompletedError(ConflictError):
+    detail = "Only a completed response with text can be inserted"
+    code = ErrorCode.AI_QUERY_NOT_COMPLETED
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +76,16 @@ async def create_query(
         and selection_from > selection_to
     ):
         raise prompts.SelectionError("The selection ends before it starts")
+    if (
+        mode is AIQueryMode.REWRITE
+        and selection_from is not None
+        and selection_to is not None
+    ):
+        # Stored snapped, so the client shows as "original" what apply replaces.
+        snapped = snap_selection(document.content, selection_from, selection_to)
+        if snapped is None:
+            raise prompts.SelectionError()
+        selection_from, selection_to = snapped
 
     context = prompts.build_context(
         document.content,
@@ -173,3 +197,58 @@ async def finish(db: AsyncSession, query_id: uuid.UUID, outcome: Outcome) -> boo
     )
     await db.commit()
     return result.rowcount == 1
+
+
+def _edit_for(
+    query: AIQuery, content: dict[str, Any], start: int | None, end: int | None
+) -> Edit:
+    text = query.response or ""
+    if query.mode is AIQueryMode.REWRITE:
+        edit = None
+        if start is not None and end is not None and start < end:
+            edit = replace_selection(content, start, end, text)
+        if edit is None:
+            raise prompts.SelectionError("The selected text is no longer there")
+        return edit
+    return insert_after(content, end, text)
+
+
+async def apply_query(
+    db: AsyncSession,
+    query: AIQuery,
+    *,
+    user_id: uuid.UUID,
+    version: int,
+    selection_from: int | None = None,
+    selection_to: int | None = None,
+) -> AppliedChange:
+    """Through `documents.apply_change`, the one write path, as an edit by the
+    requesting user. The edit is computed from the document at `version`; if
+    that is no longer the head, this is refused like any stale edit. A retried
+    apply carries the same version, so it cannot insert twice."""
+    if query.status is not AIQueryStatus.COMPLETED or not (query.response or "").strip():
+        raise QueryNotCompletedError()
+
+    document = await document_service.get_document(
+        db, query.workspace_id, query.document_id
+    )
+    if document.version != version:
+        current = snapshot(document)
+        await db.rollback()
+        raise StaleDocumentVersionError(current)
+
+    # The client maps the stored range through edits made since the query.
+    start = query.selection_from if selection_from is None else selection_from
+    end = query.selection_to if selection_to is None else selection_to
+    _check_bounds(document, start, end)
+    edit = _edit_for(query, document.content, start, end)
+
+    return await document_service.apply_change(
+        db,
+        workspace_id=query.workspace_id,
+        document_id=query.document_id,
+        user_id=user_id,
+        base_version=version,
+        operation={"steps": [edit.step], "ai_query_id": str(query.id)},
+        content=edit.content,
+    )
