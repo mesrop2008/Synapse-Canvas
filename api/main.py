@@ -24,7 +24,7 @@ from api.core.middleware import (
 from api.core.redis import close_redis, get_redis
 from api.db.session import get_engine
 from api.realtime.hub import DocumentHub
-from api.routers import auth, documents, realtime, workspaces
+from api.routers import ai, auth, documents, realtime, workspaces
 from api.schemas.document import DocumentRead, DocumentVersionConflict
 from api.services import email_service
 from api.services.ai_runner import GenerationRunner
@@ -146,6 +146,7 @@ def create_app() -> FastAPI:
     app.include_router(workspaces.router)
     app.include_router(documents.router)
     app.include_router(realtime.router)
+    app.include_router(ai.router)
 
     @app.get("/health", tags=["meta"], summary="Liveness probe")
     async def health() -> dict[str, str]:
