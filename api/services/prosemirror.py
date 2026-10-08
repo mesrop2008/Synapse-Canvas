@@ -7,6 +7,7 @@ an opening and a closing token."""
 from __future__ import annotations
 
 import bisect
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -164,3 +165,205 @@ def to_plain_text(doc: Node) -> PlainText:
         builder.block(child, pos, "")
         pos += node_size(child)
     return PlainText("".join(builder.parts), tuple(builder.runs))
+
+
+@dataclass(frozen=True, slots=True)
+class Edit:
+    """A new document and the ProseMirror ReplaceStep that turns the old one
+    into it, so peers replay the change instead of reloading."""
+
+    content: Node
+    step: dict[str, Any]
+
+
+def _replace_step(start: int, end: int, nodes: list[Node]) -> dict[str, Any]:
+    step: dict[str, Any] = {"stepType": "replace", "from": start, "to": end}
+    if nodes:
+        step["slice"] = {"content": nodes}
+    return step
+
+
+def inline_nodes(text: str, *, code: bool = False) -> list[Node]:
+    if code:
+        return [{"type": "text", "text": text}] if text else []
+    nodes: list[Node] = []
+    for index, line in enumerate(text.split("\n")):
+        if index:
+            nodes.append({"type": "hardBreak"})
+        if line:
+            nodes.append({"type": "text", "text": line})
+    return nodes
+
+
+def paragraphs(text: str) -> list[Node]:
+    """Blank lines separate paragraphs; single newlines become hard breaks.
+    Markdown is not parsed: headings and lists arrive as plain text."""
+    blocks = re.split(r"\n[ \t]*\n", text.replace("\r", "").strip("\n"))
+    return [
+        {"type": "paragraph", "content": inline_nodes(block.strip("\n"))}
+        for block in blocks
+        if block.strip()
+    ]
+
+
+def _block_spans(doc: Node) -> list[tuple[int, int]]:
+    spans, pos = [], 0
+    for child in doc.get("content", []):
+        size = node_size(child)
+        spans.append((pos, pos + size))
+        pos += size
+    return spans
+
+
+def _block_at(spans: list[tuple[int, int]], pos: int, *, forward: bool) -> int | None:
+    """The top-level block holding `pos`. On a boundary, `forward` picks the
+    block after it, otherwise the one before."""
+    for index, (start, end) in enumerate(spans):
+        if start < pos < end or pos == (start if forward else end):
+            return index
+    return None
+
+
+def _textblock_at(node: Node, pos: int, base: int = 0) -> tuple[list[int], int] | None:
+    """The path to the textblock whose content holds `pos`, and its start."""
+    child_pos = base
+    for index, child in enumerate(node.get("content", [])):
+        size = node_size(child)
+        if child_pos < pos < child_pos + size:
+            if is_textblock(child):
+                return [index], child_pos
+            if child.get("type") in LEAF_TYPES or child.get("type") == "text":
+                return None
+            found = _textblock_at(child, pos, child_pos + 1)
+            return ([index, *found[0]], found[1]) if found else None
+        child_pos += size
+    return None
+
+
+def _get(node: Node, path: list[int]) -> Node:
+    for index in path:
+        node = node["content"][index]
+    return node
+
+
+def _put(node: Node, path: list[int], replacement: Node) -> Node:
+    if not path:
+        return replacement
+    children = list(node["content"])
+    children[path[0]] = _put(children[path[0]], path[1:], replacement)
+    return {**node, "content": children}
+
+
+def _slice_inline(children: list[Node], start: int, end: int | None = None) -> list[Node]:
+    out: list[Node] = []
+    pos = 0
+    for child in children:
+        size = node_size(child)
+        low = max(start, pos)
+        high = min(pos + size if end is None else end, pos + size)
+        if low < high:
+            if child.get("type") == "text":
+                text = child["text"]
+                cut = text[utf16_index(text, low - pos) : utf16_index(text, high - pos)]
+                out.append({**child, "text": cut})
+            else:
+                out.append(child)
+        pos += size
+    return out
+
+
+def _normalize_inline(nodes: list[Node]) -> list[Node]:
+    """As ProseMirror does: no empty text nodes, and neighbours with the same
+    marks merged. The stored document must equal what peers compute."""
+    out: list[Node] = []
+    for node in nodes:
+        if node.get("type") == "text":
+            if not node.get("text"):
+                continue
+            previous = out[-1] if out else None
+            if (
+                previous is not None
+                and previous.get("type") == "text"
+                and (previous.get("marks") or []) == (node.get("marks") or [])
+            ):
+                out[-1] = {**previous, "text": previous["text"] + node["text"]}
+                continue
+        out.append(node)
+    return out
+
+
+def _inline_text(nodes: list[Node]) -> str:
+    return "".join(
+        node.get("text", "") if node.get("type") == "text" else "\n" for node in nodes
+    )
+
+
+def snap_selection(doc: Node, start: int, end: int) -> tuple[int, int] | None:
+    """A range inside one textblock is kept. One crossing blocks grows to
+    whole top-level blocks: their structure cannot be rebuilt from plain
+    text, so the rewrite replaces them as paragraphs."""
+    first = _textblock_at(doc, start)
+    last = _textblock_at(doc, end)
+    if first is not None and last is not None and first[0] == last[0]:
+        return start, end
+    spans = _block_spans(doc)
+    i = _block_at(spans, start, forward=True)
+    j = _block_at(spans, end, forward=False)
+    if i is None or j is None or i > j:
+        return None
+    return spans[i][0], spans[j][1]
+
+
+def replace_selection(doc: Node, start: int, end: int, text: str) -> Edit | None:
+    """None if the range holds no block to replace."""
+    first = _textblock_at(doc, start)
+    last = _textblock_at(doc, end)
+    if first is not None and last is not None and first[0] == last[0]:
+        path, block_start = first
+        block = _get(doc, path)
+        children = block.get("content", [])
+        low, high = start - block_start - 1, end - block_start - 1
+
+        # Keep the whitespace the user selected around the words.
+        original = _inline_text(_slice_inline(children, low, high))
+        lead = original[: len(original) - len(original.lstrip())]
+        trail = original[len(original.rstrip()) :]
+        code = block.get("type") == "codeBlock"
+        body = text.strip() if code else re.sub(r"\n\s*\n", "\n", text.strip())
+        inserted = inline_nodes(lead + body + trail, code=code)
+
+        merged = _normalize_inline(
+            _slice_inline(children, 0, low) + inserted + _slice_inline(children, high)
+        )
+        new_block = {k: v for k, v in block.items() if k != "content"}
+        if merged:
+            new_block["content"] = merged
+        return Edit(_put(doc, path, new_block), _replace_step(start, end, inserted))
+
+    snapped = snap_selection(doc, start, end)
+    if snapped is None:
+        return None
+    spans = _block_spans(doc)
+    i = _block_at(spans, snapped[0], forward=True)
+    j = _block_at(spans, snapped[1], forward=False)
+    assert i is not None and j is not None
+    nodes = paragraphs(text)
+    children = doc.get("content", [])
+    content = {**doc, "content": [*children[:i], *nodes, *children[j + 1 :]]}
+    return Edit(content, _replace_step(snapped[0], snapped[1], nodes))
+
+
+def insert_after(doc: Node, pos: int | None, text: str) -> Edit:
+    """New paragraphs after the top-level block holding `pos`, or at the end
+    of the document. Top level, so a reply never lands inside a list."""
+    spans = _block_spans(doc)
+    index = len(spans)
+    if pos is not None and spans:
+        found = _block_at(spans, pos, forward=False)
+        if found is not None:
+            index = found + 1
+    at = spans[index - 1][1] if index else 0
+    nodes = paragraphs(text)
+    children = doc.get("content", [])
+    content = {**doc, "content": [*children[:index], *nodes, *children[index:]]}
+    return Edit(content, _replace_step(at, at, nodes))
