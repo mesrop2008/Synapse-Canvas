@@ -619,3 +619,151 @@ async def test_a_long_document_is_cut_from_the_middle_keeping_the_selection(
     assert "The opening line." in prompt
     assert "[…]" in prompt
     assert len(prompt) < 200 * 3 + 1000
+
+
+# --- Apply ---
+
+
+async def completed(
+    app: FastAPI, http: AsyncClient, live: Live, **body: Any
+) -> dict[str, Any]:
+    query = (await create(http, live, **body)).json()
+    stream = await read_stream(app, f"{live.base}/{query['id']}/stream", live.auth())
+    assert stream.last[0] == "done", stream.events
+    return query
+
+
+async def apply(http: AsyncClient, live: Live, query_id: str, **body: Any) -> Response:
+    path = f"{live.base}/{query_id}/apply"
+    return await http.post(path, json=body, headers=live.auth())
+
+
+async def test_apply_writes_one_change_through_the_locked_path(
+    app: FastAPI, http: AsyncClient, live: Live
+) -> None:
+    query = await completed(app, http, live)
+
+    applied = await apply(http, live, query["id"], version=1)
+
+    assert applied.status_code == 200, applied.text
+    assert applied.json()["version"] == 2
+    assert applied.json()["content"] == doc(
+        "The first paragraph.", "The second paragraph.", "".join(WORDS)
+    )
+    async with get_sessionmaker()() as db:
+        change = await db.scalar(
+            select(DocumentChange).where(
+                DocumentChange.document_id == live.document_id,
+                DocumentChange.version == 2,
+            )
+        )
+    assert change is not None
+    assert change.base_version == 1
+    assert change.operation["ai_query_id"] == query["id"]
+    assert [step["stepType"] for step in change.operation["steps"]] == ["replace"]
+    assert await change_count(live.document_id) == 2
+
+
+async def test_apply_against_a_stale_version_is_refused_like_any_edit(
+    app: FastAPI, http: AsyncClient, live: Live
+) -> None:
+    query = await completed(app, http, live)
+    async with get_sessionmaker()() as db:
+        await document_service.update_document(
+            db,
+            workspace_id=live.workspace_id,
+            document_id=live.document_id,
+            expected_version=1,
+            title="Renamed meanwhile",
+        )
+
+    refused = await apply(http, live, query["id"], version=1)
+
+    assert refused.status_code == 409
+    assert refused.json()["code"] == "document.stale"
+    assert refused.json()["current"]["version"] == 2
+    assert await change_count(live.document_id) == 2
+
+
+async def test_a_retried_apply_cannot_insert_twice(
+    app: FastAPI, http: AsyncClient, live: Live
+) -> None:
+    query = await completed(app, http, live)
+
+    first = await apply(http, live, query["id"], version=1)
+    again = await apply(http, live, query["id"], version=1)
+
+    assert first.status_code == 200
+    assert again.status_code == 409
+    assert await change_count(live.document_id) == 2
+
+
+async def test_rewrite_replaces_only_the_selection(
+    app: FastAPI, http: AsyncClient, live: Live
+) -> None:
+    app.state.ai.provider = FakeProvider(["A ", "better ", "one"])
+    # "The first paragraph." starts at position 1; "first" spans 5 to 10.
+    query = await completed(
+        app, http, live, mode="rewrite", selection_from=5, selection_to=10
+    )
+
+    applied = await apply(http, live, query["id"], version=1)
+
+    assert applied.json()["content"] == doc(
+        "The A better one paragraph.", "The second paragraph."
+    )
+
+
+async def test_apply_follows_the_range_the_client_mapped(
+    app: FastAPI, http: AsyncClient, live: Live
+) -> None:
+    app.state.ai.provider = FakeProvider(["second"])
+    query = await completed(
+        app, http, live, mode="rewrite", selection_from=5, selection_to=10
+    )
+    # A peer typed "Oh. " at the start meanwhile, moving "first" four along.
+    async with get_sessionmaker()() as db:
+        await document_service.update_document(
+            db,
+            workspace_id=live.workspace_id,
+            document_id=live.document_id,
+            expected_version=1,
+            content=doc("Oh. The first paragraph.", "The second paragraph."),
+        )
+
+    applied = await apply(
+        http, live, query["id"], version=2, selection_from=9, selection_to=14
+    )
+
+    assert applied.json()["content"] == doc(
+        "Oh. The second paragraph.", "The second paragraph."
+    )
+
+
+async def test_only_a_completed_response_can_be_applied(
+    app: FastAPI, http: AsyncClient, live: Live
+) -> None:
+    app.state.ai.provider = FakeProvider(WORDS, fail_with=RateLimitedError())
+    query = await create(http, live)
+    await read_stream(app, f"{live.base}/{query.json()['id']}/stream", live.auth())
+
+    refused = await apply(http, live, query.json()["id"], version=1)
+
+    assert refused.status_code == 409
+    assert refused.json()["code"] == "ai.query_not_completed"
+    assert await change_count(live.document_id) == 1
+
+
+async def test_a_viewer_cannot_apply(
+    app: FastAPI, http: AsyncClient, live: Live
+) -> None:
+    query = await completed(app, http, live)
+
+    refused = await http.post(
+        f"{live.base}/{query['id']}/apply",
+        json={"version": 1},
+        headers=live.auth(WorkspaceRole.VIEWER),
+    )
+
+    assert refused.status_code == 403
+    assert await change_count(live.document_id) == 1

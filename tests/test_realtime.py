@@ -19,6 +19,7 @@ from starlette.testclient import TestClient, WebSocketDisconnect
 from api.core.config import get_settings
 from api.core.redis import get_redis
 from api.core.security import create_access_token
+from api.llm.fake import FakeProvider
 from api.main import create_app
 from api.models import Document, DocumentChange, User, Workspace, WorkspaceMember
 from api.models.enums import WorkspaceRole
@@ -387,6 +388,45 @@ def test_the_http_patch_shares_the_log_with_the_socket(live: Fixture) -> None:
             assert announced["operation"] == {"title": "Renamed"}
 
     assert asyncio.run(_logged_versions(live.document_id)) == [1, 2]
+
+
+def test_an_applied_ai_response_reaches_a_peer_as_one_edit(live: Fixture) -> None:
+    """The AI has no write path of its own: applying lands one change in the
+    log, by the requesting user, and peers replay it as ordinary steps."""
+    with websocket_app() as client:
+        client.app.state.ai.provider = FakeProvider(["Generated ", "text."])
+        ticket = ticket_for(client, live, live.viewer_token)
+
+        with client.websocket_connect(socket_url(live, ticket)) as peer:
+            assert peer.receive_json()["type"] == "init"
+
+            base = f"/documents/{live.document_id}/ai/queries"
+            editor = live.auth(live.editor_token)
+            query = client.post(base, json={"mode": "summarize"}, headers=editor).json()
+            streamed = client.get(f"{base}/{query['id']}/stream", headers=editor)
+            assert "event: done" in streamed.text
+
+            applied = client.post(
+                f"{base}/{query['id']}/apply", json={"version": 1}, headers=editor
+            )
+            assert applied.status_code == 200, applied.text
+
+            relayed = peer.receive_json()
+            assert relayed["type"] == "edit"
+            assert relayed["version"] == 2
+            assert relayed["user_id"] == str(live.editor_id)
+            assert relayed["operation"]["steps"] == [
+                {
+                    "stepType": "replace",
+                    "from": 0,
+                    "to": 0,
+                    "slice": {"content": [doc("Generated text.")["content"][0]]},
+                }
+            ]
+
+    assert asyncio.run(_logged_versions(live.document_id)) == [1, 2]
+    _, content = asyncio.run(_document_state(live.document_id))
+    assert content == doc("Generated text.")
 
 
 def test_deleting_a_document_tells_everyone_who_has_it_open(live: Fixture) -> None:
