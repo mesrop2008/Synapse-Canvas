@@ -9,6 +9,7 @@ import { I18nProvider } from './hooks/useI18n';
 import { ThemeProvider } from './hooks/useTheme';
 import { AccountPage } from './pages/AccountPage';
 import { DocumentPage } from './pages/DocumentPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -33,6 +34,7 @@ const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegisterPage /> },
   { path: '/verify-email', element: <VerifyEmailPage /> },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
   {
     element: (
       <ProtectedRoute>
