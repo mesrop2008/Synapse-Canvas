@@ -72,6 +72,7 @@
     "emailInvalid": "Enter a valid email address, like name@example.com.",
     "passwordTooShort": "Use at least 8 characters.",
     "passwordTooLong": "That password is too long. Use at most 72 bytes.",
+    "passwordMismatch": "The passwords do not match.",
     "codeIncomplete": "Enter all six digits of the code."
   }
 }
