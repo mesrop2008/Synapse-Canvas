@@ -211,3 +211,9 @@ password_reset_verify_ip_rate_limit = IPRateLimit(
     "password_reset_verify_rate_limit_per_ip",
     "password_reset_verify_rate_limit_per_ip_window_seconds",
 )
+# Same numbers, its own count: each attempt costs a bcrypt hash.
+password_reset_confirm_ip_rate_limit = IPRateLimit(
+    "password-reset-confirm",
+    "password_reset_verify_rate_limit_per_ip",
+    "password_reset_verify_rate_limit_per_ip_window_seconds",
+)

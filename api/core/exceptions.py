@@ -27,6 +27,7 @@ class ErrorCode(StrEnum):
     VERIFICATION_INVALID = "auth.verification_invalid"
     RESET_CODE_INVALID = "auth.reset_code_invalid"
     RESET_LOCKED = "auth.reset_locked"
+    RESET_TOKEN_INVALID = "auth.reset_token_invalid"
     REFRESH_UNKNOWN = "auth.refresh_unknown"
     REFRESH_REVOKED = "auth.refresh_revoked"
     REFRESH_EXPIRED = "auth.refresh_expired"

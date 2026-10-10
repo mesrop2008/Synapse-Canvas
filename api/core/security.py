@@ -165,11 +165,12 @@ def create_refresh_token(
     )
 
 
-def create_password_reset_token(subject: uuid.UUID | str) -> str:
+def create_password_reset_token(subject: uuid.UUID | str, *, version: int) -> str:
     return create_token(
         subject,
         PASSWORD_RESET_TOKEN,
         timedelta(seconds=get_settings().password_reset_token_ttl_seconds),
+        version=version,
     )
 
 

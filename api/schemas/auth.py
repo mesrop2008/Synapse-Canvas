@@ -63,6 +63,11 @@ class PasswordResetGrant(BaseModel):
     expires_in: int = Field(description="Reset token lifetime in seconds")
 
 
+class PasswordResetConfirmRequest(BaseModel):
+    reset_token: str
+    new_password: Password
+
+
 class AcceptedResponse(BaseModel):
     """The same whatever happened, so it reveals no registration."""
 

@@ -7,6 +7,7 @@ from api.dependencies import (
     DbSession,
     RequestLocale,
     login_ip_rate_limit,
+    password_reset_confirm_ip_rate_limit,
     password_reset_ip_rate_limit,
     password_reset_verify_ip_rate_limit,
     refresh_ip_rate_limit,
@@ -16,6 +17,7 @@ from api.dependencies import (
 from api.schemas.auth import (
     AcceptedResponse,
     LoginRequest,
+    PasswordResetConfirmRequest,
     PasswordResetGrant,
     PasswordResetRequest,
     PasswordResetVerifyRequest,
@@ -131,6 +133,23 @@ async def verify_password_reset(
     payload: PasswordResetVerifyRequest, db: DbSession
 ) -> PasswordResetGrant:
     return await password_reset.verify_code(db, payload.email, payload.code)
+
+
+@router.post(
+    "/password-reset/confirm",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Set a new password with a reset token, ending every session",
+    dependencies=[Depends(password_reset_confirm_ip_rate_limit)],
+    responses={
+        401: {"description": "Expired or already-used reset token, or not one at all"},
+        422: {"description": "The new password does not meet the policy"},
+        429: {"description": "Too many attempts from this address"},
+    },
+)
+async def confirm_password_reset(
+    payload: PasswordResetConfirmRequest, db: DbSession
+) -> None:
+    await password_reset.reset_password(db, payload.reset_token, payload.new_password)
 
 
 @router.post(
