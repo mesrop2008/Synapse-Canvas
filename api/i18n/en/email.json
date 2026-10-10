@@ -13,6 +13,11 @@
     "neverShare": "Never share this code. We will never ask you for it.",
     "ignore": "If you did not ask to reset your password, ignore this message. Your password has not been changed."
   },
+  "passwordChanged": {
+    "subject": "Your {brand} password was changed",
+    "body": "The password for your {brand} account was just changed, and every device that was signed in to it has been signed out.",
+    "advice": "If this was you, nothing more is needed. If it was not, reset your password straight away from the sign-in page: someone may have access to your email."
+  },
   "duplicate": {
     "subject": "Someone tried to register with your email address",
     "exists": "An account already exists for this address, so nothing was created.",

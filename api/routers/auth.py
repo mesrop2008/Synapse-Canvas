@@ -147,9 +147,11 @@ async def verify_password_reset(
     },
 )
 async def confirm_password_reset(
-    payload: PasswordResetConfirmRequest, db: DbSession
+    payload: PasswordResetConfirmRequest, db: DbSession, locale: RequestLocale
 ) -> None:
-    await password_reset.reset_password(db, payload.reset_token, payload.new_password)
+    await password_reset.reset_password(
+        db, payload.reset_token, payload.new_password, locale
+    )
 
 
 @router.post(

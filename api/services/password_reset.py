@@ -184,7 +184,12 @@ def _invalid_reset_token() -> AuthenticationError:
     )
 
 
-async def reset_password(db: AsyncSession, reset_token: str, new_password: str) -> None:
+async def reset_password(
+    db: AsyncSession,
+    reset_token: str,
+    new_password: str,
+    locale: Locale = DEFAULT_LOCALE,
+) -> None:
     """The token carries the token version it was issued under, and the reset
     bumps the version. That one write spends this token and any other reset
     token, and voids every access and refresh token: no blacklist to keep."""
@@ -197,13 +202,15 @@ async def reset_password(db: AsyncSession, reset_token: str, new_password: str) 
 
     hashed_password = await hash_password(new_password)
     # Compare-and-set: of two requests holding one token, only the first matches.
-    changed = await db.scalar(
+    email = await db.scalar(
         update(User)
         .where(User.id == user_id, User.token_version == version)
         .values(hashed_password=hashed_password, token_version=User.token_version + 1)
-        .returning(User.id)
+        .returning(User.email)
     )
-    if changed is None:
+    if email is None:
         raise _invalid_reset_token()
     # Commits the password change with it, so neither lands alone.
     await auth_service.revoke_all_for_user(db, user_id)
+
+    email_service.send_password_changed_notice(to=email, locale=locale)
