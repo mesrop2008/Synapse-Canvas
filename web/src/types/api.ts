@@ -25,6 +25,13 @@ export interface AcceptedResponse {
   detail: string;
 }
 
+export interface PasswordResetGrant {
+  /** Sets one new password; keep it in memory only. */
+  reset_token: string;
+  /** Seconds. */
+  expires_in: number;
+}
+
 export type WorkspaceRole = 'owner' | 'editor' | 'viewer';
 
 export interface Workspace {
