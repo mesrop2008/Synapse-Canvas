@@ -28,6 +28,7 @@ from api.core.security import (
     otp_matches,
 )
 from api.models.user import User
+from api.schemas.auth import PasswordResetGrant
 from api.services import email_service, rate_limit_service, verification_cooldown
 from api.services.auth_service import get_user_by_email, normalize_email
 
@@ -102,7 +103,7 @@ def _owner_of(stored: str | None, code: str) -> uuid.UUID | None:
     return None
 
 
-async def verify_code(db: AsyncSession, email: str, code: str) -> str:
+async def verify_code(db: AsyncSession, email: str, code: str) -> PasswordResetGrant:
     """Exchanges a right code for a reset token. The attempt is counted before
     the code is checked, so parallel guesses cannot get past the limit."""
     settings = get_settings()
@@ -160,4 +161,7 @@ async def verify_code(db: AsyncSession, email: str, code: str) -> str:
     user = await db.get(User, owner)
     if user is None:
         raise _invalid_code()
-    return create_password_reset_token(user.id)
+    return PasswordResetGrant(
+        reset_token=create_password_reset_token(user.id),
+        expires_in=settings.password_reset_token_ttl_seconds,
+    )
