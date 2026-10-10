@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 
 from redis.asyncio import Redis
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.config import get_settings
@@ -22,15 +23,24 @@ from api.core.exceptions import (
 from api.core.i18n import DEFAULT_LOCALE, Locale
 from api.core.redis import get_redis
 from api.core.security import (
+    PASSWORD_RESET_TOKEN,
     create_password_reset_token,
+    decode_token,
     generate_otp,
     hash_otp,
+    hash_password,
     otp_matches,
+    subject_uuid,
+    token_version,
 )
 from api.models.user import User
 from api.schemas.auth import PasswordResetGrant
-from api.services import email_service, rate_limit_service, verification_cooldown
-from api.services.auth_service import get_user_by_email, normalize_email
+from api.services import (
+    auth_service,
+    email_service,
+    rate_limit_service,
+    verification_cooldown,
+)
 
 _PURPOSE = "password-reset"
 
@@ -57,7 +67,7 @@ async def request_code(
     """Silent for unknown and unverified addresses; the lockout, the cooldown
     and the attempt reset apply to them all the same."""
     settings = get_settings()
-    email = normalize_email(email)
+    email = auth_service.normalize_email(email)
     redis = get_redis()
 
     await _ensure_not_locked(redis, email)
@@ -70,7 +80,7 @@ async def request_code(
     if retry_after:
         raise RateLimitExceededError(retry_after_seconds=retry_after)
 
-    user = await get_user_by_email(db, email)
+    user = await auth_service.get_user_by_email(db, email)
     if user is None or not user.is_active:
         await redis.delete(_key("attempts", email))
         return
@@ -107,7 +117,7 @@ async def verify_code(db: AsyncSession, email: str, code: str) -> PasswordResetG
     """Exchanges a right code for a reset token. The attempt is counted before
     the code is checked, so parallel guesses cannot get past the limit."""
     settings = get_settings()
-    email = normalize_email(email)
+    email = auth_service.normalize_email(email)
     redis = get_redis()
     max_attempts = settings.password_reset_max_attempts
 
@@ -162,6 +172,45 @@ async def verify_code(db: AsyncSession, email: str, code: str) -> PasswordResetG
     if user is None:
         raise _invalid_code()
     return PasswordResetGrant(
-        reset_token=create_password_reset_token(user.id),
+        reset_token=create_password_reset_token(user.id, version=user.token_version),
         expires_in=settings.password_reset_token_ttl_seconds,
     )
+
+
+def _invalid_reset_token() -> AuthenticationError:
+    return AuthenticationError(
+        "Reset token is invalid, expired or already used",
+        code=ErrorCode.RESET_TOKEN_INVALID,
+    )
+
+
+async def reset_password(
+    db: AsyncSession,
+    reset_token: str,
+    new_password: str,
+    locale: Locale = DEFAULT_LOCALE,
+) -> None:
+    """The token carries the token version it was issued under, and the reset
+    bumps the version. That one write spends this token and any other reset
+    token, and voids every access and refresh token: no blacklist to keep."""
+    try:
+        payload = decode_token(reset_token, PASSWORD_RESET_TOKEN)
+        user_id = subject_uuid(payload)
+        version = token_version(payload)
+    except AuthenticationError as exc:
+        raise _invalid_reset_token() from exc
+
+    hashed_password = await hash_password(new_password)
+    # Compare-and-set: of two requests holding one token, only the first matches.
+    email = await db.scalar(
+        update(User)
+        .where(User.id == user_id, User.token_version == version)
+        .values(hashed_password=hashed_password, token_version=User.token_version + 1)
+        .returning(User.email)
+    )
+    if email is None:
+        raise _invalid_reset_token()
+    # Commits the password change with it, so neither lands alone.
+    await auth_service.revoke_all_for_user(db, user_id)
+
+    email_service.send_password_changed_notice(to=email, locale=locale)

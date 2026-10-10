@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ColumnElement, DateTime, String
+from sqlalchemy import ColumnElement, DateTime, Integer, String, text
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -27,6 +27,11 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     email_verified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+    # Stamped into every token; bumping it voids them all at once.
+    token_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
     )
 
     @property

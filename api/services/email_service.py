@@ -306,6 +306,18 @@ def _send_code(*, to: str, code: str, locale: Locale, lines: dict[str, str]) -> 
     dispatch(to=to, subject=lines["subject"], body=body, html_body=html_body)
 
 
+def send_password_changed_notice(*, to: str, locale: Locale = DEFAULT_LOCALE) -> None:
+    brand = get_settings().mail_from_name
+    dispatch(
+        to=to,
+        subject=i18n.text(locale, "email.passwordChanged.subject", brand=brand),
+        body=(
+            f"{i18n.text(locale, 'email.passwordChanged.body', brand=brand)}\n\n"
+            f"{i18n.text(locale, 'email.passwordChanged.advice')}"
+        ),
+    )
+
+
 def send_duplicate_registration_notice(
     *, to: str, locale: Locale = DEFAULT_LOCALE
 ) -> None:

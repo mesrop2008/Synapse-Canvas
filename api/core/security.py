@@ -119,6 +119,8 @@ def create_token(
     token_type: TokenType,
     expires_delta: timedelta,
     jti: uuid.UUID | None = None,
+    *,
+    version: int = 0,
 ) -> str:
     settings = get_settings()
     now = datetime.now(timezone.utc)
@@ -130,6 +132,7 @@ def create_token(
         "jti": str(jti or uuid.uuid4()),
         "iss": settings.jwt_issuer,
         "aud": settings.jwt_audience,
+        "ver": version,
     }
     return jwt.encode(
         payload,
@@ -139,12 +142,13 @@ def create_token(
     )
 
 
-def create_access_token(subject: uuid.UUID | str) -> str:
+def create_access_token(subject: uuid.UUID | str, *, version: int = 0) -> str:
     settings = get_settings()
     return create_token(
         subject,
         ACCESS_TOKEN,
         timedelta(minutes=settings.access_token_expire_minutes),
+        version=version,
     )
 
 
@@ -152,16 +156,21 @@ def refresh_token_lifetime() -> timedelta:
     return timedelta(days=get_settings().refresh_token_expire_days)
 
 
-def create_refresh_token(subject: uuid.UUID | str, jti: uuid.UUID) -> str:
+def create_refresh_token(
+    subject: uuid.UUID | str, jti: uuid.UUID, *, version: int = 0
+) -> str:
     # The caller persists the same jti; a token without its row is rejected.
-    return create_token(subject, REFRESH_TOKEN, refresh_token_lifetime(), jti=jti)
+    return create_token(
+        subject, REFRESH_TOKEN, refresh_token_lifetime(), jti=jti, version=version
+    )
 
 
-def create_password_reset_token(subject: uuid.UUID | str) -> str:
+def create_password_reset_token(subject: uuid.UUID | str, *, version: int) -> str:
     return create_token(
         subject,
         PASSWORD_RESET_TOKEN,
         timedelta(seconds=get_settings().password_reset_token_ttl_seconds),
+        version=version,
     )
 
 
@@ -221,6 +230,14 @@ def subject_uuid(payload: dict[str, Any]) -> uuid.UUID:
         raise AuthenticationError(
             "Invalid token subject", code=ErrorCode.INVALID_TOKEN
         ) from exc
+
+
+def token_version(payload: dict[str, Any]) -> int:
+    # Tokens from before versions existed carry none; as 0 they stay valid.
+    version = payload.get("ver", 0)
+    if type(version) is not int:
+        raise AuthenticationError("Invalid token version", code=ErrorCode.INVALID_TOKEN)
+    return version
 
 
 def token_jti(payload: dict[str, Any]) -> uuid.UUID:
