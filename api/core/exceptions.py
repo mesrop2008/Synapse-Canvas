@@ -25,6 +25,8 @@ class ErrorCode(StrEnum):
     EMAIL_UNVERIFIED = "auth.email_unverified"
     EMAIL_UNDELIVERABLE = "auth.email_undeliverable"
     VERIFICATION_INVALID = "auth.verification_invalid"
+    RESET_CODE_INVALID = "auth.reset_code_invalid"
+    RESET_LOCKED = "auth.reset_locked"
     REFRESH_UNKNOWN = "auth.refresh_unknown"
     REFRESH_REVOKED = "auth.refresh_revoked"
     REFRESH_EXPIRED = "auth.refresh_expired"
@@ -106,6 +108,11 @@ class RateLimitExceededError(AppError):
             self.__class__.detail,
             headers={"Retry-After": str(retry_after_seconds)},
         )
+
+
+class PasswordResetLockedError(RateLimitExceededError):
+    detail = "Too many wrong codes. Password recovery for this address is paused."
+    code = ErrorCode.RESET_LOCKED
 
 
 class EmailUndeliverableError(AppError):
