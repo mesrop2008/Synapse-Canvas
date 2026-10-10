@@ -72,6 +72,7 @@
     "emailInvalid": "Введите корректный адрес, например name@example.com.",
     "passwordTooShort": "Пароль должен быть не короче 8 символов.",
     "passwordTooLong": "Пароль слишком длинный: не больше 72 байт.",
+    "passwordMismatch": "Пароли не совпадают.",
     "codeIncomplete": "Введите все шесть цифр кода."
   }
 }

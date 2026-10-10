@@ -6,6 +6,7 @@ import enAi from './en/ai.json';
 import enCommon from './en/common.json';
 import enDocument from './en/document.json';
 import enErrors from './en/errors.json';
+import enForgotPassword from './en/forgot-password.json';
 import enLayout from './en/layout.json';
 import enLogin from './en/login.json';
 import enNotFound from './en/not-found.json';
@@ -19,6 +20,7 @@ import ruAi from './rus/ai.json';
 import ruCommon from './rus/common.json';
 import ruDocument from './rus/document.json';
 import ruErrors from './rus/errors.json';
+import ruForgotPassword from './rus/forgot-password.json';
 import ruLayout from './rus/layout.json';
 import ruLogin from './rus/login.json';
 import ruNotFound from './rus/not-found.json';
@@ -38,6 +40,7 @@ const english = {
   login: enLogin,
   register: enRegister,
   verifyEmail: enVerifyEmail,
+  forgotPassword: enForgotPassword,
   notFound: enNotFound,
   workspaces: enWorkspaces,
   workspace: enWorkspace,
@@ -58,6 +61,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     login: ruLogin,
     register: ruRegister,
     verifyEmail: ruVerifyEmail,
+    forgotPassword: ruForgotPassword,
     notFound: ruNotFound,
     workspaces: ruWorkspaces,
     workspace: ruWorkspace,

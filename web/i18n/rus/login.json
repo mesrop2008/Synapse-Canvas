@@ -9,6 +9,7 @@
   "submitting": "Входим…",
   "noAccount": "Ещё нет аккаунта?",
   "createOne": "Создать",
+  "forgotPassword": "Забыли пароль?",
   "failed": "Не удалось войти.",
   "enterCode": "Ввести код"
 }

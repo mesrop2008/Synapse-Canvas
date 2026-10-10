@@ -1,4 +1,9 @@
-import type { AcceptedResponse, TokenPair, User } from '../types/api';
+import type {
+  AcceptedResponse,
+  PasswordResetGrant,
+  TokenPair,
+  User,
+} from '../types/api';
 import { clearSession, getRefreshToken, request, setSession } from './client';
 
 export async function login(email: string, password: string): Promise<TokenPair> {
@@ -33,6 +38,33 @@ export function verifyEmail(email: string, code: string): Promise<User> {
 export function resendVerification(email: string): Promise<AcceptedResponse> {
   return request<AcceptedResponse>('POST', '/auth/resend-verification', {
     body: { email },
+    authenticated: false,
+  });
+}
+
+/** 202 whether or not the address has an account. 429 within a minute of the
+ *  last code, or with `auth.reset_locked` after three wrong ones. */
+export function requestPasswordReset(email: string): Promise<AcceptedResponse> {
+  return request<AcceptedResponse>('POST', '/auth/password-reset', {
+    body: { email },
+    authenticated: false,
+  });
+}
+
+export function verifyPasswordResetCode(
+  email: string,
+  code: string,
+): Promise<PasswordResetGrant> {
+  return request<PasswordResetGrant>('POST', '/auth/password-reset/verify', {
+    body: { email, code },
+    authenticated: false,
+  });
+}
+
+/** Signs the account out everywhere, this browser included. */
+export function resetPassword(resetToken: string, newPassword: string): Promise<void> {
+  return request<void>('POST', '/auth/password-reset/confirm', {
+    body: { reset_token: resetToken, new_password: newPassword },
     authenticated: false,
   });
 }
