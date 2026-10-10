@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -69,6 +70,7 @@ from api.core.redis import use_redis  # noqa: E402
 from api.db.session import get_db, get_engine, get_sessionmaker  # noqa: E402
 from api.main import create_app  # noqa: E402
 from api.models import Base  # noqa: E402
+from api.services import email_service  # noqa: E402
 
 DEFAULT_PASSWORD = "Sup3rSecret!pw"
 
@@ -185,8 +187,6 @@ async def client(db_session: AsyncSession, redis_client: Redis) -> Any:
     app.dependency_overrides.clear()
     # Mail is sent from background tasks on this test's loop; let them finish
     # before the loop closes under them.
-    from api.services import email_service
-
     await email_service.drain()
 
 
@@ -207,6 +207,41 @@ class TestUser:
 
 
 UserFactory = Callable[..., Awaitable[TestUser]]
+
+
+class CapturingSender:
+    """Stands in for the mail server, so a test can recover the raw code that
+    otherwise exists only inside the outgoing message."""
+
+    def __init__(self) -> None:
+        self._sent: list[dict[str, Any]] = []
+
+    async def send(
+        self, *, to: str, subject: str, body: str, html_body: str | None = None
+    ) -> None:
+        self._sent.append(
+            {"to": to, "subject": subject, "body": body, "html": html_body}
+        )
+
+    async def outbox(self) -> list[dict[str, Any]]:
+        # Delivery is a background task; wait for it before looking.
+        await email_service.drain()
+        return self._sent
+
+    async def code_for(self, email: str) -> str:
+        """The code in the most recent message to `email`."""
+        messages = [m for m in await self.outbox() if m["to"] == email]
+        assert messages, f"no email was sent to {email}"
+        match = re.search(r"\b(\d{6})\b", messages[-1]["body"])
+        assert match, messages[-1]["body"]
+        return match.group(1)
+
+
+@pytest.fixture
+def capture_email(monkeypatch: pytest.MonkeyPatch) -> CapturingSender:
+    sender = CapturingSender()
+    monkeypatch.setattr(email_service, "get_email_sender", lambda: sender)
+    return sender
 
 
 async def pending_verification_code(db_session: AsyncSession, email: str) -> Any:

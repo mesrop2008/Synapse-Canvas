@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -18,42 +17,12 @@ from api.core.config import Settings
 from api.core.security import hash_otp
 from api.models import EmailVerificationCode, User
 from api.services import email_service
-from tests.conftest import DEFAULT_PASSWORD, UserFactory, pending_verification_code
-
-
-class _CapturingSender:
-    """Stands in for the mail server, so a test can recover the raw code that
-    otherwise exists only inside the outgoing message."""
-
-    def __init__(self) -> None:
-        self._sent: list[dict[str, Any]] = []
-
-    async def send(
-        self, *, to: str, subject: str, body: str, html_body: str | None = None
-    ) -> None:
-        self._sent.append(
-            {"to": to, "subject": subject, "body": body, "html": html_body}
-        )
-
-    async def outbox(self) -> list[dict[str, Any]]:
-        # Delivery is a background task; wait for it before looking.
-        await email_service.drain()
-        return self._sent
-
-    async def code_for(self, email: str) -> str:
-        """The code in the most recent message to `email`."""
-        messages = [m for m in await self.outbox() if m["to"] == email]
-        assert messages, f"no email was sent to {email}"
-        match = re.search(r"\b(\d{6})\b", messages[-1]["body"])
-        assert match, messages[-1]["body"]
-        return match.group(1)
-
-
-@pytest.fixture
-def capture_email(monkeypatch: pytest.MonkeyPatch) -> _CapturingSender:
-    sender = _CapturingSender()
-    monkeypatch.setattr(email_service, "get_email_sender", lambda: sender)
-    return sender
+from tests.conftest import (
+    DEFAULT_PASSWORD,
+    CapturingSender,
+    UserFactory,
+    pending_verification_code,
+)
 
 
 @pytest.fixture
@@ -82,7 +51,7 @@ def _wrong(code: str) -> str:
 
 
 async def test_register_emails_a_code_that_activates_the_account(
-    client: AsyncClient, db_session, capture_email: _CapturingSender
+    client: AsyncClient, db_session, capture_email: CapturingSender
 ) -> None:
     email = "newcomer@example.com"
     await _register(client, email, "Newcomer")
@@ -117,7 +86,7 @@ async def test_register_emails_a_code_that_activates_the_account(
 
 
 async def test_email_is_matched_case_insensitively(
-    client: AsyncClient, capture_email: _CapturingSender
+    client: AsyncClient, capture_email: CapturingSender
 ) -> None:
     await _register(client, "casey@example.com")
     code = await capture_email.code_for("casey@example.com")
@@ -126,7 +95,7 @@ async def test_email_is_matched_case_insensitively(
 
 
 async def test_code_is_single_use(
-    client: AsyncClient, db_session, capture_email: _CapturingSender
+    client: AsyncClient, db_session, capture_email: CapturingSender
 ) -> None:
     await _register(client, "once@example.com")
     code = await capture_email.code_for("once@example.com")
@@ -140,7 +109,7 @@ async def test_code_is_single_use(
 
 
 async def test_only_a_keyed_hash_of_the_code_is_stored(
-    client: AsyncClient, db_session, capture_email: _CapturingSender
+    client: AsyncClient, db_session, capture_email: CapturingSender
 ) -> None:
     """A plain SHA-256 of a six-digit code is reversed by trying all million;
     the stored value must need the server's key as well."""
@@ -156,7 +125,7 @@ async def test_only_a_keyed_hash_of_the_code_is_stored(
 
 
 async def test_code_lives_exactly_five_minutes(
-    client: AsyncClient, db_session, capture_email: _CapturingSender
+    client: AsyncClient, db_session, capture_email: CapturingSender
 ) -> None:
     await _register(client, "ttl@example.com")
     row = await pending_verification_code(db_session, "ttl@example.com")
@@ -164,7 +133,7 @@ async def test_code_lives_exactly_five_minutes(
 
 
 async def test_expired_code_is_refused_and_discarded(
-    client: AsyncClient, db_session, capture_email: _CapturingSender
+    client: AsyncClient, db_session, capture_email: CapturingSender
 ) -> None:
     await _register(client, "stale@example.com")
     code = await capture_email.code_for("stale@example.com")
@@ -181,7 +150,7 @@ async def test_expired_code_is_refused_and_discarded(
 
 
 async def test_five_wrong_codes_wipe_the_code(
-    client: AsyncClient, db_session, capture_email: _CapturingSender
+    client: AsyncClient, db_session, capture_email: CapturingSender
 ) -> None:
     email = "guesser@example.com"
     await _register(client, email)
@@ -200,7 +169,7 @@ async def test_five_wrong_codes_wipe_the_code(
 
 
 async def test_right_code_still_works_after_four_wrong_ones(
-    client: AsyncClient, capture_email: _CapturingSender
+    client: AsyncClient, capture_email: CapturingSender
 ) -> None:
     email = "typo@example.com"
     await _register(client, email)
@@ -213,7 +182,7 @@ async def test_right_code_still_works_after_four_wrong_ones(
 
 async def test_wrong_guesses_are_budgeted_across_codes(
     client: AsyncClient,
-    capture_email: _CapturingSender,
+    capture_email: CapturingSender,
     rate_limits: Any,
     no_cooldown: None,
 ) -> None:
@@ -239,7 +208,7 @@ async def test_wrong_guesses_are_budgeted_across_codes(
 
 
 async def test_one_users_code_does_not_verify_another(
-    client: AsyncClient, capture_email: _CapturingSender
+    client: AsyncClient, capture_email: CapturingSender
 ) -> None:
     await _register(client, "alice@example.com")
     await _register(client, "bob@example.com")
@@ -254,7 +223,7 @@ async def test_one_users_code_does_not_verify_another(
 
 @pytest.mark.parametrize("code", ["12345", "1234567", "12345a", "١٢٣٤٥٦", ""])
 async def test_malformed_code_is_rejected_before_it_costs_an_attempt(
-    client: AsyncClient, db_session, capture_email: _CapturingSender, code: str
+    client: AsyncClient, db_session, capture_email: CapturingSender, code: str
 ) -> None:
     await _register(client, "shape@example.com")
     assert (await _verify(client, "shape@example.com", code)).status_code == 422
@@ -266,7 +235,7 @@ async def test_malformed_code_is_rejected_before_it_costs_an_attempt(
 
 
 async def test_a_new_code_retires_the_previous_one(
-    client: AsyncClient, db_session, capture_email: _CapturingSender, no_cooldown: None
+    client: AsyncClient, db_session, capture_email: CapturingSender, no_cooldown: None
 ) -> None:
     email = "resend@example.com"
     await _register(client, email)
@@ -288,7 +257,7 @@ async def test_a_new_code_retires_the_previous_one(
 
 
 async def test_resend_within_a_minute_is_refused(
-    client: AsyncClient, capture_email: _CapturingSender
+    client: AsyncClient, capture_email: CapturingSender
 ) -> None:
     email = "eager@example.com"
     await _register(client, email)
@@ -300,7 +269,7 @@ async def test_resend_within_a_minute_is_refused(
 
 
 async def test_resend_works_again_once_the_cooldown_has_passed(
-    client: AsyncClient, redis_client, capture_email: _CapturingSender
+    client: AsyncClient, redis_client, capture_email: CapturingSender
 ) -> None:
     email = "patient@example.com"
     await _register(client, email)
@@ -315,7 +284,7 @@ async def test_resend_works_again_once_the_cooldown_has_passed(
 
 
 async def test_cooldown_answers_the_same_for_unknown_addresses(
-    client: AsyncClient, capture_email: _CapturingSender
+    client: AsyncClient, capture_email: CapturingSender
 ) -> None:
     """A 429 only for addresses with accounts would be an enumeration oracle."""
     first = await client.post("/auth/resend-verification", json={"email": "ghost@example.com"})
@@ -325,7 +294,7 @@ async def test_cooldown_answers_the_same_for_unknown_addresses(
 
 
 async def test_hourly_send_cap(
-    client: AsyncClient, capture_email: _CapturingSender, rate_limits: Any, no_cooldown: None
+    client: AsyncClient, capture_email: CapturingSender, rate_limits: Any, no_cooldown: None
 ) -> None:
     rate_limits(email_verification_send_limit=2)
     email = "capped@example.com"
@@ -337,7 +306,7 @@ async def test_hourly_send_cap(
 
 
 async def test_registration_during_a_cooldown_sends_nothing(
-    client: AsyncClient, db_session, capture_email: _CapturingSender
+    client: AsyncClient, db_session, capture_email: CapturingSender
 ) -> None:
     """Registration cannot be used to get around the resend cooldown."""
     email = "bomb@example.com"
@@ -349,7 +318,7 @@ async def test_registration_during_a_cooldown_sends_nothing(
 
 
 async def test_resend_is_silent_for_unknown_and_verified_addresses(
-    client: AsyncClient, make_user: UserFactory, capture_email: _CapturingSender
+    client: AsyncClient, make_user: UserFactory, capture_email: CapturingSender
 ) -> None:
     """Resend answers 202 whether or not it actually sent anything."""
     unknown = await client.post(
@@ -373,7 +342,7 @@ async def test_resend_is_silent_for_unknown_and_verified_addresses(
 
 
 async def test_every_failure_looks_the_same(
-    client: AsyncClient, make_user: UserFactory, capture_email: _CapturingSender
+    client: AsyncClient, make_user: UserFactory, capture_email: CapturingSender
 ) -> None:
     """Unknown address, verified address, wrong code: one indistinguishable 401."""
     await _register(client, "pending@example.com")
@@ -391,7 +360,7 @@ async def test_every_failure_looks_the_same(
 
 
 async def test_duplicate_registration_notifies_the_real_owner(
-    client: AsyncClient, capture_email: _CapturingSender, no_cooldown: None
+    client: AsyncClient, capture_email: CapturingSender, no_cooldown: None
 ) -> None:
     """The one signal about a duplicate goes to the address owner, by email."""
     email = "owner@example.com"
@@ -713,7 +682,7 @@ async def test_a_dns_failure_does_not_block_registration(
 
 
 async def test_emails_follow_the_clients_language(
-    client: AsyncClient, capture_email: _CapturingSender
+    client: AsyncClient, capture_email: CapturingSender
 ) -> None:
     await client.post(
         "/auth/register",
