@@ -45,6 +45,8 @@ for _limit_var in (
     "REGISTER_RATE_LIMIT_PER_IP",
     "REFRESH_RATE_LIMIT_PER_IP",
     "VERIFY_EMAIL_RATE_LIMIT_PER_IP",
+    "PASSWORD_RESET_RATE_LIMIT_PER_IP",
+    "PASSWORD_RESET_VERIFY_RATE_LIMIT_PER_IP",
 ):
     os.environ[_limit_var] = "0"
 # The suite registers @example.com, which publishes a null MX, and must not
