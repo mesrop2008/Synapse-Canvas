@@ -32,6 +32,7 @@
       "refresh_unknown": "Your session is not valid. Please sign in again.",
       "reset_code_invalid": "That code is wrong or has expired. Check it and try again, or request a new one.",
       "reset_locked": "Too many wrong codes. Password recovery for this address is paused for a few minutes.",
+      "session_revoked": "This session has ended because the account's password was changed. Sign in again.",
       "token_expired": "Your session has expired. Please sign in again.",
       "user_gone": "This account no longer exists.",
       "verification_invalid": "That code is wrong or has expired. Check it and try again, or request a new one.",

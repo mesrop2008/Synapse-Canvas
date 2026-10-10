@@ -20,7 +20,7 @@ from api.core.exceptions import (
     NotFoundError,
     PermissionDeniedError,
 )
-from api.core.security import ACCESS_TOKEN, decode_token, subject_uuid
+from api.core.security import ACCESS_TOKEN, decode_token, subject_uuid, token_version
 from api.db.session import get_db
 from api.models.document import Document
 from api.models.enums import WorkspaceRole
@@ -51,6 +51,10 @@ async def get_current_user(
     if user is None:
         # Valid signature, deleted account: the token must stop working.
         raise AuthenticationError("User no longer exists", code=ErrorCode.USER_GONE)
+    if token_version(payload) != user.token_version:
+        raise AuthenticationError(
+            "This session has been ended", code=ErrorCode.SESSION_REVOKED
+        )
     return user
 
 

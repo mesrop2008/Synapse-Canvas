@@ -37,6 +37,7 @@ from api.core.security import (
     decode_token,
     hash_password,
     subject_uuid,
+    token_version,
     verify_password,
 )
 from api.models.email_verification import EmailVerificationCode
@@ -347,8 +348,8 @@ async def issue_token_pair(
     await db.commit()
 
     return TokenPair(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id, jti),
+        access_token=create_access_token(user.id, version=user.token_version),
+        refresh_token=create_refresh_token(user.id, jti, version=user.token_version),
         expires_in=settings.access_token_expire_minutes * 60,
     )
 
@@ -389,6 +390,10 @@ async def refresh_token_pair(db: AsyncSession, refresh_token: str) -> TokenPair:
     user = await get_user_by_id(db, subject_uuid(payload))
     if user is None:
         raise AuthenticationError("User no longer exists", code=ErrorCode.USER_GONE)
+    if token_version(payload) != user.token_version:
+        raise AuthenticationError(
+            "This session has been ended", code=ErrorCode.SESSION_REVOKED
+        )
 
     pair = await issue_token_pair(db, user, family_id=record.family_id)
 

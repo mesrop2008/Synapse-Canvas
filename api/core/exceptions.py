@@ -30,6 +30,7 @@ class ErrorCode(StrEnum):
     REFRESH_UNKNOWN = "auth.refresh_unknown"
     REFRESH_REVOKED = "auth.refresh_revoked"
     REFRESH_EXPIRED = "auth.refresh_expired"
+    SESSION_REVOKED = "auth.session_revoked"
 
     WORKSPACE_NOT_FOUND = "workspace.not_found"
     ROLE_TOO_LOW = "workspace.role_too_low"
