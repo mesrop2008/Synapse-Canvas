@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Any
 
+import jwt as pyjwt
 import pytest_asyncio
 from httpx import AsyncClient, Response
 from sqlalchemy import select
@@ -12,7 +13,7 @@ from sqlalchemy import select
 from api.core import i18n
 from api.core.config import get_settings
 from api.core.security import PASSWORD_RESET_TOKEN, create_token
-from api.models import RefreshToken
+from api.models import RefreshToken, User
 from tests.conftest import DEFAULT_PASSWORD, CapturingSender, TestUser, UserFactory
 
 NEW_PASSWORD = "An0ther-Secret!pw"
@@ -60,6 +61,18 @@ async def _me(client: AsyncClient, access_token: str) -> Response:
 
 async def _refresh(client: AsyncClient, refresh_token: str) -> Response:
     return await client.post("/auth/refresh", json={"refresh_token": refresh_token})
+
+
+def _reissued(token: str, **changes: Any) -> str:
+    """The same claims, re-signed with some changed (None drops one)."""
+    settings = get_settings()
+    claims = pyjwt.decode(token, options={"verify_signature": False})
+    for name, value in changes.items():
+        if value is None:
+            claims.pop(name, None)
+        else:
+            claims[name] = value
+    return pyjwt.encode(claims, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
 # --- setting the password -----------------------------------------------------
@@ -190,3 +203,40 @@ async def test_confirm_is_limited_per_ip(
     rate_limits(password_reset_verify_rate_limit_per_ip=1)
     assert (await _confirm(client, "not.a.jwt")).status_code == 401
     assert (await _confirm(client, "not.a.jwt")).status_code == 429
+
+
+# --- the token version ----------------------------------------------------------
+
+
+async def test_a_bumped_version_ends_sessions_whose_rows_are_live(
+    client: AsyncClient, account: TestUser, db_session: Any
+) -> None:
+    """The version alone is enough: the refresh rows are not what stops them."""
+    user = await db_session.get(User, account.id)
+    user.token_version += 1
+    await db_session.commit()
+
+    me = await _me(client, account.access_token)
+    assert me.json()["code"] == "auth.session_revoked"
+    refreshed = await _refresh(client, account.refresh_token)
+    assert refreshed.status_code == 401
+    assert refreshed.json()["code"] == "auth.session_revoked"
+
+
+async def test_tokens_from_before_versions_still_work(
+    client: AsyncClient, account: TestUser
+) -> None:
+    """Upgrading must not sign everyone out."""
+    unversioned = _reissued(account.access_token, ver=None)
+    assert "ver" not in pyjwt.decode(unversioned, options={"verify_signature": False})
+
+    assert (await _me(client, unversioned)).status_code == 200
+
+
+async def test_a_malformed_version_is_refused(
+    client: AsyncClient, account: TestUser
+) -> None:
+    for version in ("0", 0.0, True, [0]):
+        response = await _me(client, _reissued(account.access_token, ver=version))
+        assert response.status_code == 401
+        assert response.json()["code"] == "auth.invalid_token"
