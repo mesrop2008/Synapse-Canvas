@@ -1,14 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 import { resendVerification, verifyEmail } from '../api/auth';
 import { ApiError } from '../api/client';
 import { describeFailure, failed, type FailedRequest } from '../api/errors';
 import { Alert } from '../components/Alert';
+import { CodeInput } from '../components/CodeInput';
 import { FieldError, invalidProps } from '../components/FieldError';
 import { LanguageToggle } from '../components/LanguageToggle';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { Logo } from '../components/icons';
+import { useCountdown } from '../hooks/useCountdown';
 import { useField, validateAll } from '../hooks/useField';
 import { useI18n } from '../hooks/useI18n';
 import { checkEmail } from '../validation';
@@ -33,15 +35,9 @@ export function VerifyEmailPage() {
   const [verified, setVerified] = useState(false);
   const [error, setError] = useState<FailedRequest | null>(null);
   const [resent, setResent] = useState(false);
-  const [cooldown, setCooldown] = useState(
+  const [cooldown, startCooldown] = useCountdown(
     handedOver.sent ? RESEND_COOLDOWN_SECONDS : 0,
   );
-
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    const timer = window.setTimeout(() => setCooldown((left) => left - 1), 1000);
-    return () => window.clearTimeout(timer);
-  }, [cooldown]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -68,10 +64,10 @@ export function VerifyEmailPage() {
       await resendVerification(email.value.trim());
       setResent(true);
       setCode('');
-      setCooldown(RESEND_COOLDOWN_SECONDS);
+      startCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 429) {
-        setCooldown(caught.retryAfter ?? RESEND_COOLDOWN_SECONDS);
+        startCooldown(caught.retryAfter ?? RESEND_COOLDOWN_SECONDS);
       }
       setError(failed(caught, 'verifyEmail.resendFailed'));
     }
@@ -141,22 +137,12 @@ export function VerifyEmailPage() {
 
           <div className="field">
             <label htmlFor="code">{t('verifyEmail.code')}</label>
-            <input
+            <CodeInput
               id="code"
-              className="input input-code"
-              type="text"
-              inputMode="numeric"
-              // Lets iOS and Android offer the code straight from the email.
-              autoComplete="one-time-code"
-              // No maxLength: it would cut a pasted "123 456" to "123 45"
-              // before the filter below could drop the space.
               placeholder={t('verifyEmail.codePlaceholder')}
               autoFocus={Boolean(handedOver.email)}
               value={code}
-              // Pasting "123 456" or "123-456" should still work.
-              onChange={(event) =>
-                setCode(event.target.value.replace(/\D/g, '').slice(0, 6))
-              }
+              onChange={setCode}
             />
             <p className="hint">{t('verifyEmail.codeHint')}</p>
           </div>
