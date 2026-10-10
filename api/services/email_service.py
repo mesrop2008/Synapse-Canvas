@@ -238,28 +238,52 @@ async def drain(timeout: float | None = None) -> None:
         logger.warning("Abandoned %d undelivered email(s) at shutdown", len(still_pending))
 
 
-def _verification_lines(locale: Locale) -> dict[str, str]:
-    settings = get_settings()
-    brand = settings.mail_from_name
+def _code_lines(
+    locale: Locale, section: str, *, ttl_seconds: int, attempts: int
+) -> dict[str, str]:
+    brand = get_settings().mail_from_name
     return {
-        "subject": i18n.text(locale, "email.verification.subject", brand=brand),
-        "intro": i18n.text(locale, "email.verification.intro", brand=brand),
+        "subject": i18n.text(locale, f"email.{section}.subject", brand=brand),
+        "intro": i18n.text(locale, f"email.{section}.intro", brand=brand),
         "instructions": i18n.text(
             locale,
-            "email.verification.instructions",
-            minutes=max(1, round(settings.email_verification_code_ttl_seconds / 60)),
-            attempts=settings.email_verification_max_attempts,
+            f"email.{section}.instructions",
+            minutes=max(1, round(ttl_seconds / 60)),
+            attempts=attempts,
         ),
-        "never_share": i18n.text(locale, "email.verification.neverShare"),
-        "ignore": i18n.text(locale, "email.verification.ignore"),
+        "never_share": i18n.text(locale, f"email.{section}.neverShare"),
+        "ignore": i18n.text(locale, f"email.{section}.ignore"),
     }
 
 
 def send_verification_code(
     *, to: str, code: str, locale: Locale = DEFAULT_LOCALE
 ) -> None:
+    settings = get_settings()
+    lines = _code_lines(
+        locale,
+        "verification",
+        ttl_seconds=settings.email_verification_code_ttl_seconds,
+        attempts=settings.email_verification_max_attempts,
+    )
+    _send_code(to=to, code=code, locale=locale, lines=lines)
+
+
+def send_password_reset_code(
+    *, to: str, code: str, locale: Locale = DEFAULT_LOCALE
+) -> None:
+    settings = get_settings()
+    lines = _code_lines(
+        locale,
+        "passwordReset",
+        ttl_seconds=settings.password_reset_code_ttl_seconds,
+        attempts=settings.password_reset_max_attempts,
+    )
+    _send_code(to=to, code=code, locale=locale, lines=lines)
+
+
+def _send_code(*, to: str, code: str, locale: Locale, lines: dict[str, str]) -> None:
     # The code stays out of the subject, which lock screens show to anyone.
-    lines = _verification_lines(locale)
     body = (
         f"{lines['intro']}\n\n    {code}\n\n{lines['instructions']}\n\n"
         f"{lines['never_share']}\n{lines['ignore']}"

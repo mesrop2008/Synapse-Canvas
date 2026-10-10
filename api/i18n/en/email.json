@@ -6,6 +6,13 @@
     "neverShare": "Never share this code. We will never ask you for it.",
     "ignore": "If you did not create an account, ignore this message."
   },
+  "passwordReset": {
+    "subject": "Your {brand} password reset code",
+    "intro": "Your {brand} password reset code is:",
+    "instructions": "Enter it on the password reset page to choose a new password. The code expires in {minutes} min and stops working after {attempts} wrong attempts.",
+    "neverShare": "Never share this code. We will never ask you for it.",
+    "ignore": "If you did not ask to reset your password, ignore this message. Your password has not been changed."
+  },
   "duplicate": {
     "subject": "Someone tried to register with your email address",
     "exists": "An account already exists for this address, so nothing was created.",

@@ -197,3 +197,13 @@ verify_email_ip_rate_limit = IPRateLimit(
     "verify_email_rate_limit_per_ip",
     "verify_email_rate_limit_per_ip_window_seconds",
 )
+password_reset_ip_rate_limit = IPRateLimit(
+    "password-reset",
+    "password_reset_rate_limit_per_ip",
+    "password_reset_rate_limit_per_ip_window_seconds",
+)
+password_reset_verify_ip_rate_limit = IPRateLimit(
+    "password-reset-verify",
+    "password_reset_verify_rate_limit_per_ip",
+    "password_reset_verify_rate_limit_per_ip_window_seconds",
+)

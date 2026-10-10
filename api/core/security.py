@@ -15,10 +15,11 @@ from passlib.context import CryptContext
 from api.core.config import get_settings
 from api.core.exceptions import AuthenticationError, ErrorCode
 
-TokenType = Literal["access", "refresh"]
+TokenType = Literal["access", "refresh", "password_reset"]
 
 ACCESS_TOKEN: Final[TokenType] = "access"
 REFRESH_TOKEN: Final[TokenType] = "refresh"
+PASSWORD_RESET_TOKEN: Final[TokenType] = "password_reset"
 
 # bcrypt silently truncates past this; the schema refuses longer passwords.
 BCRYPT_MAX_BYTES: Final[int] = 72
@@ -60,31 +61,44 @@ def hash_url_token(raw_token: str) -> str:
 
 OTP_DIGITS: Final[int] = 6
 
+OtpPurpose = Literal["email-verification", "password-reset"]
+
 
 def generate_otp() -> str:
     return f"{secrets.randbelow(10**OTP_DIGITS):0{OTP_DIGITS}d}"
 
 
-@lru_cache(maxsize=1)
-def _otp_key() -> bytes:
-    # Derived from the signing secret under its own label, so it verifies no
-    # JWT. Rotating the secret voids outstanding codes, which last minutes.
+@lru_cache(maxsize=2)
+def _otp_key(purpose: OtpPurpose) -> bytes:
+    # Derived from the signing secret under a label per purpose, so it verifies
+    # no JWT and a code issued for one purpose hashes differently for another.
+    # Rotating the secret voids outstanding codes, which last minutes.
     return hmac.new(
         get_settings().jwt_secret_key.encode("utf-8"),
-        b"synapse-canvas/email-verification-otp/v1",
+        f"synapse-canvas/{purpose}-otp/v1".encode("utf-8"),
         hashlib.sha256,
     ).digest()
 
 
-def hash_otp(code: str, *, subject: uuid.UUID) -> str:
+def hash_otp(
+    code: str, *, subject: uuid.UUID, purpose: OtpPurpose = "email-verification"
+) -> str:
     """Keyed: an unkeyed hash of one of a million codes is reversed by brute
     force. The user id binds a row to its own user's code."""
     message = f"{subject}:{code}".encode("utf-8")
-    return hmac.new(_otp_key(), message, hashlib.sha256).hexdigest()
+    return hmac.new(_otp_key(purpose), message, hashlib.sha256).hexdigest()
 
 
-def otp_matches(code: str, *, subject: uuid.UUID, stored_hash: str) -> bool:
-    return hmac.compare_digest(hash_otp(code, subject=subject), stored_hash)
+def otp_matches(
+    code: str,
+    *,
+    subject: uuid.UUID,
+    stored_hash: str,
+    purpose: OtpPurpose = "email-verification",
+) -> bool:
+    return hmac.compare_digest(
+        hash_otp(code, subject=subject, purpose=purpose), stored_hash
+    )
 
 
 def _key_id(secret: str) -> str:
@@ -141,6 +155,14 @@ def refresh_token_lifetime() -> timedelta:
 def create_refresh_token(subject: uuid.UUID | str, jti: uuid.UUID) -> str:
     # The caller persists the same jti; a token without its row is rejected.
     return create_token(subject, REFRESH_TOKEN, refresh_token_lifetime(), jti=jti)
+
+
+def create_password_reset_token(subject: uuid.UUID | str) -> str:
+    return create_token(
+        subject,
+        PASSWORD_RESET_TOKEN,
+        timedelta(seconds=get_settings().password_reset_token_ttl_seconds),
+    )
 
 
 def decode_token(token: str, expected_type: TokenType) -> dict[str, Any]:

@@ -7,6 +7,8 @@ from api.dependencies import (
     DbSession,
     RequestLocale,
     login_ip_rate_limit,
+    password_reset_ip_rate_limit,
+    password_reset_verify_ip_rate_limit,
     refresh_ip_rate_limit,
     register_ip_rate_limit,
     verify_email_ip_rate_limit,
@@ -14,6 +16,9 @@ from api.dependencies import (
 from api.schemas.auth import (
     AcceptedResponse,
     LoginRequest,
+    PasswordResetGrant,
+    PasswordResetRequest,
+    PasswordResetVerifyRequest,
     RefreshRequest,
     RegisterRequest,
     ResendVerificationRequest,
@@ -21,7 +26,7 @@ from api.schemas.auth import (
     VerifyEmailRequest,
 )
 from api.schemas.user import UserRead
-from api.services import auth_service
+from api.services import auth_service, password_reset
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -83,6 +88,49 @@ async def resend_verification(
     return AcceptedResponse(
         detail="If that address needs verifying, a new code is on its way."
     )
+
+
+@router.post(
+    "/password-reset",
+    response_model=AcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Email a password reset code",
+    dependencies=[Depends(password_reset_ip_rate_limit)],
+    responses={
+        429: {
+            "description": "A code was sent to this address under a minute ago "
+            "(rate_limit.exceeded), recovery for it is locked after three wrong "
+            "codes (auth.reset_locked), or this IP is over its limit. Retry-After "
+            "says when to retry."
+        },
+    },
+)
+async def request_password_reset(
+    payload: PasswordResetRequest, db: DbSession, locale: RequestLocale
+) -> AcceptedResponse:
+    # Always 202, and each 429 applies to every address alike.
+    await password_reset.request_code(db, payload.email, locale)
+    return AcceptedResponse(detail="If the email exists, a code has been sent.")
+
+
+@router.post(
+    "/password-reset/verify",
+    response_model=PasswordResetGrant,
+    summary="Exchange an emailed reset code for a short-lived reset token",
+    dependencies=[Depends(password_reset_verify_ip_rate_limit)],
+    responses={
+        401: {"description": "Wrong, expired, used-up or unknown code"},
+        429: {
+            "description": "The third wrong code, which destroys it and locks "
+            "recovery for the address (auth.reset_locked); or too many wrong codes "
+            "today, or from this IP. Retry-After says when to retry."
+        },
+    },
+)
+async def verify_password_reset(
+    payload: PasswordResetVerifyRequest, db: DbSession
+) -> PasswordResetGrant:
+    return await password_reset.verify_code(db, payload.email, payload.code)
 
 
 @router.post(

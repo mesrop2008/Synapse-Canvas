@@ -1,8 +1,20 @@
 from __future__ import annotations
 
+from typing import Annotated
+
 from pydantic import BaseModel, EmailStr, Field
 
 from api.schemas.common import NewEmail, NonEmptyName, Password
+
+# [0-9], not \d: pydantic's regex engine treats \d as any Unicode digit.
+EmailedCode = Annotated[
+    str,
+    Field(
+        pattern=r"^[0-9]{6}$",
+        description="The six-digit code from the email",
+        examples=["042917"],
+    ),
+]
 
 
 class RegisterRequest(BaseModel):
@@ -30,16 +42,25 @@ class TokenPair(BaseModel):
 
 class VerifyEmailRequest(BaseModel):
     email: EmailStr
-    # [0-9], not \d: pydantic's regex engine treats \d as any Unicode digit.
-    code: str = Field(
-        pattern=r"^[0-9]{6}$",
-        description="The six-digit code from the verification email",
-        examples=["042917"],
-    )
+    code: EmailedCode
 
 
 class ResendVerificationRequest(BaseModel):
     email: EmailStr
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetVerifyRequest(BaseModel):
+    email: EmailStr
+    code: EmailedCode
+
+
+class PasswordResetGrant(BaseModel):
+    reset_token: str
+    expires_in: int = Field(description="Reset token lifetime in seconds")
 
 
 class AcceptedResponse(BaseModel):

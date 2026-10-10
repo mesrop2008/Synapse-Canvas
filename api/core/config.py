@@ -53,6 +53,14 @@ class Settings(BaseSettings):
     email_check_deliverability: bool = True
     email_dns_servers_raw: str = Field(default="", alias="EMAIL_DNS_SERVERS")
 
+    password_reset_code_ttl_seconds: int = 300
+    password_reset_max_attempts: int = 3
+    password_reset_resend_cooldown_seconds: int = 60
+    password_reset_lockout_seconds: int = 300
+    password_reset_failure_limit: int = 20
+    password_reset_failure_limit_window_seconds: int = 86400
+    password_reset_token_ttl_seconds: int = 300
+
     email_backend: EmailBackend = "console"
     smtp_host: str = ""
     smtp_port: int = 587
@@ -75,6 +83,10 @@ class Settings(BaseSettings):
     refresh_rate_limit_per_ip_window_seconds: int = 300
     verify_email_rate_limit_per_ip: int = 30
     verify_email_rate_limit_per_ip_window_seconds: int = 300
+    password_reset_rate_limit_per_ip: int = 10
+    password_reset_rate_limit_per_ip_window_seconds: int = 3600
+    password_reset_verify_rate_limit_per_ip: int = 30
+    password_reset_verify_rate_limit_per_ip_window_seconds: int = 300
     trust_proxy_headers: bool = False
 
     ws_ticket_ttl_seconds: int = 30
