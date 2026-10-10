@@ -12,6 +12,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useField, validateAll } from '../hooks/useField';
 import { useI18n } from '../hooks/useI18n';
 import { checkEmail, checkRequired } from '../validation';
+import type { ForgotPasswordState } from './ForgotPasswordPage';
 import type { VerifyEmailState } from './VerifyEmailPage';
 
 export function LoginPage() {
@@ -126,9 +127,19 @@ export function LoginPage() {
           {submitting ? t('login.submitting') : t('login.submit')}
         </button>
 
-        <p className="auth-foot">
-          {t('login.noAccount')} <Link to="/register">{t('login.createOne')}</Link>
-        </p>
+        <div className="auth-foot">
+          <p>
+            <Link
+              to="/forgot-password"
+              state={{ email: email.value.trim() } satisfies ForgotPasswordState}
+            >
+              {t('login.forgotPassword')}
+            </Link>
+          </p>
+          <p>
+            {t('login.noAccount')} <Link to="/register">{t('login.createOne')}</Link>
+          </p>
+        </div>
       </form>
     </main>
   );
