@@ -14,6 +14,7 @@ Environment = Literal["local", "test", "staging", "production"]
 EmailBackend = Literal["console", "smtp"]
 SmtpSecurity = Literal["starttls", "tls", "none"]
 LLMProviderName = Literal["fake", "gemini"]
+EmbeddingProviderName = Literal["gemini", "local", "fake"]
 
 
 class Settings(BaseSettings):
@@ -115,6 +116,15 @@ class Settings(BaseSettings):
     ai_buffer_ttl_seconds: int = 600
     ai_query_timeout_seconds: int = 300
 
+    embedding_provider: EmbeddingProviderName = "gemini"
+    gemini_embedding_model: str = "gemini-embedding-001"
+    local_embedding_model: str = (
+        "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    )
+    # Must equal the vector(N) of source_chunks.embedding; checked at startup.
+    embedding_dimension: int = 1536
+    embedding_timeout_seconds: float = 60.0
+
     # Comma-separated str, not list[str]: pydantic-settings JSON-decodes list
     # types before validators run.
     cors_origins_raw: str = Field(default="", alias="CORS_ORIGINS")
@@ -140,6 +150,38 @@ class Settings(BaseSettings):
                 "LLM_PROVIDER=fake returns scripted text and is only allowed when "
                 "ENVIRONMENT is local or test. Set LLM_PROVIDER=gemini and "
                 "GEMINI_API_KEY."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _check_embedding_settings(self) -> "Settings":
+        # Here, not at the top: api.embeddings imports this module.
+        from api.embeddings.base import HNSW_MAX_DIMENSIONS
+        from api.embeddings.local import LOCAL_EMBEDDING_DIMENSION
+
+        if self.embedding_provider == "fake" and self.environment not in ("local", "test"):
+            raise ValueError(
+                "EMBEDDING_PROVIDER=fake makes vectors from word hashes and is only "
+                "allowed when ENVIRONMENT is local or test. Use gemini, or local to "
+                "run without a key."
+            )
+        if not 1 <= self.embedding_dimension <= HNSW_MAX_DIMENSIONS:
+            raise ValueError(
+                f"EMBEDDING_DIMENSION={self.embedding_dimension}, but pgvector's HNSW "
+                f"index takes at most {HNSW_MAX_DIMENSIONS} dimensions."
+            )
+        # gemini-embedding-001 returns 128 to 3072 dimensions.
+        if self.embedding_provider == "gemini" and self.embedding_dimension < 128:
+            raise ValueError("Gemini embeddings have at least 128 dimensions.")
+        if (
+            self.embedding_provider == "local"
+            and self.embedding_dimension != LOCAL_EMBEDDING_DIMENSION
+        ):
+            raise ValueError(
+                f"The local embedding model has {LOCAL_EMBEDDING_DIMENSION} "
+                f"dimensions; set EMBEDDING_DIMENSION={LOCAL_EMBEDDING_DIMENSION}. "
+                "Changing it on a database that already holds chunks needs a "
+                "re-embed (see README)."
             )
         return self
 

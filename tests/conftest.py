@@ -57,6 +57,8 @@ os.environ["EMAIL_CHECK_DELIVERABILITY"] = "false"
 os.environ["EMAIL_BACKEND"] = "console"
 # Likewise a real GEMINI_API_KEY: no test may spend money.
 os.environ["LLM_PROVIDER"] = "fake"
+os.environ["EMBEDDING_PROVIDER"] = "fake"
+os.environ["EMBEDDING_DIMENSION"] = "1536"
 os.environ["GEMINI_API_KEY"] = ""
 
 from httpx import ASGITransport, AsyncClient  # noqa: E402
