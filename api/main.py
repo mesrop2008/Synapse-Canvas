@@ -23,10 +23,11 @@ from api.core.middleware import (
     SecurityHeadersMiddleware,
 )
 from api.core.queue import ArqQueue
+from api.embeddings.errors import EmbeddingError
 from api.core.redis import close_redis, get_redis
 from api.db.session import get_engine
 from api.realtime.hub import DocumentHub
-from api.routers import ai, auth, documents, realtime, sources, workspaces
+from api.routers import ai, auth, documents, realtime, search, sources, workspaces
 from api.schemas.document import DocumentRead, DocumentVersionConflict
 from api.services import email_service
 from api.services.ai_runner import GenerationRunner
@@ -80,6 +81,22 @@ async def stale_document_version_handler(
     return JSONResponse(status_code=exc.status_code, content=body.model_dump(mode="json"))
 
 
+# Raised while embedding a query inside a request; the worker records its own.
+_EMBEDDING_STATUS = {
+    ErrorCode.EMBEDDING_QUOTA_EXHAUSTED: 429,
+    ErrorCode.EMBEDDING_INPUT_TOO_LONG: 422,
+    ErrorCode.EMBEDDING_INVALID_KEY: 503,
+    ErrorCode.EMBEDDING_UNAVAILABLE: 503,
+}
+
+
+async def embedding_error_handler(request: Request, exc: EmbeddingError) -> JSONResponse:
+    return JSONResponse(
+        status_code=_EMBEDDING_STATUS.get(exc.code, 502),
+        content={"code": exc.code.value, "detail": exc.detail},
+    )
+
+
 async def validation_error_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
@@ -124,6 +141,7 @@ def create_app() -> FastAPI:
         StaleDocumentVersionError, stale_document_version_handler
     )
     app.add_exception_handler(AppError, app_error_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(EmbeddingError, embedding_error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, unhandled_error_handler)  # type: ignore[arg-type]
 
     app.add_middleware(SecurityHeadersMiddleware)
@@ -169,6 +187,7 @@ def create_app() -> FastAPI:
     app.include_router(realtime.router)
     app.include_router(ai.router)
     app.include_router(sources.router)
+    app.include_router(search.router)
 
     @app.get("/health", tags=["meta"], summary="Liveness probe")
     async def health() -> dict[str, str]:
