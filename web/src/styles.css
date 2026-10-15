@@ -1728,6 +1728,11 @@ a.user-chip:hover {
   line-height: 1.5;
 }
 
+.source-failure .muted {
+  display: block;
+  color: var(--text-3);
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
