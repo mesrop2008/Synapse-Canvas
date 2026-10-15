@@ -20,9 +20,12 @@ RUN apt-get update \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+# true adds torch and sentence-transformers for EMBEDDING_PROVIDER=local.
+ARG INSTALL_LOCAL_EMBEDDINGS=false
+
 WORKDIR /app
-COPY requirements.txt ./
-RUN pip install --upgrade pip && pip install -r requirements.txt
+COPY requirements.txt requirements-local.txt ./
+RUN pip install --upgrade pip && pip install -r requirements.txt     && if [ "$INSTALL_LOCAL_EMBEDDINGS" = "true" ]; then         pip install -r requirements-local.txt;     fi
 
 
 FROM base AS runtime
@@ -41,6 +44,10 @@ COPY --chmod=0755 docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 # A volume mounted here inherits this owner, so the key can be written.
 RUN mkdir -p /var/lib/synapse && chown appuser:appuser /var/lib/synapse
+
+# Where the local embedding model is downloaded to, on first use.
+ENV HF_HOME=/var/lib/synapse-models
+RUN mkdir -p /var/lib/synapse-models && chown appuser:appuser /var/lib/synapse-models
 
 USER appuser
 EXPOSE 8000

@@ -44,6 +44,7 @@ x-app-build: &app-build
   target: runtime
   args:
     PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.13-slim}
+    INSTALL_LOCAL_EMBEDDINGS: ${INSTALL_LOCAL_EMBEDDINGS:-false}
 
 services:
   # Postgres 15 with pgvector, so an existing postgres:15 data volume carries
@@ -110,6 +111,8 @@ services:
       - ./api:/app/api:ro
       - ./alembic:/app/alembic:ro
       - jwt_secret:/var/lib/synapse
+      # The local embedding model, downloaded once; queries are embedded here.
+      - embedding_models:/var/lib/synapse-models
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
   # A static build: rebuild with `docker compose up -d --build web`.
@@ -132,3 +135,4 @@ services:
 volumes:
   postgres_data:
   jwt_secret:
+  embedding_models:
