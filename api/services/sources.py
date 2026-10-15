@@ -18,6 +18,7 @@ from api.core.exceptions import AppError, ConflictError, ErrorCode, NotFoundErro
 from api.core.queue import JobQueue
 from api.models.enums import SourceStatus
 from api.models.source import Source
+from api.models.source_chunk import SourceChunk
 from api.services.source_files import measure, sanitize_filename, sniff
 from api.storage import SourceStorage
 
@@ -42,6 +43,11 @@ _STORAGE_LOCK = 0x5C
 class SourceNotFoundError(NotFoundError):
     detail = "Source not found"
     code = ErrorCode.SOURCE_NOT_FOUND
+
+
+class ChunkNotFoundError(NotFoundError):
+    detail = "That passage no longer exists"
+    code = ErrorCode.SOURCE_CHUNK_NOT_FOUND
 
 
 class SourceNotFailedError(ConflictError):
@@ -191,6 +197,23 @@ async def get_source(
     if source is None:
         raise SourceNotFoundError()
     return source
+
+
+async def get_chunk(
+    db: AsyncSession, workspace_id: uuid.UUID, source_id: uuid.UUID, chunk_id: uuid.UUID
+) -> tuple[Source, SourceChunk]:
+    """What a citation opens. Source first, so a deleted one says so."""
+    source = await get_source(db, workspace_id, source_id)
+    chunk = await db.scalar(
+        select(SourceChunk).where(
+            SourceChunk.id == chunk_id,
+            SourceChunk.source_id == source.id,
+            SourceChunk.workspace_id == workspace_id,
+        )
+    )
+    if chunk is None:
+        raise ChunkNotFoundError()
+    return source, chunk
 
 
 async def delete_source(

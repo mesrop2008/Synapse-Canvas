@@ -6,7 +6,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, File, Request, Response, UploadFile, status
 
 from api.dependencies import DbSession, RequireEditor, RequireViewer
-from api.schemas.source import SourceRead
+from api.schemas.source import SourceChunkRead, SourceRead
 from api.services import sources as source_service
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/sources", tags=["sources"])
@@ -78,6 +78,19 @@ async def get_source(
 ) -> SourceRead:
     source = await source_service.get_source(db, ctx.workspace.id, source_id)
     return SourceRead.of(source)
+
+
+@router.get(
+    "/{source_id}/chunks/{chunk_id}",
+    response_model=SourceChunkRead,
+    summary="One passage of a source, as a citation points at it",
+    responses={404: {"description": "The source or the passage is gone"}},
+)
+async def get_chunk(
+    source_id: uuid.UUID, chunk_id: uuid.UUID, ctx: RequireViewer, db: DbSession
+) -> SourceChunkRead:
+    source, chunk = await source_service.get_chunk(db, ctx.workspace.id, source_id, chunk_id)
+    return SourceChunkRead.of(source, chunk)
 
 
 @router.delete(

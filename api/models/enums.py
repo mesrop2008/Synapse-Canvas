@@ -32,6 +32,8 @@ class AIQueryMode(StrEnum):
     REWRITE = "rewrite"
     SUMMARIZE = "summarize"
     ASK = "ask"
+    # Ask, answered from the workspace's sources alone.
+    SOURCES = "sources"
 
 
 class AIQueryStatus(StrEnum):

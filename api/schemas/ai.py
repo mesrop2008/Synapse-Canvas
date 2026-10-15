@@ -5,6 +5,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from api.models.ai_query import AIQuery
 from api.models.enums import AIQueryMode, AIQueryStatus
 from api.services.ai_usage import WorkspaceUsage
 
@@ -25,13 +26,28 @@ class AIQueryCreate(BaseModel):
 
     @model_validator(mode="after")
     def _mode_needs(self) -> AIQueryCreate:
-        if self.mode is AIQueryMode.ASK and not self.instruction.strip():
+        if self.mode in (AIQueryMode.ASK, AIQueryMode.SOURCES) and not (
+            self.instruction.strip()
+        ):
             raise ValueError("Ask needs a question in `instruction`")
         if self.mode is AIQueryMode.REWRITE and (
             self.selection_from is None or self.selection_to is None
         ):
             raise ValueError("Rewrite needs selection_from and selection_to")
         return self
+
+
+class CitationRead(BaseModel):
+    marker: int = Field(description="The [n] in the response.")
+    chunk_id: uuid.UUID
+    source_id: uuid.UUID
+    filename: str
+    page_number: int | None
+    char_start: int
+    char_end: int
+    available: bool = Field(
+        description="False once the source has been deleted; the citation still names it."
+    )
 
 
 class AIQueryRead(BaseModel):
@@ -53,6 +69,31 @@ class AIQueryRead(BaseModel):
     completion_tokens: int | None
     created_at: datetime
     completed_at: datetime | None
+    retrieved_chunk_ids: list[uuid.UUID] | None = Field(
+        default=None,
+        description="Passages sent with the prompt, [1] first. Null when the mode does "
+        "not search sources; empty when the search found nothing.",
+    )
+    citations: list[CitationRead] = Field(default_factory=list)
+
+    @classmethod
+    def of(cls, query: AIQuery, existing_chunks: set[uuid.UUID]) -> AIQueryRead:
+        citations = [
+            CitationRead(
+                **citation,
+                available=uuid.UUID(citation["chunk_id"]) in existing_chunks,
+            )
+            for citation in query.citations or []
+        ]
+        read = cls.model_validate(
+            {
+                name: getattr(query, name)
+                for name in cls.model_fields
+                if name != "citations"
+            }
+        )
+        read.citations = citations
+        return read
 
 
 class AIQueryApply(BaseModel):

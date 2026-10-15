@@ -42,6 +42,7 @@ def terminal_from_row(query: AIQuery) -> Event:
                     "completion_tokens": query.completion_tokens or 0,
                     "model": query.model,
                 },
+                "citations": query.citations or [],
             },
         )
     if query.status is AIQueryStatus.CANCELLED:

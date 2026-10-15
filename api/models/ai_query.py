@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, Uuid
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import text as sa_text
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from api.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -85,6 +87,16 @@ class AIQuery(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+    # The passages sent with the prompt, in marker order: [1] is the first.
+    # Null when the mode does not search sources, empty when the search
+    # found nothing.
+    retrieved_chunk_ids: Mapped[list[uuid.UUID] | None] = mapped_column(
+        ARRAY(Uuid(as_uuid=True)), nullable=True
+    )
+    # The markers the answer used, resolved when it completed. A copy, so a
+    # past answer still names its sources once the passages are gone.
+    citations: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"<AIQuery id={self.id} mode={self.mode} status={self.status}>"

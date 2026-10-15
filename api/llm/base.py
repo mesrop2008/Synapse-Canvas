@@ -28,6 +28,8 @@ class LLMRequest:
     user: str
     max_output_tokens: int
     locale: Locale = DEFAULT_LOCALE
+    # Passages of the workspace's sources in `user`, labelled [1] to [n].
+    source_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)

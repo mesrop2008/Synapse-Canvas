@@ -1,12 +1,14 @@
 """Builds what is sent to the provider from the mode, the user's instruction,
-the document title and the document itself. The wording is in
-api/i18n/*/ai.json, in the language the user's client asks for.
+the document title, the document itself and passages of the workspace's
+sources. The wording is in api/i18n/*/ai.json, in the language the user's
+client asks for.
 
-The title, the document and (from Part 5) the sources are untrusted: anyone in
-the workspace wrote them, and they may contain text posing as instructions.
-They are fenced in tags the system instruction declares to be data. That
-mitigates prompt injection; it does not solve it, which is one reason output
-is only ever a proposal the user has to accept."""
+The title, the document and the sources are untrusted: anyone in the
+workspace wrote the first two, and the sources came from outside it. Any of
+them may contain text posing as instructions. They are fenced in tags the
+system instruction declares to be data. That mitigates prompt injection; it
+does not solve it, which is one reason output is only ever a proposal the
+user has to accept."""
 
 from __future__ import annotations
 
@@ -37,9 +39,11 @@ class SelectionError(AppError):
 
 @dataclass(frozen=True, slots=True)
 class Source:
-    """A retrieved passage. Part 5 supplies these; until then there are none."""
+    """A retrieved passage, shown to the model as `[marker]`. The model is
+    given no filename, page or link to repeat: a citation is resolved from
+    the marker on the server."""
 
-    title: str
+    marker: int
     text: str
 
 
@@ -124,14 +128,18 @@ def _around_selection(text: str, start: int, end: int, budget: int) -> DocumentC
 
 
 def sources_section(sources: Sequence[Source]) -> str:
-    """Empty until Part 5 retrieves sources. The system instruction already
-    treats <sources> as data."""
+    """Uploaded files are adversarial in a way the document is not: a PDF
+    can carry text written to steer whatever model reads it. Each passage is
+    fenced so it cannot close its tag and speak outside it, and the system
+    instruction says <sources> is evidence, never instructions. This narrows
+    prompt injection; it does not prevent it -- a model can still be talked
+    round -- so answers stay proposals, and citations are resolved here
+    rather than taken on the model's word."""
     if not sources:
         return ""
     items = "\n".join(
-        f'<source index="{index}" title="{_fence(source.title)}">\n'
-        f"{_fence(source.text)}\n</source>"
-        for index, source in enumerate(sources, start=1)
+        f'<source marker="[{source.marker}]">\n{_fence(source.text)}\n</source>'
+        for source in sources
     )
     return f"<sources>\n{items}\n</sources>"
 
@@ -147,20 +155,27 @@ def build_prompt(
     sources: Sequence[Source] = (),
 ) -> LLMRequest:
     mark = i18n.text(locale, "ai.prompt.selectionMark")
-    task = i18n.text(locale, f"ai.prompt.tasks.{mode.value}", mark=mark)
+    task_key = mode.value
+    if mode is AIQueryMode.ASK and sources:
+        task_key = "askWithSources"
+    task = i18n.text(locale, f"ai.prompt.tasks.{task_key}", mark=mark)
     default = i18n.text(locale, f"ai.prompt.defaults.{mode.value}")
 
-    document = context.before
-    if mode is AIQueryMode.REWRITE:
-        document += mark + context.after
-
-    sections = [
-        i18n.text(locale, "ai.prompt.task", task=task),
-        f"<title>{_fence(title)}</title>",
-        f"<document>\n{_fence(document)}\n</document>",
-    ]
-    if mode is AIQueryMode.REWRITE:
-        sections.append(f"<selection>\n{_fence(context.selection)}\n</selection>")
+    sections = [i18n.text(locale, "ai.prompt.task", task=task)]
+    if sources:
+        sections.append(i18n.text(locale, "ai.prompt.cite"))
+    # Answering from the sources alone, the document is left out so it
+    # cannot stand in for them.
+    if mode is not AIQueryMode.SOURCES:
+        document = context.before
+        if mode is AIQueryMode.REWRITE:
+            document += mark + context.after
+        sections += [
+            f"<title>{_fence(title)}</title>",
+            f"<document>\n{_fence(document)}\n</document>",
+        ]
+        if mode is AIQueryMode.REWRITE:
+            sections.append(f"<selection>\n{_fence(context.selection)}\n</selection>")
     sections.append(sources_section(sources))
     sections.append(
         f"<instruction>\n{_fence(instruction.strip() or default)}\n</instruction>"
@@ -171,4 +186,5 @@ def build_prompt(
         user="\n\n".join(section for section in sections if section),
         max_output_tokens=max_output_tokens,
         locale=locale,
+        source_count=len(sources),
     )
