@@ -6,7 +6,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, select, tuple_, update
@@ -15,12 +15,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.core import i18n
 from api.core.config import get_settings
 from api.core.exceptions import ConflictError, ErrorCode, NotFoundError
+from api.embeddings.base import EmbeddingProvider
 from api.llm.base import LLMRequest, Usage, estimate_tokens
 from api.models.ai_query import AIQuery
 from api.models.document import Document
 from api.models.enums import AIQueryMode, AIQueryStatus
-from api.services import ai_usage, prompts
+from api.services import ai_usage, prompts, retrieval
 from api.services import documents as document_service
+from api.services.citations import Citation
 from api.services.documents import AppliedChange, StaleDocumentVersionError, snapshot
 from api.services.prosemirror import (
     Edit,
@@ -48,6 +50,7 @@ class Outcome:
     error_code: ErrorCode | None = None
     detail: str | None = None
     usage: Usage | None = None
+    citations: list[Citation] | None = None
 
 
 def _check_bounds(document: Document, *positions: int | None) -> None:
@@ -67,9 +70,16 @@ async def create_query(
     selection_from: int | None,
     selection_to: int | None,
     locale: i18n.Locale = i18n.DEFAULT_LOCALE,
-) -> tuple[AIQuery, LLMRequest]:
+    embeddings: EmbeddingProvider | None = None,
+) -> tuple[AIQuery, LLMRequest | None, list[retrieval.RetrievedChunk]]:
     """The prompt is built now, against the document as the user sees it, and
-    handed to the runner in memory; only the instruction is stored."""
+    handed to the runner in memory with the passages it was sent; only the
+    instruction and the passages' ids are stored.
+
+    Questions search the workspace's sources first. Answering from the
+    sources alone with nothing found, the model is not asked at all: the
+    answer is that the sources do not say, rather than the model's own
+    knowledge passed off as theirs. No request then goes to the runner."""
     settings = get_settings()
     _check_bounds(document, selection_from, selection_to)
     if (
@@ -89,6 +99,18 @@ async def create_query(
             raise prompts.SelectionError()
         selection_from, selection_to = snapped
 
+    retrieved: list[retrieval.RetrievedChunk] = []
+    searches = mode in (AIQueryMode.ASK, AIQueryMode.SOURCES) and embeddings is not None
+    if searches:
+        assert embeddings is not None
+        found = await retrieval.retrieve(db, embeddings, document.workspace_id, instruction)
+        retrieved = found.chunks
+        if mode is AIQueryMode.SOURCES and not retrieved:
+            query = await _answer_without_sources(
+                db, document, user_id, instruction, locale, searched=found.searched
+            )
+            return query, None, []
+
     context = prompts.build_context(
         document.content,
         mode,
@@ -103,6 +125,10 @@ async def create_query(
         context=context,
         max_output_tokens=settings.ai_max_output_tokens,
         locale=locale,
+        sources=[
+            prompts.Source(marker, chunk.content)
+            for marker, chunk in enumerate(retrieved, start=1)
+        ],
     )
 
     await ai_usage.lock_workspace(db, document.workspace_id)
@@ -119,10 +145,40 @@ async def create_query(
         selection_from=selection_from,
         selection_to=selection_to,
         status=AIQueryStatus.STREAMING,
+        retrieved_chunk_ids=[chunk.chunk_id for chunk in retrieved] if searches else None,
     )
     db.add(query)
     await db.commit()
-    return query, request
+    return query, request, retrieved
+
+
+async def _answer_without_sources(
+    db: AsyncSession,
+    document: Document,
+    user_id: uuid.UUID,
+    instruction: str,
+    locale: i18n.Locale,
+    *,
+    searched: bool,
+) -> AIQuery:
+    key = "ai.noSources.unrelated" if searched else "ai.noSources.none"
+    query = AIQuery(
+        document_id=document.id,
+        workspace_id=document.workspace_id,
+        user_id=user_id,
+        prompt=instruction,
+        mode=AIQueryMode.SOURCES,
+        status=AIQueryStatus.COMPLETED,
+        response=i18n.text(locale, key),
+        retrieved_chunk_ids=[],
+        citations=[],
+        prompt_tokens=0,
+        completion_tokens=0,
+        completed_at=datetime.now(UTC),
+    )
+    db.add(query)
+    await db.commit()
+    return query
 
 
 async def get_query(
@@ -185,18 +241,21 @@ async def finish(db: AsyncSession, query_id: uuid.UUID, outcome: Outcome) -> boo
     """False if the row was no longer streaming -- expired as abandoned while
     the generation ran."""
     usage = outcome.usage
+    values: dict[str, Any] = {
+        "status": outcome.status,
+        "response": outcome.response,
+        "error_code": outcome.error_code.value if outcome.error_code else None,
+        "model": usage.model if usage else None,
+        "prompt_tokens": usage.prompt_tokens if usage else None,
+        "completion_tokens": usage.completion_tokens if usage else None,
+        "completed_at": func.now(),
+    }
+    if outcome.citations is not None:
+        values["citations"] = [citation.as_json() for citation in outcome.citations]
     result = await db.execute(
         update(AIQuery)
         .where(AIQuery.id == query_id, AIQuery.status == AIQueryStatus.STREAMING)
-        .values(
-            status=outcome.status,
-            response=outcome.response,
-            error_code=outcome.error_code.value if outcome.error_code else None,
-            model=usage.model if usage else None,
-            prompt_tokens=usage.prompt_tokens if usage else None,
-            completion_tokens=usage.completion_tokens if usage else None,
-            completed_at=func.now(),
-        )
+        .values(**values)
     )
     await db.commit()
     return result.rowcount == 1

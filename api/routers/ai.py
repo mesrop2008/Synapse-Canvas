@@ -16,11 +16,12 @@ from fastapi.responses import StreamingResponse
 
 from api.core.exceptions import AppError, ErrorCode
 from api.core.redis import get_redis
+from api.models.ai_query import AIQuery
 from api.dependencies import DbSession, DocumentEditor, DocumentViewer, RequestLocale
 from api.models.enums import AIQueryStatus
 from api.schemas.ai import AIQueryApply, AIQueryCreate, AIQueryPage, AIQueryRead
 from api.schemas.document import DocumentRead, DocumentVersionConflict
-from api.services import ai_buffer, ai_queries, ai_stream
+from api.services import ai_buffer, ai_queries, ai_stream, citations
 
 router = APIRouter(prefix="/documents/{document_id}/ai/queries", tags=["ai"])
 
@@ -36,6 +37,18 @@ class CursorError(AppError):
     status_code = 422
     detail = "Malformed cursor"
     code = ErrorCode.REQUEST_INVALID
+
+
+async def _read(db: DbSession, *queries: AIQuery) -> list[AIQueryRead]:
+    """With each citation marked available or not: its source may have been
+    deleted since."""
+    cited = {
+        uuid.UUID(citation["chunk_id"])
+        for query in queries
+        for citation in query.citations or []
+    }
+    existing = await citations.existing_chunks(db, cited)
+    return [AIQueryRead.of(query, existing) for query in queries]
 
 
 def _encode_cursor(created_at: datetime, query_id: uuid.UUID) -> str:
@@ -70,7 +83,7 @@ async def create_query(
     request: Request,
     locale: RequestLocale,
 ) -> AIQueryRead:
-    query, llm_request = await ai_queries.create_query(
+    query, llm_request, sent = await ai_queries.create_query(
         db,
         document=scope.document,
         user_id=scope.user.id,
@@ -79,9 +92,13 @@ async def create_query(
         selection_from=payload.selection_from,
         selection_to=payload.selection_to,
         locale=locale,
+        embeddings=request.app.state.embeddings,
     )
-    await request.app.state.ai.start(query.id, llm_request)
-    return AIQueryRead.model_validate(query)
+    # None when the answer needed no model; its stream replays the row.
+    if llm_request is not None:
+        await request.app.state.ai.start(query.id, llm_request, sent)
+    [read] = await _read(db, query)
+    return read
 
 
 def _sse(event: ai_buffer.Event | None) -> str:
@@ -147,7 +164,8 @@ async def cancel_query(
     if query.status is AIQueryStatus.STREAMING:
         await ai_buffer.request_cancel(get_redis(), query.id)
         query = await ai_queries.wait_until_ended(db, query, CANCEL_WAIT_SECONDS)
-    return AIQueryRead.model_validate(query)
+    [read] = await _read(db, query)
+    return read
 
 
 @router.post(
@@ -210,6 +228,4 @@ async def list_queries(
         db, scope.document.id, scope.user.id, limit=limit, before=before
     )
     next_cursor = _encode_cursor(rows[-1].created_at, rows[-1].id) if more else None
-    return AIQueryPage(
-        items=[AIQueryRead.model_validate(row) for row in rows], next_cursor=next_cursor
-    )
+    return AIQueryPage(items=await _read(db, *rows), next_cursor=next_cursor)

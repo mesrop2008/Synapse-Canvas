@@ -14,6 +14,7 @@ import asyncio
 import dataclasses
 import logging
 import uuid
+from collections.abc import Sequence
 
 from redis.asyncio import Redis
 
@@ -23,8 +24,9 @@ from api.db.session import get_sessionmaker
 from api.llm.base import LLMProvider, LLMRequest, Usage, estimate_tokens
 from api.llm.errors import ProviderError
 from api.models.enums import AIQueryStatus
-from api.services import ai_buffer, ai_queries
+from api.services import ai_buffer, ai_queries, citations
 from api.services.ai_queries import Outcome
+from api.services.retrieval import RetrievedChunk
 
 logger = logging.getLogger(__name__)
 
@@ -59,17 +61,26 @@ class GenerationRunner:
         self._redis = redis
         self._tasks: set[asyncio.Task[None]] = set()
 
-    async def start(self, query_id: uuid.UUID, request: LLMRequest) -> None:
+    async def start(
+        self,
+        query_id: uuid.UUID,
+        request: LLMRequest,
+        sent: Sequence[RetrievedChunk] = (),
+    ) -> None:
+        """`sent` are the passages in the prompt, in marker order; the
+        answer's citations are resolved against them and nothing else."""
         # The first reader gets the grace period to connect.
         await ai_buffer.touch_reader(self._redis, query_id)
         await ai_buffer.touch_runner(self._redis, query_id, RUNNER_TTL_MS)
         task = asyncio.create_task(
-            self._run(query_id, request), name=f"ai-query:{query_id}"
+            self._run(query_id, request, sent), name=f"ai-query:{query_id}"
         )
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
-    async def _run(self, query_id: uuid.UUID, request: LLMRequest) -> None:
+    async def _run(
+        self, query_id: uuid.UUID, request: LLMRequest, sent: Sequence[RetrievedChunk]
+    ) -> None:
         queue: asyncio.Queue[_Item] = asyncio.Queue()
         pump = asyncio.create_task(_pump(self.provider, request, queue))
         produced: list[str] = []
@@ -86,7 +97,7 @@ class GenerationRunner:
             outcome = Outcome(AIQueryStatus.FAILED, error_code=ErrorCode.AI_FAILED)
         finally:
             await _stop(pump)
-            await asyncio.shield(self._finish(query_id, request, produced, outcome))
+            await asyncio.shield(self._finish(query_id, request, produced, outcome, sent))
 
     async def _relay(
         self, query_id: uuid.UUID, queue: asyncio.Queue[_Item], produced: list[str]
@@ -150,10 +161,15 @@ class GenerationRunner:
         request: LLMRequest,
         produced: list[str],
         outcome: Outcome,
+        sent: Sequence[RetrievedChunk] = (),
     ) -> None:
         if outcome.usage is None:
             usage = self._estimated_usage(request, produced, outcome)
             outcome = dataclasses.replace(outcome, usage=usage)
+        if outcome.status is AIQueryStatus.COMPLETED:
+            outcome = dataclasses.replace(
+                outcome, citations=citations.resolve(outcome.response or "", sent)
+            )
 
         # The row first: a reader that sees `done` may apply at once.
         try:
@@ -191,6 +207,7 @@ def _terminal_event(outcome: Outcome) -> tuple[ai_buffer.EventType, dict[str, ob
                 "completion_tokens": usage.completion_tokens if usage else 0,
                 "model": usage.model if usage else None,
             },
+            "citations": [citation.as_json() for citation in outcome.citations or []],
         }
     if outcome.status is AIQueryStatus.CANCELLED:
         return "cancelled", {}
