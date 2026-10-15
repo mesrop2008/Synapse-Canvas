@@ -46,7 +46,12 @@ class FakeProvider(LLMProvider):
         self.started += 1
         self.requests.append(request)
         chunks = self.chunks
-        if chunks is None:
+        if chunks is None and request.source_count:
+            reply = i18n.text(
+                request.locale, "ai.fake.replyWithSources", count=request.source_count
+            )
+            chunks = split_words(reply)
+        elif chunks is None:
             chunks = split_words(i18n.text(request.locale, "ai.fake.reply"))
         try:
             for index, chunk in enumerate(chunks):
