@@ -4,6 +4,7 @@ import uuid
 
 from fastapi import APIRouter, Request, status
 
+from api.core.config import get_settings
 from api.dependencies import CurrentUser, DbSession, RequireOwner, RequireViewer
 from api.schemas.ai import WorkspaceUsageRead
 from api.schemas.workspace import (
@@ -16,6 +17,7 @@ from api.schemas.workspace import (
 )
 from api.services import ai_usage, workspace_service
 from api.services import documents as document_service
+from api.services import sources as source_service
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
@@ -94,6 +96,10 @@ async def delete_workspace(
     documents = await document_service.list_documents(db, ctx.workspace.id)
 
     await workspace_service.delete_workspace(db, ctx.workspace)
+    # The rows went with the workspace; the files are not in the database.
+    await source_service.delete_workspace_files(
+        request.app.state.storage, ctx.workspace.id
+    )
 
     for document in documents:
         await request.app.state.hub.publish(
@@ -104,11 +110,15 @@ async def delete_workspace(
 @router.get(
     "/{workspace_id}/usage",
     response_model=WorkspaceUsageRead,
-    summary="Today's AI token use and the workspace's limits",
+    summary="Today's AI token use, storage used, and the workspace's limits",
     responses=_MEMBERSHIP_RESPONSES,
 )
 async def get_usage(ctx: RequireViewer, db: DbSession) -> WorkspaceUsageRead:
-    return WorkspaceUsageRead.of(await ai_usage.get_usage(db, ctx.workspace.id))
+    return WorkspaceUsageRead.of(
+        await ai_usage.get_usage(db, ctx.workspace.id),
+        storage_used_bytes=await source_service.storage_used(db, ctx.workspace.id),
+        storage_quota_bytes=get_settings().source_workspace_quota_bytes,
+    )
 
 
 @router.get(

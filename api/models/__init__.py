@@ -8,6 +8,8 @@ from api.models.email_verification import EmailVerificationCode
 from api.models.enums import WORKSPACE_ROLE_ENUM_NAME, WorkspaceRole
 from api.models.rate_limit import RateLimitBucket
 from api.models.refresh_token import RefreshToken
+from api.models.source import Source
+from api.models.source_chunk import SourceChunk
 from api.models.user import User
 from api.models.workspace import Workspace
 from api.models.workspace_member import WorkspaceMember
@@ -20,6 +22,8 @@ __all__ = [
     "EmailVerificationCode",
     "RateLimitBucket",
     "RefreshToken",
+    "Source",
+    "SourceChunk",
     "User",
     "Workspace",
     "WorkspaceMember",

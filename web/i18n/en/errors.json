@@ -68,6 +68,15 @@
     "server": {
       "error": "Something went wrong on the server. Try again in a moment."
     },
+    "source": {
+      "not_found": "That source does not exist, or it was deleted.",
+      "unsupported_type": "Only PDF, Word (.docx), plain text and Markdown files can be uploaded.",
+      "archive": "Archives and compressed files are not accepted. Upload the documents inside them one by one.",
+      "empty": "This file has no text to read.",
+      "too_large": "That file is larger than the upload limit.",
+      "storage_quota": "This workspace has no room for that file. Delete a source to free some space.",
+      "not_failed": "Only a source that failed can be retried."
+    },
     "workspace": {
       "not_found": "That workspace does not exist, or you are not a member of it.",
       "role_too_low": "Your role in this workspace does not allow that."

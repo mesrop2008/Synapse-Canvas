@@ -42,6 +42,9 @@ x-app-environment: &app-environment
   GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}
   LOCAL_EMBEDDING_MODEL: ${LOCAL_EMBEDDING_MODEL:-sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}
   EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-1536}
+  SOURCE_STORAGE_DIR: /var/lib/synapse-sources
+  SOURCE_MAX_FILE_BYTES: ${SOURCE_MAX_FILE_BYTES:-20971520}
+  SOURCE_WORKSPACE_QUOTA_BYTES: ${SOURCE_WORKSPACE_QUOTA_BYTES:-209715200}
 
 x-app-build: &app-build
   context: .
@@ -117,6 +120,7 @@ services:
       - jwt_secret:/var/lib/synapse
       # The local embedding model, downloaded once; queries are embedded here.
       - embedding_models:/var/lib/synapse-models
+      - source_files:/var/lib/synapse-sources
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
   # A static build: rebuild with `docker compose up -d --build web`.
@@ -140,3 +144,4 @@ volumes:
   postgres_data:
   jwt_secret:
   embedding_models:
+  source_files:

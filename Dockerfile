@@ -45,6 +45,9 @@ COPY --chmod=0755 docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 # A volume mounted here inherits this owner, so the key can be written.
 RUN mkdir -p /var/lib/synapse && chown appuser:appuser /var/lib/synapse
 
+# Uploaded sources. A volume, shared by the API and the worker.
+RUN mkdir -p /var/lib/synapse-sources && chown appuser:appuser /var/lib/synapse-sources
+
 # Where the local embedding model is downloaded to, on first use.
 ENV HF_HOME=/var/lib/synapse-models
 RUN mkdir -p /var/lib/synapse-models && chown appuser:appuser /var/lib/synapse-models

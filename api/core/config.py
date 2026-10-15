@@ -125,6 +125,13 @@ class Settings(BaseSettings):
     embedding_dimension: int = 1536
     embedding_timeout_seconds: float = 60.0
 
+    # Relative to the working directory; the containers use a volume.
+    source_storage_dir: str = "var/sources"
+    source_max_file_bytes: int = 20 * 1024 * 1024
+    source_workspace_quota_bytes: int = 200 * 1024 * 1024
+    # What a DOCX may expand to; a zip bomb weighs little and expands to gigabytes.
+    source_max_uncompressed_bytes: int = 100 * 1024 * 1024
+
     # Comma-separated str, not list[str]: pydantic-settings JSON-decodes list
     # types before validators run.
     cors_origins_raw: str = Field(default="", alias="CORS_ORIGINS")
