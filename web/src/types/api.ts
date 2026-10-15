@@ -214,6 +214,11 @@ export interface AIQuery {
   citations: Citation[];
 }
 
+export interface AIQueryPage {
+  items: AIQuery[];
+  next_cursor: string | null;
+}
+
 export interface AIQueryInput {
   mode: AIQueryMode;
   instruction: string;

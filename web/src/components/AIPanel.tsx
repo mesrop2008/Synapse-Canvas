@@ -10,6 +10,7 @@ import { useAIStream } from '../hooks/useAIStream';
 import { useI18n } from '../hooks/useI18n';
 import type { MessageKey } from '../../i18n';
 import type { AIQueryInput, AIQueryMode, WorkspaceUsage } from '../types/api';
+import { AIHistory, aiHistoryKey } from './AIHistory';
 import { Alert } from './Alert';
 import { CitedAnswer } from './CitedAnswer';
 
@@ -153,8 +154,9 @@ export function AIPanel({ editor, documentId, workspaceId, socket }: AIPanelProp
   useEffect(() => {
     if (ai.status !== 'idle' && ai.status !== 'streaming') {
       void queryClient.invalidateQueries({ queryKey: aiUsageKey(workspaceId) });
+      void queryClient.invalidateQueries({ queryKey: aiHistoryKey(documentId) });
     }
-  }, [ai.status, queryClient, workspaceId]);
+  }, [ai.status, queryClient, workspaceId, documentId]);
 
   async function submit(event?: FormEvent) {
     event?.preventDefault();
@@ -404,6 +406,12 @@ export function AIPanel({ editor, documentId, workspaceId, socket }: AIPanelProp
           {t('ai.inserted')}
         </p>
       )}
+
+      <AIHistory
+        documentId={documentId}
+        workspaceId={workspaceId}
+        currentId={ai.status === 'idle' ? null : (ai.query?.id ?? null)}
+      />
     </aside>
   );
 }

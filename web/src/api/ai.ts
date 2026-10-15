@@ -1,6 +1,7 @@
 import type {
   AIQuery,
   AIQueryInput,
+  AIQueryPage,
   AIStreamEvent,
   DocumentDetail,
   WorkspaceUsage,
@@ -11,6 +12,11 @@ const queries = (documentId: string) => `/documents/${documentId}/ai/queries`;
 
 export function createQuery(documentId: string, input: AIQueryInput): Promise<AIQuery> {
   return request<AIQuery>('POST', queries(documentId), { body: input });
+}
+
+/** The caller's own queries on the document, newest first. */
+export function listQueries(documentId: string, limit: number): Promise<AIQueryPage> {
+  return request<AIQueryPage>('GET', `${queries(documentId)}?limit=${limit}`);
 }
 
 export function cancelQuery(documentId: string, queryId: string): Promise<AIQuery> {

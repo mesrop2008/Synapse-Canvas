@@ -65,5 +65,10 @@
     "notGrounded": "No passage of this workspace's sources matched the question, so this answer is not grounded in them.",
     "noneCited": "The answer cites none of the {count} passages found in the sources.",
     "close": "Close"
+  },
+  "history": {
+    "title": "Earlier answers",
+    "loading": "Loading earlier answers…",
+    "item": "{mode} · {when}"
   }
 }

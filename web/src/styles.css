@@ -1871,6 +1871,49 @@ a.user-chip:hover {
   overflow-wrap: anywhere;
 }
 
+.ai-history {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  font-size: 13.5px;
+}
+
+.ai-history > summary {
+  color: var(--text-2);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ai-history ul {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-history li details {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+
+.ai-history li summary {
+  display: grid;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.ai-history li details[open] summary {
+  margin-bottom: 8px;
+}
+
+.ai-history-prompt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* --- modal ---------------------------------------------------------------- */
 
 .modal-backdrop {
