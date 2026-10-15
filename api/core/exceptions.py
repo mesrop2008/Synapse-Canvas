@@ -58,6 +58,14 @@ class ErrorCode(StrEnum):
     AI_QUERY_NOT_FOUND = "ai.query_not_found"
     AI_QUERY_NOT_COMPLETED = "ai.query_not_completed"
 
+    SOURCE_NOT_FOUND = "source.not_found"
+    SOURCE_UNSUPPORTED_TYPE = "source.unsupported_type"
+    SOURCE_ARCHIVE = "source.archive"
+    SOURCE_EMPTY = "source.empty"
+    SOURCE_TOO_LARGE = "source.too_large"
+    SOURCE_STORAGE_QUOTA = "source.storage_quota"
+    SOURCE_NOT_FAILED = "source.not_failed"
+
     EMBEDDING_FAILED = "embedding.failed"
     EMBEDDING_QUOTA_EXHAUSTED = "embedding.quota_exhausted"
     EMBEDDING_INPUT_TOO_LONG = "embedding.input_too_long"
