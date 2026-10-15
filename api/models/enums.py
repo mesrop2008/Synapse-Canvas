@@ -43,3 +43,13 @@ class AIQueryStatus(StrEnum):
 
 AI_QUERY_MODE_ENUM_NAME = "ai_query_mode"
 AI_QUERY_STATUS_ENUM_NAME = "ai_query_status"
+
+
+class SourceStatus(StrEnum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    READY = "ready"
+    FAILED = "failed"
+
+
+SOURCE_STATUS_ENUM_NAME = "source_status"
