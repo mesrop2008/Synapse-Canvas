@@ -10,27 +10,32 @@ import { useAIStream } from '../hooks/useAIStream';
 import { useI18n } from '../hooks/useI18n';
 import type { MessageKey } from '../../i18n';
 import type { AIQueryInput, AIQueryMode, WorkspaceUsage } from '../types/api';
+import { AIHistory, aiHistoryKey } from './AIHistory';
 import { Alert } from './Alert';
+import { CitedAnswer } from './CitedAnswer';
 
-const MODES: readonly AIQueryMode[] = ['continue', 'rewrite', 'summarize', 'ask'];
+const MODES: readonly AIQueryMode[] = ['continue', 'rewrite', 'summarize', 'ask', 'sources'];
 
 const MODE_LABELS: Record<AIQueryMode, MessageKey> = {
   continue: 'ai.modes.continue',
   rewrite: 'ai.modes.rewrite',
   summarize: 'ai.modes.summarize',
   ask: 'ai.modes.ask',
+  sources: 'ai.modes.sources',
 };
 const MODE_HINTS: Record<AIQueryMode, MessageKey> = {
   continue: 'ai.hints.continue',
   rewrite: 'ai.hints.rewrite',
   summarize: 'ai.hints.summarize',
   ask: 'ai.hints.ask',
+  sources: 'ai.hints.sources',
 };
 const PLACEHOLDERS: Record<AIQueryMode, MessageKey> = {
   continue: 'ai.placeholders.continue',
   rewrite: 'ai.placeholders.rewrite',
   summarize: 'ai.placeholders.summarize',
   ask: 'ai.placeholders.ask',
+  sources: 'ai.placeholders.sources',
 };
 
 const SETTLE_TIMEOUT_MS = 2000;
@@ -128,7 +133,7 @@ export function AIPanel({ editor, documentId, workspaceId, socket }: AIPanelProp
   const busy = ai.status === 'streaming';
   const blocked =
     (mode === 'rewrite' && !selectionText.trim()) ||
-    (mode === 'ask' && !instruction.trim());
+    ((mode === 'ask' || mode === 'sources') && !instruction.trim());
 
   // The server widens a rewrite that crosses blocks to whole blocks. Its
   // range is adopted unless the document has changed since the request.
@@ -149,8 +154,9 @@ export function AIPanel({ editor, documentId, workspaceId, socket }: AIPanelProp
   useEffect(() => {
     if (ai.status !== 'idle' && ai.status !== 'streaming') {
       void queryClient.invalidateQueries({ queryKey: aiUsageKey(workspaceId) });
+      void queryClient.invalidateQueries({ queryKey: aiHistoryKey(documentId) });
     }
-  }, [ai.status, queryClient, workspaceId]);
+  }, [ai.status, queryClient, workspaceId, documentId]);
 
   async function submit(event?: FormEvent) {
     event?.preventDefault();
@@ -328,7 +334,16 @@ export function AIPanel({ editor, documentId, workspaceId, socket }: AIPanelProp
           ) : (
             <>
               <h3 className="ai-label">{t('ai.proposed')}</h3>
-              <p className="ai-text">{ai.text}</p>
+              {ai.query ? (
+                <CitedAnswer
+                  workspaceId={workspaceId}
+                  query={ai.query}
+                  text={ai.text}
+                  citations={ai.citations}
+                />
+              ) : (
+                <p className="ai-text">{ai.text}</p>
+              )}
             </>
           )}
 
@@ -391,6 +406,12 @@ export function AIPanel({ editor, documentId, workspaceId, socket }: AIPanelProp
           {t('ai.inserted')}
         </p>
       )}
+
+      <AIHistory
+        documentId={documentId}
+        workspaceId={workspaceId}
+        currentId={ai.status === 'idle' ? null : (ai.query?.id ?? null)}
+      />
     </aside>
   );
 }

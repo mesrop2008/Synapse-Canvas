@@ -816,3 +816,27 @@ async def test_a_russian_client_gets_russian_wording(
 
     assert provider.requests[0].system == i18n.text("ru", "ai.prompt.system")
     assert stream.text == i18n.text("ru", "ai.fake.reply")
+
+
+async def test_a_new_empty_document_takes_the_editors_cursor(
+    app: FastAPI, http: AsyncClient, live: Live
+) -> None:
+    """Stored with no blocks, shown with one empty paragraph: the editor's
+    cursor is one past the stored end."""
+    async with get_sessionmaker()() as db:
+        empty = await document_service.create_document(
+            db,
+            workspace_id=live.workspace_id,
+            created_by=None,
+            title="Blank",
+            content={"type": "doc", "content": []},
+        )
+
+    response = await http.post(
+        f"/documents/{empty.id}/ai/queries",
+        json={"mode": "ask", "instruction": "Anything?", "selection_to": 1},
+        headers=live.auth(),
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["selection_to"] is None

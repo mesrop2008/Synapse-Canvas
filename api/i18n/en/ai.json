@@ -22,7 +22,7 @@
   },
   "fake": {
     "reply": "This reply comes from FakeProvider, a stand-in that streams scripted text so the assistant can be tried without an API key or network access. Set LLM_PROVIDER=gemini and GEMINI_API_KEY to get real answers about this document.",
-    "replyWithSources": "This reply comes from FakeProvider, a stand-in that streams scripted text so the assistant can be tried without an API key. It was sent {count} passages from your sources and cites the first one here [1]. Set LLM_PROVIDER=gemini and GEMINI_API_KEY to get real answers."
+    "replyWithSources": "This reply comes from FakeProvider, a stand-in that streams scripted text so the assistant can be tried without an API key. Passages sent to it from your sources: {count}. It cites the first one here [1]. Set LLM_PROVIDER=gemini and GEMINI_API_KEY to get real answers."
   },
   "noSources": {
     "none": "This workspace has no processed sources yet, so there is nothing to answer from. Upload a source and ask again once it is ready.",

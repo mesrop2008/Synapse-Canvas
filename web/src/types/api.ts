@@ -170,7 +170,22 @@ export function canEdit(role: WorkspaceRole): boolean {
 
 /* AI assistant: mirrors api/schemas/ai.py and the events in api/services/ai_runner.py. */
 
-export type AIQueryMode = 'continue' | 'rewrite' | 'summarize' | 'ask';
+/** `sources` asks, answered from the workspace's sources alone. */
+export type AIQueryMode = 'continue' | 'rewrite' | 'summarize' | 'ask' | 'sources';
+
+/** A [n] in a response, resolved by the server to the passage it was sent. */
+export interface Citation {
+  marker: number;
+  chunk_id: string;
+  source_id: string;
+  filename: string;
+  page_number: number | null;
+  char_start: number;
+  char_end: number;
+  /** On a stored query: false once the source is deleted. Absent on a
+   *  live stream, where it is always there. */
+  available?: boolean;
+}
 
 export type AIQueryStatus = 'streaming' | 'completed' | 'cancelled' | 'failed';
 
@@ -193,6 +208,15 @@ export interface AIQuery {
   completion_tokens: number | null;
   created_at: Timestamp;
   completed_at: Timestamp | null;
+  /** Passages sent with the prompt, [1] first. Null when the mode does not
+   *  search sources; empty when the search found nothing. */
+  retrieved_chunk_ids: string[] | null;
+  citations: Citation[];
+}
+
+export interface AIQueryPage {
+  items: AIQuery[];
+  next_cursor: string | null;
 }
 
 export interface AIQueryInput {
@@ -211,7 +235,7 @@ export interface AIUsage {
 export type AIStreamEvent =
   | { type: 'token'; text: string }
   /** `response` is the whole text, authoritative over the tokens. */
-  | { type: 'done'; response: string; usage: AIUsage }
+  | { type: 'done'; response: string; usage: AIUsage; citations: Citation[] }
   | { type: 'error'; code: string; detail: string }
   | { type: 'cancelled' };
 
