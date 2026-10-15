@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -21,15 +22,17 @@ from api.core.middleware import (
     BodySizeLimitMiddleware,
     SecurityHeadersMiddleware,
 )
+from api.core.queue import ArqQueue
 from api.core.redis import close_redis, get_redis
 from api.db.session import get_engine
 from api.realtime.hub import DocumentHub
-from api.routers import ai, auth, documents, realtime, workspaces
+from api.routers import ai, auth, documents, realtime, sources, workspaces
 from api.schemas.document import DocumentRead, DocumentVersionConflict
 from api.services import email_service
 from api.services.ai_runner import GenerationRunner
 from api.services.documents import StaleDocumentVersionError
 from api.services.embedding_column import check_embedding_column
+from api.storage import build_storage
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +52,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Ends running generations and closes the provider's client.
     await app.state.ai.aclose()
     await app.state.embeddings.aclose()
+    await app.state.jobs.aclose()
     await close_redis()
     await get_engine().dispose()  # close pooled connections on shutdown
 
@@ -124,7 +128,16 @@ def create_app() -> FastAPI:
 
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
-        BodySizeLimitMiddleware, max_bytes=settings.max_request_body_bytes
+        BodySizeLimitMiddleware,
+        max_bytes=settings.max_request_body_bytes,
+        overrides=[
+            # The file plus multipart framing.
+            (
+                "POST",
+                re.compile(r"/workspaces/[^/]+/sources/?"),
+                settings.source_max_file_bytes + 64 * 1024,
+            )
+        ],
     )
 
     if settings.cors_origins:
@@ -147,12 +160,15 @@ def create_app() -> FastAPI:
     app.state.ai = GenerationRunner(llm.build_provider(settings), get_redis())
     # Queries are embedded here; documents by the worker.
     app.state.embeddings = embeddings.build_embedding_provider(settings)
+    app.state.storage = build_storage(settings)
+    app.state.jobs = ArqQueue(settings.redis_url)
 
     app.include_router(auth.router)
     app.include_router(workspaces.router)
     app.include_router(documents.router)
     app.include_router(realtime.router)
     app.include_router(ai.router)
+    app.include_router(sources.router)
 
     @app.get("/health", tags=["meta"], summary="Liveness probe")
     async def health() -> dict[str, str]:

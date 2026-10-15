@@ -43,6 +43,8 @@ x-app-environment: &app-environment
   LOCAL_EMBEDDING_MODEL: ${LOCAL_EMBEDDING_MODEL:-sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}
   EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-1536}
   SOURCE_STORAGE_DIR: /var/lib/synapse-sources
+  SOURCE_MAX_FILE_BYTES: ${SOURCE_MAX_FILE_BYTES:-20971520}
+  SOURCE_WORKSPACE_QUOTA_BYTES: ${SOURCE_WORKSPACE_QUOTA_BYTES:-209715200}
 
 x-app-build: &app-build
   context: .

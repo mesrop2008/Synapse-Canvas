@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+import re
+from collections.abc import Awaitable, Callable, Sequence
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
@@ -40,11 +41,24 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 class BodySizeLimitMiddleware(BaseHTTPMiddleware):
     """Checks Content-Length only; a chunked body slips past, so the reverse
-    proxy should cap size too."""
+    proxy should cap size too. `overrides` raise the limit for a method and
+    path pattern, such as an upload."""
 
-    def __init__(self, app: object, max_bytes: int) -> None:
+    def __init__(
+        self,
+        app: object,
+        max_bytes: int,
+        overrides: Sequence[tuple[str, re.Pattern[str], int]] = (),
+    ) -> None:
         super().__init__(app)  # type: ignore[arg-type]
         self.max_bytes = max_bytes
+        self.overrides = overrides
+
+    def _limit_for(self, request: Request) -> int:
+        for method, pattern, limit in self.overrides:
+            if request.method == method and pattern.fullmatch(request.url.path):
+                return limit
+        return self.max_bytes
 
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
@@ -61,12 +75,13 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
                         "detail": "Malformed Content-Length",
                     },
                 )
-            if declared > self.max_bytes:
+            limit = self._limit_for(request)
+            if declared > limit:
                 return JSONResponse(
                     status_code=413,
                     content={
                         "code": ErrorCode.REQUEST_TOO_LARGE.value,
-                        "detail": "Request body exceeds %d bytes" % self.max_bytes,
+                        "detail": "Request body exceeds %d bytes" % limit,
                     },
                 )
         return await call_next(request)
