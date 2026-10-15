@@ -1,0 +1,46 @@
+{
+  "title": "Sources",
+  "count": "{count} files",
+  "intro": "Upload papers and notes for the AI to answer from. Its answers cite the passages they use.",
+  "drop": "Drop files here, or {choose}",
+  "choose": "choose files",
+  "dropActive": "Drop to upload",
+  "dropLabel": "Upload sources",
+  "accepted": "PDF, Word (.docx), plain text or Markdown, up to {size} each.",
+  "viewerNotice": "Only editors and owners can upload or remove sources.",
+  "uploading": "Uploading",
+  "uploaded": "Uploaded",
+  "duplicate": "Already in this workspace as “{existing}”, so it was not processed again.",
+  "tooLargeHere": "Larger than the {size} upload limit, so it was not sent.",
+  "progressLabel": "Upload progress of {name}",
+  "loading": "Loading sources…",
+  "emptyTitle": "No sources yet",
+  "emptyText": "Uploaded files appear here while they are read, and are ready for the AI once they are.",
+  "storage": {
+    "label": "Storage",
+    "used": "{used} of {quota} used",
+    "unlimited": "{used} used, no limit"
+  },
+  "status": {
+    "pending": "Queued",
+    "processing": "Reading…",
+    "ready": "Ready",
+    "failed": "Failed"
+  },
+  "pages": "{count} pp.",
+  "passages": "{count} passages",
+  "retry": "Retry",
+  "retryLater": "Worth trying again later.",
+  "permanent": "Trying again will not help with this file.",
+  "unknownFailure": "Processing failed.",
+  "delete": "Delete {name}",
+  "deleteTitle": "Delete this source?",
+  "deleteMessage": "{name}, its passages and the stored file will be removed. Answers that cited it will show the citation as unavailable.",
+  "dismiss": "Dismiss",
+  "types": {
+    "pdf": "PDF",
+    "docx": "DOCX",
+    "markdown": "MD",
+    "text": "TXT"
+  }
+}
