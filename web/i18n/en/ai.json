@@ -5,20 +5,23 @@
     "continue": "Continue",
     "rewrite": "Rewrite",
     "summarize": "Summarize",
-    "ask": "Ask"
+    "ask": "Ask",
+    "sources": "Sources"
   },
   "hints": {
     "continue": "Writes on from your cursor, in the document's style.",
     "rewrite": "Rewrites the text you have selected.",
     "summarize": "Summarizes the whole document.",
-    "ask": "Answers a question about the document."
+    "ask": "Answers a question about the document.",
+    "sources": "Answers only from this workspace's sources, and says so when they do not cover it."
   },
   "instructionLabel": "Instruction",
   "placeholders": {
     "continue": "Optional — e.g. “add an example”",
     "rewrite": "Optional — e.g. “more formal”",
     "summarize": "Optional — e.g. “three short points”",
-    "ask": "What do you want to know?"
+    "ask": "What do you want to know?",
+    "sources": "What do the sources say about…?"
   },
   "selected": "Selected: “{text}”",
   "selectFirst": "Select text in the document to rewrite it.",
@@ -49,5 +52,18 @@
     "lost": "The document was reloaded, so the original text can no longer be found. Select it and rewrite again.",
     "busy": "Pause typing for a moment, then Insert.",
     "offline": "Insert is paused until the document reconnects."
+  },
+  "citations": {
+    "title": "Sources used",
+    "item": "{filename}, p. {page}",
+    "itemNoPage": "{filename}",
+    "open": "Open the passage cited as [{marker}]",
+    "passageTitle": "Cited passage [{marker}]",
+    "page": "Page {page}",
+    "loading": "Loading the passage…",
+    "unavailable": "This source has been deleted, so the passage is no longer available.",
+    "notGrounded": "No passage of this workspace's sources matched the question, so this answer is not grounded in them.",
+    "noneCited": "The answer cites none of the {count} passages found in the sources.",
+    "close": "Close"
   }
 }
