@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from api.models.enums import SourceStatus
 from api.models.source import Source
+from api.models.source_chunk import SourceChunk
 from api.services.sources import is_retryable
 
 
@@ -48,4 +49,28 @@ class SourceRead(BaseModel):
             chunk_count=source.chunk_count,
             created_at=source.created_at,
             processed_at=source.processed_at,
+        )
+
+
+class SourceChunkRead(BaseModel):
+    id: uuid.UUID
+    source_id: uuid.UUID
+    filename: str
+    chunk_index: int
+    content: str
+    page_number: int | None = Field(description="The page the passage starts on.")
+    char_start: int = Field(description="Offset into the text extracted from the source.")
+    char_end: int
+
+    @classmethod
+    def of(cls, source: Source, chunk: SourceChunk) -> SourceChunkRead:
+        return cls(
+            id=chunk.id,
+            source_id=source.id,
+            filename=source.filename,
+            chunk_index=chunk.chunk_index,
+            content=chunk.content,
+            page_number=chunk.page_number,
+            char_start=chunk.char_start,
+            char_end=chunk.char_end,
         )

@@ -68,6 +68,7 @@ class ErrorCode(StrEnum):
     SOURCE_PARSE_FAILED = "source.parse_failed"
     SOURCE_NO_TEXT = "source.no_text"
     SOURCE_ENCRYPTED = "source.encrypted"
+    SOURCE_CHUNK_NOT_FOUND = "source.chunk_not_found"
 
     RETRIEVAL_MIXED_MODELS = "retrieval.mixed_models"
     RETRIEVAL_MODEL_MISMATCH = "retrieval.model_mismatch"

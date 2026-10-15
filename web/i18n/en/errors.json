@@ -83,7 +83,8 @@
       "not_failed": "Only a source that failed can be retried.",
       "parse_failed": "This file could not be read: it may be damaged, or written in a way the reader does not understand. Trying again will not help; upload another copy.",
       "no_text": "This PDF has no text layer, as a scan does. Text recognition (OCR) is not supported; upload a PDF whose text can be selected.",
-      "encrypted": "This file is protected by a password. Remove the password and upload it again."
+      "encrypted": "This file is protected by a password. Remove the password and upload it again.",
+      "chunk_not_found": "That passage is no longer available: its source was deleted or processed again."
     },
     "workspace": {
       "not_found": "That workspace does not exist, or you are not a member of it.",
