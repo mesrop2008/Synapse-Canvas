@@ -100,11 +100,13 @@ async def create_query(
         selection_from, selection_to = snapped
 
     retrieved: list[retrieval.RetrievedChunk] = []
-    searches = mode in (AIQueryMode.ASK, AIQueryMode.SOURCES) and embeddings is not None
-    if searches:
-        assert embeddings is not None
+    # Whether there were passages to search: a workspace without ready
+    # sources has none, and the query records no search at all.
+    searched = False
+    if mode in (AIQueryMode.ASK, AIQueryMode.SOURCES) and embeddings is not None:
         found = await retrieval.retrieve(db, embeddings, document.workspace_id, instruction)
         retrieved = found.chunks
+        searched = found.searched
         if mode is AIQueryMode.SOURCES and not retrieved:
             query = await _answer_without_sources(
                 db, document, user_id, instruction, locale, searched=found.searched
@@ -145,7 +147,7 @@ async def create_query(
         selection_from=selection_from,
         selection_to=selection_to,
         status=AIQueryStatus.STREAMING,
-        retrieved_chunk_ids=[chunk.chunk_id for chunk in retrieved] if searches else None,
+        retrieved_chunk_ids=[chunk.chunk_id for chunk in retrieved] if searched else None,
     )
     db.add(query)
     await db.commit()
@@ -170,7 +172,7 @@ async def _answer_without_sources(
         mode=AIQueryMode.SOURCES,
         status=AIQueryStatus.COMPLETED,
         response=i18n.text(locale, key),
-        retrieved_chunk_ids=[],
+        retrieved_chunk_ids=[] if searched else None,
         citations=[],
         prompt_tokens=0,
         completion_tokens=0,

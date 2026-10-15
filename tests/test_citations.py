@@ -266,8 +266,11 @@ async def test_answering_from_sources_in_a_workspace_without_any(
     app: FastAPI, http: AsyncClient, live: Live
 ) -> None:
     query = await ask(http, live, PEAT, mode="sources")
+    plain = await ask(http, live, PEAT)
 
     assert query["response"] == i18n.text("en", "ai.noSources.none")
+    assert query["retrieved_chunk_ids"] is None, "nothing was there to search"
+    assert plain["retrieved_chunk_ids"] is None
     assert (await load_query(query["id"])).status is AIQueryStatus.COMPLETED
 
 
