@@ -22,6 +22,12 @@ from arq.connections import ArqRedis, RedisSettings
 PROCESS_SOURCE = "process_source"
 
 
+def source_job_id(source_id: uuid.UUID) -> str:
+    """One per source: Arq refuses a second job under an id still queued or
+    running."""
+    return f"{PROCESS_SOURCE}:{source_id}"
+
+
 class JobQueue(Protocol):
     async def enqueue_source(self, source_id: uuid.UUID) -> None: ...
 
@@ -29,14 +35,16 @@ class JobQueue(Protocol):
 
 
 class ArqQueue:
-    def __init__(self, redis_url: str) -> None:
+    def __init__(self, redis_url: str, *, pool: ArqRedis | None = None) -> None:
         self._settings = RedisSettings.from_dsn(redis_url)
-        self._pool: ArqRedis | None = None
+        self._pool = pool
 
     async def enqueue_source(self, source_id: uuid.UUID) -> None:
         if self._pool is None:
             self._pool = await create_pool(self._settings)
-        await self._pool.enqueue_job(PROCESS_SOURCE, str(source_id))
+        await self._pool.enqueue_job(
+            PROCESS_SOURCE, str(source_id), _job_id=source_job_id(source_id)
+        )
 
     async def aclose(self) -> None:
         if self._pool is not None:
