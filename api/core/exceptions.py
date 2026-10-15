@@ -69,6 +69,9 @@ class ErrorCode(StrEnum):
     SOURCE_NO_TEXT = "source.no_text"
     SOURCE_ENCRYPTED = "source.encrypted"
 
+    RETRIEVAL_MIXED_MODELS = "retrieval.mixed_models"
+    RETRIEVAL_MODEL_MISMATCH = "retrieval.model_mismatch"
+
     EMBEDDING_FAILED = "embedding.failed"
     EMBEDDING_QUOTA_EXHAUSTED = "embedding.quota_exhausted"
     EMBEDDING_DAILY_LIMIT = "embedding.daily_limit"

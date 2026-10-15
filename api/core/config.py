@@ -150,6 +150,12 @@ class Settings(BaseSettings):
     # Per workspace per UTC day, retries included; metered providers only.
     embedding_daily_request_limit: int = 300
 
+    retrieval_top_k: int = 6
+    # None takes the embedding model's own floor; see api/embeddings.
+    retrieval_min_similarity: float | None = None
+    # Passages sent with one question, by the provider's token count.
+    retrieval_token_budget: int = 3000
+
     worker_max_jobs: int = 2
     worker_job_timeout_seconds: int = 1800
 

@@ -66,6 +66,10 @@
       "malformed_length": "The request was malformed.",
       "too_large": "That is too large to send."
     },
+    "retrieval": {
+      "mixed_models": "This workspace's sources were embedded by more than one model, and their passages cannot be compared. They need to be re-embedded with one model.",
+      "model_mismatch": "This workspace's sources were embedded by a different model from the one the server uses now. They need to be re-embedded before they can be searched."
+    },
     "server": {
       "error": "Something went wrong on the server. Try again in a moment."
     },
