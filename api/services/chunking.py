@@ -39,7 +39,9 @@ class _Unit:
     tokens: int
 
 
-def _pieces(text: str, start: int, end: int, separator: re.Pattern[str]) -> Iterator[tuple[int, int]]:
+def _pieces(
+    text: str, start: int, end: int, separator: re.Pattern[str]
+) -> Iterator[tuple[int, int]]:
     """Non-blank stretches of text[start:end] between separators, trimmed."""
     position = start
     for match in separator.finditer(text, start, end):
@@ -130,7 +132,10 @@ def chunk_text(
         # move forward.
         following = last + 1
         carried = 0
-        while following - 1 > first and carried + units[following - 1].tokens <= overlap_tokens:
+        while (
+            following - 1 > first
+            and carried + units[following - 1].tokens <= overlap_tokens
+        ):
             following -= 1
             carried += units[following].tokens
         first = following
@@ -138,10 +143,14 @@ def chunk_text(
     drafts: list[ChunkDraft] = []
     for first, last in spans:
         drafts.extend(
-            _verified(text, units[first : last + 1], count_tokens, max_tokens, page_starts)
+            _verified(
+                text, units[first : last + 1], count_tokens, max_tokens, page_starts
+            )
         )
     return [
-        ChunkDraft(index, d.content, d.char_start, d.char_end, d.page_number, d.token_count)
+        ChunkDraft(
+            index, d.content, d.char_start, d.char_end, d.page_number, d.token_count
+        )
         for index, d in enumerate(drafts)
     ]
 
@@ -160,8 +169,8 @@ def _verified(
     tokens = count_tokens(content)
     if tokens > max_tokens and len(units) > 1:
         half = len(units) // 2
-        return _verified(text, units[:half], count_tokens, max_tokens, page_starts) + _verified(
-            text, units[half:], count_tokens, max_tokens, page_starts
-        )
+        return _verified(
+            text, units[:half], count_tokens, max_tokens, page_starts
+        ) + _verified(text, units[half:], count_tokens, max_tokens, page_starts)
     page = bisect.bisect_right(page_starts, start) if page_starts else None
     return [ChunkDraft(0, content, start, end, page, tokens)]

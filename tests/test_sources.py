@@ -55,13 +55,19 @@ async def app(db_session: AsyncSession, redis_client: Redis, tmp_path: Path) -> 
 
 @pytest_asyncio.fixture
 async def http(app: FastAPI) -> Any:
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
         yield ac
 
 
 def stored_files(app: FastAPI) -> list[Path]:
     root: Path = app.state.storage.root
-    return sorted(path for path in root.rglob("*") if path.is_file()) if root.exists() else []
+    return (
+        sorted(path for path in root.rglob("*") if path.is_file())
+        if root.exists()
+        else []
+    )
 
 
 async def upload(
@@ -82,7 +88,9 @@ async def test_an_upload_is_stored_under_a_generated_key_and_queued(
 ) -> None:
     data = pdf_bytes("Findings on page one.")
 
-    response = await upload(http, shared_workspace, owner, "../../etc/Report\u202e.pdf", data)
+    response = await upload(
+        http, shared_workspace, owner, "../../etc/Report\u202e.pdf", data
+    )
 
     assert response.status_code == 201, response.text
     source = response.json()
@@ -104,9 +112,13 @@ async def test_an_upload_is_stored_under_a_generated_key_and_queued(
 @pytest.mark.parametrize(
     ("name", "data", "content_type"),
     [
-        ("notes.docx", docx_bytes("A paragraph."), "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
-        ("notes.md", "# Heading\n\nSome *Markdown*.".encode(), "text/markdown"),
-        ("notes.txt", "Plain words.".encode(), "text/plain"),
+        (
+            "notes.docx",
+            docx_bytes("A paragraph."),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ),
+        ("notes.md", b"# Heading\n\nSome *Markdown*.", "text/markdown"),
+        ("notes.txt", b"Plain words.", "text/plain"),
         ("заметки.txt", "Обычный текст в Windows-1251.".encode("cp1251"), "text/plain"),
         # The bytes decide, not the extension.
         ("looks-like.pdf", b"Only text, whatever the name says.", "text/plain"),
@@ -132,9 +144,17 @@ async def test_each_supported_type_is_recognised_from_its_bytes(
     [
         ("photo.pdf", PNG, "source.unsupported_type"),
         ("bundle.docx", zip_bytes({"a.txt": b"hello"}), "source.archive"),
-        ("sheet.docx", zip_bytes({"[Content_Types].xml": b"<Types/>", "xl/workbook.xml": b"<x/>"}), "source.archive"),
+        (
+            "sheet.docx",
+            zip_bytes({"[Content_Types].xml": b"<Types/>", "xl/workbook.xml": b"<x/>"}),
+            "source.archive",
+        ),
         ("notes.txt.gz", b"\x1f\x8b\x08\x00" + b"\x00" * 20, "source.archive"),
-        ("old.doc", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 64, "source.unsupported_type"),
+        (
+            "old.doc",
+            b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 64,
+            "source.unsupported_type",
+        ),
     ],
     ids=["png", "plain-zip", "other-office-zip", "gzip", "word-97"],
 )
@@ -218,7 +238,9 @@ async def test_the_workspace_storage_quota_is_enforced(
     assert second.json()["code"] == "source.storage_quota"
     assert len(stored_files(app)) == 1
 
-    usage = await http.get(f"/workspaces/{shared_workspace['id']}/usage", headers=owner.headers)
+    usage = await http.get(
+        f"/workspaces/{shared_workspace['id']}/usage", headers=owner.headers
+    )
     assert usage.json()["storage_used_bytes"] == 2000
     assert usage.json()["storage_quota_bytes"] == 3000
     assert usage.json()["source_max_file_bytes"] == 20 * 1024 * 1024
@@ -357,7 +379,9 @@ async def test_deleting_the_workspace_removes_its_files(
 ) -> None:
     await upload(http, shared_workspace, owner, "a.txt", b"text")
 
-    deleted = await http.delete(f"/workspaces/{shared_workspace['id']}", headers=owner.headers)
+    deleted = await http.delete(
+        f"/workspaces/{shared_workspace['id']}", headers=owner.headers
+    )
 
     assert deleted.status_code == 204
     assert stored_files(app) == []

@@ -20,9 +20,7 @@ class SourceRead(BaseModel):
     size_bytes: int
     checksum: str = Field(description="SHA-256 of the file, hex.")
     status: SourceStatus
-    error_code: str | None = Field(
-        description="Why it failed; the client translates it."
-    )
+    error_code: str | None = Field(description="Why it failed; the client translates it.")
     retryable: bool = Field(
         description="Failed for a reason another try may fix (a quota, an outage), "
         "not one the same file will always hit (unreadable, no text)."

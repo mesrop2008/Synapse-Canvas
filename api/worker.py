@@ -55,7 +55,8 @@ async def requeue_stalled(ctx: dict[str, Any]) -> int:
     stalled = await ingestion.stalled_sources(
         pending_for=timedelta(seconds=settings.source_requeue_after_seconds),
         processing_for=timedelta(
-            seconds=settings.worker_job_timeout_seconds + settings.source_requeue_after_seconds
+            seconds=settings.worker_job_timeout_seconds
+            + settings.source_requeue_after_seconds
         ),
     )
     queued = 0

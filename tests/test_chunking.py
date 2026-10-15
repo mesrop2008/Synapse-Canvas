@@ -6,7 +6,9 @@ from api.embeddings.base import conservative_token_count
 from api.services.chunking import chunk_text
 from api.services.extraction import PAGE_BREAK
 
-SENTENCES = [f"Sentence number {i} says something about topic {i % 7}." for i in range(120)]
+SENTENCES = [
+    f"Sentence number {i} says something about topic {i % 7}." for i in range(120)
+]
 
 
 def chunks(text: str, page_starts: list[int] | None = None, **sizes: int):
@@ -85,7 +87,9 @@ def test_each_passage_knows_the_page_it_starts_on() -> None:
 
     assert {d.page_number for d in drafts} == {1, 2, 3}
     for draft in drafts:
-        expected = max(i + 1 for i, start in enumerate(starts) if start <= draft.char_start)
+        expected = max(
+            i + 1 for i, start in enumerate(starts) if start <= draft.char_start
+        )
         assert draft.page_number == expected
 
 

@@ -51,7 +51,9 @@ async def app(
 
 @pytest_asyncio.fixture
 async def http(app: FastAPI) -> Any:
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
         yield ac
 
 
@@ -98,7 +100,9 @@ async def add_source(
     return source
 
 
-async def new_workspace(http: AsyncClient, user: TestUser, name: str = "Other") -> dict[str, Any]:
+async def new_workspace(
+    http: AsyncClient, user: TestUser, name: str = "Other"
+) -> dict[str, Any]:
     response = await http.post("/workspaces", json={"name": name}, headers=user.headers)
     return response.json()
 
@@ -231,9 +235,15 @@ async def test_near_identical_passages_of_one_source_are_returned_once(
     shared_workspace: dict[str, Any],
 ) -> None:
     repeated = await add_source(
-        db_session, shared_workspace["id"], PEAT, PEAT + " ", "Peatlands store a third of the world's soil carbon."
+        db_session,
+        shared_workspace["id"],
+        PEAT,
+        PEAT + " ",
+        "Peatlands store a third of the world's soil carbon.",
     )
-    elsewhere = await add_source(db_session, shared_workspace["id"], PEAT, filename="b.pdf")
+    elsewhere = await add_source(
+        db_session, shared_workspace["id"], PEAT, filename="b.pdf"
+    )
 
     found = (await search(http, shared_workspace, owner, PEAT)).json()["results"]
 
@@ -294,7 +304,9 @@ async def test_passages_from_two_models_are_refused(
     await add_source(db_session, shared_workspace["id"], RIVER, model="another-model")
 
     with pytest.raises(MixedEmbeddingModelsError):
-        await retrieval.retrieve(db_session, provider, uuid.UUID(shared_workspace["id"]), PEAT)
+        await retrieval.retrieve(
+            db_session, provider, uuid.UUID(shared_workspace["id"]), PEAT
+        )
     refused = await search(http, shared_workspace, owner, PEAT)
 
     assert refused.status_code == 409
@@ -309,10 +321,14 @@ async def test_passages_from_another_model_than_the_providers_are_refused(
     shared_workspace: dict[str, Any],
     provider: FakeEmbeddingProvider,
 ) -> None:
-    await add_source(db_session, shared_workspace["id"], PEAT, model="gemini-embedding-001")
+    await add_source(
+        db_session, shared_workspace["id"], PEAT, model="gemini-embedding-001"
+    )
 
     with pytest.raises(EmbeddingModelMismatchError):
-        await retrieval.retrieve(db_session, provider, uuid.UUID(shared_workspace["id"]), PEAT)
+        await retrieval.retrieve(
+            db_session, provider, uuid.UUID(shared_workspace["id"]), PEAT
+        )
 
 
 # --- Quota ---
@@ -332,7 +348,9 @@ async def test_a_search_counts_against_the_daily_embedding_limit(
 
     first = await search(http, shared_workspace, owner, PEAT)
     second = await search(http, shared_workspace, owner, PEAT)
-    usage = await http.get(f"/workspaces/{shared_workspace['id']}/usage", headers=owner.headers)
+    usage = await http.get(
+        f"/workspaces/{shared_workspace['id']}/usage", headers=owner.headers
+    )
 
     assert first.status_code == 200
     assert second.status_code == 429

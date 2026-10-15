@@ -123,7 +123,12 @@ async def embed(
     retries = get_settings().embedding_max_retries
     for attempt in range(retries + 1):
         await record_request(
-            db, provider, workspace_id=workspace_id, source_id=source_id, kind=kind, texts=texts
+            db,
+            provider,
+            workspace_id=workspace_id,
+            source_id=source_id,
+            kind=kind,
+            texts=texts,
         )
         try:
             return await provider.embed(texts, kind)

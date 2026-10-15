@@ -71,7 +71,9 @@ def resolve(response: str, sent: Sequence[RetrievedChunk]) -> list[Citation]:
     return citations
 
 
-async def existing_chunks(db: AsyncSession, chunk_ids: Iterable[uuid.UUID]) -> set[uuid.UUID]:
+async def existing_chunks(
+    db: AsyncSession, chunk_ids: Iterable[uuid.UUID]
+) -> set[uuid.UUID]:
     """Of these passages, the ones still there. A passage goes with its
     source, so a missing one means the source was deleted."""
     wanted = set(chunk_ids)

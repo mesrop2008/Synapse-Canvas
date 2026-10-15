@@ -60,7 +60,9 @@ def retrieved(index: int, **overrides: Any) -> RetrievedChunk:
 
 
 def test_markers_are_read_once_each_in_the_order_cited() -> None:
-    answer = "Carbon [2]. Water [1][2]. Both [1, 3]; again [3 ; 1]. Not a marker: [x] [12a]."
+    answer = (
+        "Carbon [2]. Water [1][2]. Both [1, 3]; again [3 ; 1]. Not a marker: [x] [12a]."
+    )
 
     assert cited_markers(answer) == [2, 1, 3]
 
@@ -112,7 +114,9 @@ def test_passages_are_labelled_and_the_model_is_told_to_cite_them() -> None:
 
 
 def test_answering_from_sources_alone_leaves_the_document_out() -> None:
-    context = build_context(doc("The document must not be used."), AIQueryMode.SOURCES, None, None, 300)
+    context = build_context(
+        doc("The document must not be used."), AIQueryMode.SOURCES, None, None, 300
+    )
 
     prompt = build_prompt(
         mode=AIQueryMode.SOURCES,
@@ -133,7 +137,9 @@ def test_answering_from_sources_alone_leaves_the_document_out() -> None:
 # --- End to end ---
 
 
-async def add_source(workspace_id: uuid.UUID, *passages: str, filename: str = "bog.pdf") -> list[SourceChunk]:
+async def add_source(
+    workspace_id: uuid.UUID, *passages: str, filename: str = "bog.pdf"
+) -> list[SourceChunk]:
     async with get_sessionmaker()() as db:
         source = Source(
             workspace_id=workspace_id,
@@ -170,7 +176,9 @@ async def add_source(workspace_id: uuid.UUID, *passages: str, filename: str = "b
         return chunks
 
 
-async def ask(http: AsyncClient, live: Live, question: str, mode: str = "ask") -> dict[str, Any]:
+async def ask(
+    http: AsyncClient, live: Live, question: str, mode: str = "ask"
+) -> dict[str, Any]:
     response = await http.post(
         live.base, json={"mode": mode, "instruction": question}, headers=live.auth()
     )
@@ -181,8 +189,12 @@ async def ask(http: AsyncClient, live: Live, question: str, mode: str = "ask") -
 async def test_an_answer_cites_the_passages_it_was_sent(
     app: FastAPI, http: AsyncClient, live: Live
 ) -> None:
-    peat, peat_too, _football = await add_source(live.workspace_id, PEAT, PEAT_TOO, FOOTBALL)
-    provider = FakeProvider(["Carbon sits in peat [1]. ", "It stays for ages [2]. ", "Also [7]."])
+    peat, peat_too, _football = await add_source(
+        live.workspace_id, PEAT, PEAT_TOO, FOOTBALL
+    )
+    provider = FakeProvider(
+        ["Carbon sits in peat [1]. ", "It stays for ages [2]. ", "Also [7]."]
+    )
     app.state.ai.provider = provider
 
     query = await ask(http, live, PEAT)
