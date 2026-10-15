@@ -412,6 +412,7 @@ def _smtp_settings(**overrides: Any) -> Settings:
         "mail_from_address": "mailer@example.com",
         "mail_from_name": "Synapse Canvas",
         "llm_provider": "gemini",
+        "embedding_provider": "gemini",
     }
     values.update(overrides)
     return Settings(_env_file=None, **values)  # type: ignore[call-arg]

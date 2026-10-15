@@ -13,7 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from api import llm
+from api import embeddings, llm
 from api.core.config import get_settings
 from api.core.exceptions import AppError, ErrorCode
 from api.core.logging import configure_logging
@@ -38,6 +38,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Background: an unreachable mail server takes the full timeout to fail.
     mail_check = asyncio.create_task(email_service.report_delivery_status())
     llm.report_status(app.state.ai.provider)
+    embeddings.report_status(app.state.embeddings)
     yield
     mail_check.cancel()
     # First, so a code queued just before shutdown still goes out.
@@ -45,6 +46,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await app.state.hub.aclose()
     # Ends running generations and closes the provider's client.
     await app.state.ai.aclose()
+    await app.state.embeddings.aclose()
     await close_redis()
     await get_engine().dispose()  # close pooled connections on shutdown
 
@@ -141,6 +143,8 @@ def create_app() -> FastAPI:
     # Per app, not per module: one per worker, and tests can run two.
     app.state.hub = DocumentHub(get_redis())
     app.state.ai = GenerationRunner(llm.build_provider(settings), get_redis())
+    # Queries are embedded here; documents by the worker.
+    app.state.embeddings = embeddings.build_embedding_provider(settings)
 
     app.include_router(auth.router)
     app.include_router(workspaces.router)

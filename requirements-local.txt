@@ -1,0 +1,5 @@
+# Only for EMBEDDING_PROVIDER=local, on top of requirements.txt. The CPU build
+# of torch: the default Linux wheel brings gigabytes of CUDA libraries.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.4
+sentence-transformers>=5.0,<7
