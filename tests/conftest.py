@@ -105,6 +105,8 @@ async def _reset_schema(url: str) -> None:
             # foreign keys into `users` and block the drop.
             await conn.execute(text("DROP SCHEMA public CASCADE"))
             await conn.execute(text("CREATE SCHEMA public"))
+            # Dropped with the schema; source_chunks needs its type.
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             await conn.run_sync(Base.metadata.create_all)
     finally:
         await engine.dispose()
