@@ -82,9 +82,13 @@ class WorkspaceUsageRead(BaseModel):
     streaming_queries: int
     max_concurrent_queries: int = Field(description="0 means no limit.")
     resets_at: datetime
+    storage_used_bytes: int = Field(description="Uploaded sources, in bytes.")
+    storage_quota_bytes: int = Field(description="0 means no quota.")
 
     @classmethod
-    def of(cls, usage: WorkspaceUsage) -> WorkspaceUsageRead:
+    def of(
+        cls, usage: WorkspaceUsage, *, storage_used_bytes: int, storage_quota_bytes: int
+    ) -> WorkspaceUsageRead:
         return cls(
             day=usage.day,
             tokens_used=usage.tokens_used,
@@ -93,4 +97,6 @@ class WorkspaceUsageRead(BaseModel):
             streaming_queries=usage.streaming_queries,
             max_concurrent_queries=usage.max_concurrent_queries,
             resets_at=usage.resets_at,
+            storage_used_bytes=storage_used_bytes,
+            storage_quota_bytes=storage_quota_bytes,
         )
