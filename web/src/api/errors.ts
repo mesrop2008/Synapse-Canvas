@@ -36,3 +36,13 @@ export function errorMessage(
   if (error instanceof Error && error.message) return error.message;
   return translate(fallback);
 }
+
+/** The text for an API error code stored on a row rather than thrown, such
+ *  as why a source failed. */
+export function codeMessage(code: string | null, fallback: MessageKey): string {
+  if (code) {
+    const translated = lookup(getActiveLocale(), `errors.api.${code}`);
+    if (translated) return translated;
+  }
+  return translate(fallback);
+}
