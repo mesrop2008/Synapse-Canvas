@@ -32,9 +32,13 @@ def pdf_bytes(*pages: str | None) -> bytes:
                 line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
                 for line in text.split("\n")
             ]
-            shown = b" T* ".join(b"(" + line.encode("latin-1") + b") Tj" for line in lines)
+            shown = b" T* ".join(
+                b"(" + line.encode("latin-1") + b") Tj" for line in lines
+            )
             stream = b"BT /F1 11 Tf 14 TL 72 720 Td " + shown + b" ET"
-        content = add(b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream")
+        content = add(
+            b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream"
+        )
         kids.append(
             add(
                 b"<< /Type /Page /Parent %d 0 R /MediaBox [0 0 612 792] "
@@ -79,7 +83,9 @@ def docx_bytes(*paragraphs: str, table: list[list[str]] | None = None) -> bytes:
     return out.getvalue()
 
 
-def zip_bytes(entries: dict[str, bytes], *, declared: dict[str, int] | None = None) -> bytes:
+def zip_bytes(
+    entries: dict[str, bytes], *, declared: dict[str, int] | None = None
+) -> bytes:
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
         for name, data in entries.items():
@@ -107,5 +113,7 @@ class RecordingQueue:
         pass
 
 
-def upload_body(name: str, data: bytes, content_type: str = "application/octet-stream") -> dict[str, Any]:
+def upload_body(
+    name: str, data: bytes, content_type: str = "application/octet-stream"
+) -> dict[str, Any]:
     return {"files": {"file": (name, data, content_type)}}

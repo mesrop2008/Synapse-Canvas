@@ -28,7 +28,10 @@ _EDITOR_RESPONSES: dict[int | str, dict[str, Any]] = {
     summary="Upload a source file (editor or owner)",
     responses={
         **_EDITOR_RESPONSES,
-        200: {"description": "The workspace already holds this exact file", "model": SourceRead},
+        200: {
+            "description": "The workspace already holds this exact file",
+            "model": SourceRead,
+        },
         413: {"description": "Over the per-file size or the workspace's storage quota"},
         415: {"description": "Not a PDF, DOCX, text or Markdown file, or an archive"},
     },
@@ -89,7 +92,9 @@ async def get_source(
 async def get_chunk(
     source_id: uuid.UUID, chunk_id: uuid.UUID, ctx: RequireViewer, db: DbSession
 ) -> SourceChunkRead:
-    source, chunk = await source_service.get_chunk(db, ctx.workspace.id, source_id, chunk_id)
+    source, chunk = await source_service.get_chunk(
+        db, ctx.workspace.id, source_id, chunk_id
+    )
     return SourceChunkRead.of(source, chunk)
 
 

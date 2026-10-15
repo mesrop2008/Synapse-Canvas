@@ -86,10 +86,14 @@ def _pdf(data: bytes) -> Extracted:
         raise
     except Exception as exc:
         # pypdf raises a wide range of things on a malformed file.
-        raise ExtractionError(ErrorCode.SOURCE_PARSE_FAILED, "The PDF could not be read") from exc
+        raise ExtractionError(
+            ErrorCode.SOURCE_PARSE_FAILED, "The PDF could not be read"
+        ) from exc
 
     extracted = _join_pages(pages)
-    if len(_ALNUM.findall(extracted.text)) < _MIN_CHARACTERS_PER_PAGE * max(1, len(pages)):
+    if len(_ALNUM.findall(extracted.text)) < _MIN_CHARACTERS_PER_PAGE * max(
+        1, len(pages)
+    ):
         raise ExtractionError(
             ErrorCode.SOURCE_NO_TEXT,
             "The PDF has no text layer, as a scan does; OCR is not supported",
@@ -137,7 +141,9 @@ def extract(data: bytes, content_type: str) -> Extracted:
     elif content_type.startswith("text/"):
         extracted = _text(data)
     else:
-        raise ExtractionError(ErrorCode.SOURCE_PARSE_FAILED, f"Cannot read {content_type}")
+        raise ExtractionError(
+            ErrorCode.SOURCE_PARSE_FAILED, f"Cannot read {content_type}"
+        )
     if not extracted.text.strip():
         raise ExtractionError(ErrorCode.SOURCE_EMPTY, "The file has no text")
     return extracted
@@ -155,7 +161,9 @@ def _child(
     except ExtractionError as exc:
         connection.send(("error", (exc.code, exc.detail)))
     except MemoryError:
-        connection.send(("error", (ErrorCode.SOURCE_PARSE_FAILED, "Parsing ran out of memory")))
+        connection.send(
+            ("error", (ErrorCode.SOURCE_PARSE_FAILED, "Parsing ran out of memory"))
+        )
     except Exception as exc:
         connection.send(("error", (ErrorCode.SOURCE_PARSE_FAILED, type(exc).__name__)))
     finally:

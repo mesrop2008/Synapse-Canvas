@@ -103,7 +103,9 @@ class EmbedStub:
         self.body = body
         self.requests: list[dict[str, Any]] = []
 
-    def provider(self, api_key: str = "test-key", dimension: int = 4) -> GeminiEmbeddingProvider:
+    def provider(
+        self, api_key: str = "test-key", dimension: int = 4
+    ) -> GeminiEmbeddingProvider:
         return GeminiEmbeddingProvider(
             api_key=api_key,
             model="gemini-embedding-001",
@@ -166,7 +168,10 @@ def quota_error(quota_id: str) -> dict[str, Any]:
                     "@type": "type.googleapis.com/google.rpc.QuotaFailure",
                     "violations": [{"quotaId": quota_id}],
                 },
-                {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "17s"},
+                {
+                    "@type": "type.googleapis.com/google.rpc.RetryInfo",
+                    "retryDelay": "17s",
+                },
             ],
         }
     }

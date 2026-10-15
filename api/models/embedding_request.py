@@ -14,7 +14,9 @@ class EmbeddingRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     __tablename__ = "embedding_requests"
     __table_args__ = (
-        Index("ix_embedding_requests_workspace_id_created_at", "workspace_id", "created_at"),
+        Index(
+            "ix_embedding_requests_workspace_id_created_at", "workspace_id", "created_at"
+        ),
     )
 
     workspace_id: Mapped[uuid.UUID] = mapped_column(

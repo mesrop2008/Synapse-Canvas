@@ -55,7 +55,9 @@ class LocalEmbeddingProvider(EmbeddingProvider):
     def count_tokens(self, text: str) -> int:
         """Exact: the model's own tokenizer, special tokens included."""
         tokenizer = self._encoder().tokenizer
-        encoded = tokenizer(text, add_special_tokens=True, truncation=False, verbose=False)
+        encoded = tokenizer(
+            text, add_special_tokens=True, truncation=False, verbose=False
+        )
         return len(encoded["input_ids"])
 
     async def _embed(self, texts: list[str], kind: EmbeddingKind) -> EmbeddingBatch:

@@ -216,9 +216,7 @@ async def get_chunk(
     return source, chunk
 
 
-async def delete_source(
-    db: AsyncSession, source: Source, storage: SourceStorage
-) -> None:
+async def delete_source(db: AsyncSession, source: Source, storage: SourceStorage) -> None:
     """The row first: its chunks go with it, and a file left behind by a
     failed removal is only wasted space, while a row without its file
     would be a source that can never be retried."""

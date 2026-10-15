@@ -42,5 +42,5 @@ class SearchResults(BaseModel):
     results: list[SearchHit]
     min_similarity: float = Field(description="Passages scoring below this are left out.")
     searched: bool = Field(
-        description="False when the workspace has no ready sources, so nothing was searched."
+        description="False when the workspace has no ready sources to search."
     )

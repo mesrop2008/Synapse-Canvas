@@ -159,7 +159,9 @@ async def add_source(world: World, name: str, data: bytes) -> uuid.UUID:
 
 
 async def run(world: World, source_id: uuid.UUID, provider: FakeEmbeddingProvider) -> str:
-    return await ingestion.process_source(source_id, provider=provider, storage=world.storage)
+    return await ingestion.process_source(
+        source_id, provider=provider, storage=world.storage
+    )
 
 
 async def load(source_id: uuid.UUID) -> Source:
@@ -186,7 +188,9 @@ async def requests_made(world: World) -> int:
 
 async def set_status(source_id: uuid.UUID, status: SourceStatus) -> None:
     async with get_sessionmaker()() as db:
-        await db.execute(update(Source).where(Source.id == source_id).values(status=status))
+        await db.execute(
+            update(Source).where(Source.id == source_id).values(status=status)
+        )
         await db.commit()
 
 
@@ -204,7 +208,9 @@ def arq_pool() -> ArqRedis:
     return ArqRedis(connection_pool=fake.connection_pool)
 
 
-async def run_worker(pool: ArqRedis, world: World, provider: FakeEmbeddingProvider) -> None:
+async def run_worker(
+    pool: ArqRedis, world: World, provider: FakeEmbeddingProvider
+) -> None:
     worker = Worker(
         functions=WorkerSettings.functions,
         redis_pool=pool,
@@ -227,12 +233,19 @@ async def test_an_upload_becomes_ready_through_the_worker(world: World) -> None:
     app.state.storage = world.storage
     app.state.jobs = ArqQueue(get_settings().redis_url, pool=pool)
     provider = FakeEmbeddingProvider()
-    pages = ["Page one is about peat.\n" + PARAGRAPH, "Page two is about rivers.\n" + PARAGRAPH]
+    pages = [
+        "Page one is about peat.\n" + PARAGRAPH,
+        "Page two is about rivers.\n" + PARAGRAPH,
+    ]
     data = pdf_bytes(*pages)
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as http:
         base = f"/workspaces/{world.workspace_id}/sources"
-        uploaded = await http.post(base, headers=world.headers, **upload_body("bog.pdf", data))
+        uploaded = await http.post(
+            base, headers=world.headers, **upload_body("bog.pdf", data)
+        )
         assert uploaded.status_code == 201, uploaded.text
         source_id = uploaded.json()["id"]
 
@@ -259,7 +272,9 @@ async def test_an_upload_becomes_ready_through_the_worker(world: World) -> None:
     assert provider.calls, "embedded in a batch request"
 
 
-async def test_passages_record_their_page_and_offsets(world: World, small_chunks: None) -> None:
+async def test_passages_record_their_page_and_offsets(
+    world: World, small_chunks: None
+) -> None:
     pages = [f"Page {n}.\n" + PARAGRAPH * 3 for n in range(1, 4)]
     data = pdf_bytes(*pages)
     source_id = await add_source(world, "three.pdf", data)
@@ -279,7 +294,9 @@ async def test_passages_record_their_page_and_offsets(world: World, small_chunks
 
 async def test_a_word_document_is_read_with_its_tables(world: World) -> None:
     data = docx_bytes(
-        "Field notes.", "Water table readings follow.", table=[["Site", "Depth"], ["A", "40 cm"]]
+        "Field notes.",
+        "Water table readings follow.",
+        table=[["Site", "Depth"], ["A", "40 cm"]],
     )
     source_id = await add_source(world, "notes.docx", data)
 
@@ -371,7 +388,9 @@ async def test_a_retry_after_a_failure_embeds_only_what_is_missing(
 
     async with get_sessionmaker()() as db:
         retried = await source_service.retry_source(
-            db, await db.get(Source, source_id), RecordingQueue()  # type: ignore[arg-type]
+            db,
+            await db.get(Source, source_id),
+            RecordingQueue(),  # type: ignore[arg-type]
         )
         assert retried.status is SourceStatus.PENDING
     resumed = FakeEmbeddingProvider()
@@ -444,8 +463,12 @@ async def test_a_daily_quota_is_not_retried(world: World, small_chunks: None) ->
     assert len(provider.calls) == 1
 
 
-async def test_a_brief_outage_is_retried_through(world: World, small_chunks: None) -> None:
-    provider = FakeEmbeddingProvider(failures=[UpstreamUnavailableError(), RateLimitedError()])
+async def test_a_brief_outage_is_retried_through(
+    world: World, small_chunks: None
+) -> None:
+    provider = FakeEmbeddingProvider(
+        failures=[UpstreamUnavailableError(), RateLimitedError()]
+    )
     source_id = await add_source(world, "a.txt", b"Third time lucky.")
 
     assert await run(world, source_id, provider) == "ready"
@@ -470,7 +493,12 @@ async def test_backoff_doubles_and_waits_as_long_as_the_provider_asks(
 
     async with get_sessionmaker()() as db:
         await embedding_usage.embed(
-            db, provider, ["text"], kind="document", workspace_id=world.workspace_id, sleep=sleep
+            db,
+            provider,
+            ["text"],
+            kind="document",
+            workspace_id=world.workspace_id,
+            sleep=sleep,
         )
 
     assert [0.5 <= waited[0] <= 1, 1 <= waited[1] <= 2, 2 <= waited[2] <= 4] == [True] * 3
@@ -551,7 +579,9 @@ async def test_isolated_extraction_reads_a_file_in_a_child_process(
 
 def test_a_parser_that_overruns_is_killed() -> None:
     with pytest.raises(ExtractionError) as raised:
-        extract_isolated(pdf_bytes("Too slow."), "application/pdf", timeout=0.001, memory_bytes=0)
+        extract_isolated(
+            pdf_bytes("Too slow."), "application/pdf", timeout=0.001, memory_bytes=0
+        )
 
     assert raised.value.code.value == "source.parse_failed"
     assert "longer than" in raised.value.detail

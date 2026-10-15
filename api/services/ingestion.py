@@ -104,7 +104,10 @@ async def _process(
             by_content.setdefault(draft.content, []).append(draft)
         for batch in _batches(list(by_content), settings.embedding_batch_size):
             await _embed_batch(
-                source_id, workspace_id, [d for c in batch for d in by_content[c]], provider
+                source_id,
+                workspace_id,
+                [d for c in batch for d in by_content[c]],
+                provider,
             )
     except ExtractionError as exc:
         logger.info("Source %s could not be read: %s", source_id, exc.detail)
@@ -117,10 +120,14 @@ async def _process(
         return "gone"
     except FileNotFoundError:
         logger.error("The file of source %s is missing from storage", source_id)
-        return await _finish(source_id, SourceStatus.FAILED, error_code=ErrorCode.SERVER_ERROR)
+        return await _finish(
+            source_id, SourceStatus.FAILED, error_code=ErrorCode.SERVER_ERROR
+        )
     except Exception:
         logger.exception("Processing source %s failed", source_id)
-        return await _finish(source_id, SourceStatus.FAILED, error_code=ErrorCode.SERVER_ERROR)
+        return await _finish(
+            source_id, SourceStatus.FAILED, error_code=ErrorCode.SERVER_ERROR
+        )
 
     return await _finish(
         source_id,
@@ -164,7 +171,9 @@ async def _keep_reusable(
             select(
                 SourceChunk.id,
                 SourceChunk.chunk_index,
-                func.encode(func.sha256(func.convert_to(SourceChunk.content, "UTF8")), "hex"),
+                func.encode(
+                    func.sha256(func.convert_to(SourceChunk.content, "UTF8")), "hex"
+                ),
                 SourceChunk.char_start,
                 SourceChunk.char_end,
                 SourceChunk.page_number,
@@ -256,7 +265,9 @@ async def _finish(
     return status.value if error_code is None else f"{status.value}: {error_code.value}"
 
 
-async def stalled_sources(*, pending_for: timedelta, processing_for: timedelta) -> list[uuid.UUID]:
+async def stalled_sources(
+    *, pending_for: timedelta, processing_for: timedelta
+) -> list[uuid.UUID]:
     """Pending ones whose job was lost -- Redis restarted, or was down at
     upload -- and processing ones whose worker died without Arq noticing."""
     async with get_sessionmaker()() as db:
