@@ -122,6 +122,7 @@ async def get_usage(
         await ai_usage.get_usage(db, ctx.workspace.id),
         storage_used_bytes=await source_service.storage_used(db, ctx.workspace.id),
         storage_quota_bytes=settings.source_workspace_quota_bytes,
+        source_max_file_bytes=settings.source_max_file_bytes,
         embedding_requests_used=await embedding_usage.requests_today(db, ctx.workspace.id),
         embedding_daily_request_limit=(
             settings.embedding_daily_request_limit if metered else 0

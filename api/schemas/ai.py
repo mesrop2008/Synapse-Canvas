@@ -125,6 +125,7 @@ class WorkspaceUsageRead(BaseModel):
     resets_at: datetime
     storage_used_bytes: int = Field(description="Uploaded sources, in bytes.")
     storage_quota_bytes: int = Field(description="0 means no quota.")
+    source_max_file_bytes: int = Field(description="The largest file an upload may be.")
     embedding_requests_used: int = Field(description="Today, retries included.")
     embedding_daily_request_limit: int = Field(
         description="0 means no limit, as with a local embedding model."
@@ -137,6 +138,7 @@ class WorkspaceUsageRead(BaseModel):
         *,
         storage_used_bytes: int,
         storage_quota_bytes: int,
+        source_max_file_bytes: int,
         embedding_requests_used: int,
         embedding_daily_request_limit: int,
     ) -> WorkspaceUsageRead:
@@ -150,6 +152,7 @@ class WorkspaceUsageRead(BaseModel):
             resets_at=usage.resets_at,
             storage_used_bytes=storage_used_bytes,
             storage_quota_bytes=storage_quota_bytes,
+            source_max_file_bytes=source_max_file_bytes,
             embedding_requests_used=embedding_requests_used,
             embedding_daily_request_limit=embedding_daily_request_limit,
         )
