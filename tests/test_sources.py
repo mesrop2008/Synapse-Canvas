@@ -7,6 +7,7 @@ from __future__ import annotations
 import io
 import uuid
 import zipfile
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -283,9 +284,15 @@ async def test_members_list_and_fetch_sources(
     owner: TestUser,
     viewer: TestUser,
     shared_workspace: dict[str, Any],
+    db_session: AsyncSession,
 ) -> None:
     older = (await upload(http, shared_workspace, owner, "older.txt", b"one")).json()
     newer = (await upload(http, shared_workspace, owner, "newer.txt", b"two")).json()
+    # One test transaction, so now() is the same for both.
+    row = await db_session.get(Source, uuid.UUID(older["id"]))
+    assert row is not None
+    row.created_at = row.created_at - timedelta(minutes=1)
+    await db_session.commit()
     base = f"/workspaces/{shared_workspace['id']}/sources"
 
     listed = await http.get(base, headers=viewer.headers)
