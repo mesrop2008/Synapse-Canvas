@@ -45,6 +45,13 @@ x-app-environment: &app-environment
   SOURCE_STORAGE_DIR: /var/lib/synapse-sources
   SOURCE_MAX_FILE_BYTES: ${SOURCE_MAX_FILE_BYTES:-20971520}
   SOURCE_WORKSPACE_QUOTA_BYTES: ${SOURCE_WORKSPACE_QUOTA_BYTES:-209715200}
+  CHUNK_TARGET_TOKENS: ${CHUNK_TARGET_TOKENS:-600}
+  CHUNK_OVERLAP_TOKENS: ${CHUNK_OVERLAP_TOKENS:-80}
+  CHUNK_MAX_TOKENS: ${CHUNK_MAX_TOKENS:-1000}
+  EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-50}
+  EMBEDDING_MAX_RETRIES: ${EMBEDDING_MAX_RETRIES:-4}
+  EMBEDDING_DAILY_REQUEST_LIMIT: ${EMBEDDING_DAILY_REQUEST_LIMIT:-300}
+  WORKER_MAX_JOBS: ${WORKER_MAX_JOBS:-2}
 
 x-app-build: &app-build
   context: .
@@ -122,6 +129,37 @@ services:
       - embedding_models:/var/lib/synapse-models
       - source_files:/var/lib/synapse-sources
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Reads, splits and embeds uploaded sources. Scale with
+  # `docker compose up -d --scale worker=2`; jobs are idempotent and a
+  # source is only ever processed by one worker at a time.
+  worker:
+    build: *app-build
+    image: synapse-canvas-api:local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment: *app-environment
+    volumes:
+      # Dev only, as for the API; the worker does not reload on change.
+      - ./api:/app/api:ro
+      - jwt_secret:/var/lib/synapse
+      - embedding_models:/var/lib/synapse-models
+      - source_files:/var/lib/synapse-sources
+    command: arq api.worker.WorkerSettings
+    # The image's check calls the API's port; this one asks Arq whether the
+    # worker has written its heartbeat to Redis lately.
+    healthcheck:
+      test: ["CMD", "arq", "--check", "api.worker.WorkerSettings"]
+      interval: 60s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
 
   # A static build: rebuild with `docker compose up -d --build web`.
   web:

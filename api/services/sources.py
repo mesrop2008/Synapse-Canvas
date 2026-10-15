@@ -26,7 +26,13 @@ logger = logging.getLogger(__name__)
 # Failures that the same bytes will always reproduce. Anything else -- a
 # quota, an outage, a crash -- is worth another try.
 PERMANENT_FAILURES = frozenset(
-    {ErrorCode.SOURCE_EMPTY, ErrorCode.EMBEDDING_INPUT_TOO_LONG}
+    {
+        ErrorCode.SOURCE_PARSE_FAILED,
+        ErrorCode.SOURCE_NO_TEXT,
+        ErrorCode.SOURCE_ENCRYPTED,
+        ErrorCode.SOURCE_EMPTY,
+        ErrorCode.EMBEDDING_INPUT_TOO_LONG,
+    }
 )
 
 # Distinct from the AI usage lock, which is keyed on the workspace id alone.

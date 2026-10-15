@@ -15,7 +15,7 @@ from api.schemas.workspace import (
     WorkspaceWithRole,
     workspace_with_role,
 )
-from api.services import ai_usage, workspace_service
+from api.services import ai_usage, embedding_usage, workspace_service
 from api.services import documents as document_service
 from api.services import sources as source_service
 
@@ -113,11 +113,19 @@ async def delete_workspace(
     summary="Today's AI token use, storage used, and the workspace's limits",
     responses=_MEMBERSHIP_RESPONSES,
 )
-async def get_usage(ctx: RequireViewer, db: DbSession) -> WorkspaceUsageRead:
+async def get_usage(
+    ctx: RequireViewer, db: DbSession, request: Request
+) -> WorkspaceUsageRead:
+    settings = get_settings()
+    metered = request.app.state.embeddings.metered
     return WorkspaceUsageRead.of(
         await ai_usage.get_usage(db, ctx.workspace.id),
         storage_used_bytes=await source_service.storage_used(db, ctx.workspace.id),
-        storage_quota_bytes=get_settings().source_workspace_quota_bytes,
+        storage_quota_bytes=settings.source_workspace_quota_bytes,
+        embedding_requests_used=await embedding_usage.requests_today(db, ctx.workspace.id),
+        embedding_daily_request_limit=(
+            settings.embedding_daily_request_limit if metered else 0
+        ),
     )
 
 

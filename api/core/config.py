@@ -131,6 +131,27 @@ class Settings(BaseSettings):
     source_workspace_quota_bytes: int = 200 * 1024 * 1024
     # What a DOCX may expand to; a zip bomb weighs little and expands to gigabytes.
     source_max_uncompressed_bytes: int = 100 * 1024 * 1024
+    # Parsing runs in a child process that is killed past the timeout, and on
+    # Linux capped at the memory below.
+    source_extract_isolated: bool = True
+    source_extract_timeout_seconds: float = 120.0
+    source_extract_memory_bytes: int = 1024 * 1024 * 1024
+    # A source pending this long has lost its job and is queued again.
+    source_requeue_after_seconds: int = 60
+
+    # By the embedding provider's count. The cap stays under its input limit.
+    chunk_target_tokens: int = 600
+    chunk_overlap_tokens: int = 80
+    chunk_max_tokens: int = 1000
+    embedding_batch_size: int = 50
+    embedding_max_retries: int = 4
+    embedding_backoff_base_seconds: float = 2.0
+    embedding_backoff_max_seconds: float = 60.0
+    # Per workspace per UTC day, retries included; metered providers only.
+    embedding_daily_request_limit: int = 300
+
+    worker_max_jobs: int = 2
+    worker_job_timeout_seconds: int = 1800
 
     # Comma-separated str, not list[str]: pydantic-settings JSON-decodes list
     # types before validators run.
@@ -190,6 +211,18 @@ class Settings(BaseSettings):
                 "Changing it on a database that already holds chunks needs a "
                 "re-embed (see README)."
             )
+        return self
+
+    @model_validator(mode="after")
+    def _check_chunking(self) -> "Settings":
+        if not 0 <= self.chunk_overlap_tokens < self.chunk_target_tokens <= self.chunk_max_tokens:
+            raise ValueError(
+                "Chunk sizes must satisfy 0 <= CHUNK_OVERLAP_TOKENS < "
+                "CHUNK_TARGET_TOKENS <= CHUNK_MAX_TOKENS."
+            )
+        # Gemini takes at most 100 texts per batch request.
+        if not 1 <= self.embedding_batch_size <= 100:
+            raise ValueError("EMBEDDING_BATCH_SIZE must be between 1 and 100.")
         return self
 
     @model_validator(mode="after")
