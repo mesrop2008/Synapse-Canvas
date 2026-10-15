@@ -221,6 +221,7 @@ async def test_the_workspace_storage_quota_is_enforced(
     usage = await http.get(f"/workspaces/{shared_workspace['id']}/usage", headers=owner.headers)
     assert usage.json()["storage_used_bytes"] == 2000
     assert usage.json()["storage_quota_bytes"] == 3000
+    assert usage.json()["source_max_file_bytes"] == 20 * 1024 * 1024
 
 
 async def test_the_same_file_twice_returns_the_first_without_queueing_it_again(

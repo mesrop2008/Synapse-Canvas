@@ -224,4 +224,47 @@ export interface WorkspaceUsage {
   streaming_queries: number;
   max_concurrent_queries: number;
   resets_at: Timestamp;
+  storage_used_bytes: number;
+  /** 0 means no quota. */
+  storage_quota_bytes: number;
+  /** Largest file an upload may be. */
+  source_max_file_bytes: number;
+  embedding_requests_used: number;
+  /** 0 means no limit, as with a local embedding model. */
+  embedding_daily_request_limit: number;
+}
+
+/* Sources: mirrors api/schemas/source.py and api/schemas/search.py. */
+
+export type SourceStatus = 'pending' | 'processing' | 'ready' | 'failed';
+
+export interface Source {
+  id: string;
+  workspace_id: string;
+  uploaded_by: string | null;
+  filename: string;
+  /** Sniffed from the bytes by the server. */
+  content_type: string;
+  size_bytes: number;
+  checksum: string;
+  status: SourceStatus;
+  /** An API error code; translated like any other. */
+  error_code: string | null;
+  /** Failed for a reason another try may fix, such as a quota. */
+  retryable: boolean;
+  page_count: number | null;
+  chunk_count: number;
+  created_at: Timestamp;
+  processed_at: Timestamp | null;
+}
+
+export interface SourceChunk {
+  id: string;
+  source_id: string;
+  filename: string;
+  chunk_index: number;
+  content: string;
+  page_number: number | null;
+  char_start: number;
+  char_end: number;
 }

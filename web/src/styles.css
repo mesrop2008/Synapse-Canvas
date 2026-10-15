@@ -1590,6 +1590,203 @@ a.user-chip:hover {
   }
 }
 
+/* --- sources -------------------------------------------------------------- */
+
+.sources > .hint {
+  margin: 6px 0 16px;
+}
+
+.storage {
+  display: grid;
+  gap: 6px;
+  max-width: 420px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.storage-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-2);
+  font-weight: 560;
+}
+
+.storage[data-low] .ai-meter span {
+  background: var(--warning);
+}
+
+.dropzone {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 26px 20px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--text-3);
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dropzone[data-active] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.dropzone-text {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 14.5px;
+}
+
+.dropzone .hint {
+  margin: 0;
+}
+
+.upload-list,
+.source-list {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.upload,
+.source {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+}
+
+.upload + .upload,
+.source + .source {
+  border-top: 1px solid var(--border);
+}
+
+.upload {
+  font-size: 13.5px;
+}
+
+.upload-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 560;
+}
+
+.upload-note {
+  flex: 1;
+  color: var(--text-2);
+}
+
+.upload[data-state='error'] .upload-note {
+  color: var(--danger);
+}
+
+.progress {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+
+.source .row-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.source-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-failure {
+  margin: 4px 0 0;
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.source-failure .muted {
+  display: block;
+  color: var(--text-3);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-pill[data-status='ready'] {
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--success);
+}
+
+.status-pill[data-status='processing'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.status-pill[data-status='failed'] {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.spinner {
+  width: 10px;
+  height: 10px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 620px) {
+  .source {
+    flex-wrap: wrap;
+  }
+
+  .source .row-main {
+    flex: 1 1 calc(100% - 60px);
+  }
+}
+
 /* --- modal ---------------------------------------------------------------- */
 
 .modal-backdrop {

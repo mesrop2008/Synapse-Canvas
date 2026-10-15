@@ -114,3 +114,24 @@ export function Logo({ size = 24 }: { size?: number }) {
     </svg>
   );
 }
+
+export const UploadIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M12 15V4M7.5 8.5 12 4l4.5 4.5" />
+    <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+  </Svg>
+);
+
+export const RetryIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M20 11a8 8 0 1 0-2.3 5.7" />
+    <path d="M20 4v7h-7" />
+  </Svg>
+);
+
+export const BookIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z" />
+    <path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" />
+  </Svg>
+);

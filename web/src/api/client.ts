@@ -206,6 +206,88 @@ async function failure(response: Response): Promise<ApiError> {
   );
 }
 
+interface XhrReply {
+  status: number;
+  body: unknown;
+  retryAfter: number | null;
+}
+
+function parseText(text: string): unknown {
+  if (!text) return undefined;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
+/** fetch() cannot report upload progress; XMLHttpRequest can. */
+function postWithProgress(
+  path: string,
+  form: FormData,
+  token: string | null,
+  onProgress?: (fraction: number) => void,
+  signal?: AbortSignal,
+): Promise<XhrReply> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE_URL}${path}`);
+    xhr.setRequestHeader('Accept-Language', getActiveLocale());
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress?.(event.loaded / event.total);
+    };
+    xhr.onload = () => {
+      const seconds = Number(xhr.getResponseHeader('Retry-After'));
+      resolve({
+        status: xhr.status,
+        body: parseText(xhr.responseText),
+        retryAfter: Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : null,
+      });
+    };
+    // A TypeError, as fetch() throws, so errorMessage() says "unreachable".
+    xhr.onerror = () => reject(new TypeError('Network request failed'));
+    xhr.onabort = () => reject(new DOMException('Upload cancelled', 'AbortError'));
+    signal?.addEventListener('abort', () => xhr.abort());
+    xhr.send(form);
+  });
+}
+
+/** A multipart POST with progress, and `request`'s refresh-once on a 401. */
+export async function upload<T>(
+  path: string,
+  form: FormData,
+  options: { onProgress?: (fraction: number) => void; signal?: AbortSignal } = {},
+): Promise<{ status: number; body: T }> {
+  let reply = await postWithProgress(
+    path,
+    form,
+    accessToken,
+    options.onProgress,
+    options.signal,
+  );
+  if (reply.status === 401 && getRefreshToken()) {
+    let fresh: string;
+    try {
+      fresh = await refreshAccessToken();
+    } catch {
+      clearSession({ notify: true });
+      throw new ApiError(401, translate('errors.sessionExpired'), null);
+    }
+    reply = await postWithProgress(path, form, fresh, options.onProgress, options.signal);
+  }
+  if (reply.status < 200 || reply.status >= 300) {
+    throw new ApiError(
+      reply.status,
+      describe(reply.status, reply.body),
+      reply.body,
+      errorCode(reply.body),
+      reply.retryAfter,
+    );
+  }
+  return { status: reply.status, body: reply.body as T };
+}
+
 export async function request<T>(
   method: Method,
   path: string,

@@ -5,6 +5,7 @@ import { errorMessage } from '../api/errors';
 import { Alert } from '../components/Alert';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { MemberPanel } from '../components/MemberPanel';
+import { SourcesPanel } from '../components/SourcesPanel';
 import {
   ChevronRightIcon,
   FileIcon,
@@ -252,6 +253,8 @@ export function WorkspacePage() {
           ))}
         </div>
       )}
+
+      {workspace.data && <SourcesPanel workspace={workspace.data} />}
 
       {workspace.data && <MemberPanel workspace={workspace.data} />}
 
