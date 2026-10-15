@@ -81,6 +81,10 @@ async def create_query(
     answer is that the sources do not say, rather than the model's own
     knowledge passed off as theirs. No request then goes to the runner."""
     settings = get_settings()
+    if mode is not AIQueryMode.REWRITE and not document.content.get("content"):
+        # A new document is stored with no blocks, while the editor shows an
+        # empty paragraph with the cursor inside it -- past the stored end.
+        selection_from = selection_to = None
     _check_bounds(document, selection_from, selection_to)
     if (
         selection_from is not None
