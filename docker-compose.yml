@@ -46,8 +46,10 @@ x-app-build: &app-build
     PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.13-slim}
 
 services:
+  # Postgres 15 with pgvector, so an existing postgres:15 data volume carries
+  # over. Pinned: the HNSW dimension limit is checked against this version.
   postgres:
-    image: ${POSTGRES_IMAGE:-mirror.gcr.io/library/postgres:15-alpine}
+    image: ${POSTGRES_IMAGE:-mirror.gcr.io/pgvector/pgvector:0.8.7-pg15}
     container_name: synapse_canvas_postgres
     restart: unless-stopped
     environment:
