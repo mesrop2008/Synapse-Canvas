@@ -27,8 +27,8 @@
     "ready": "Ready",
     "failed": "Failed"
   },
-  "pages": "{count} pp.",
-  "passages": "{count} passages",
+  "pages": "Pages: {count}",
+  "passages": "Passages: {count}",
   "retry": "Retry",
   "retryLater": "Worth trying again later.",
   "permanent": "Trying again will not help with this file.",
