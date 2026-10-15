@@ -59,6 +59,8 @@ os.environ["EMAIL_BACKEND"] = "console"
 os.environ["LLM_PROVIDER"] = "fake"
 os.environ["EMBEDDING_PROVIDER"] = "fake"
 os.environ["EMBEDDING_DIMENSION"] = "1536"
+# A child process per file is slow on Windows; test_ingestion turns it on.
+os.environ["SOURCE_EXTRACT_ISOLATED"] = "false"
 os.environ["GEMINI_API_KEY"] = ""
 
 from httpx import ASGITransport, AsyncClient  # noqa: E402
