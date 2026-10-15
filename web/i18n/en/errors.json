@@ -43,6 +43,13 @@
       "not_found": "That document does not exist, or you cannot open it.",
       "stale": "This document changed while you were working on it."
     },
+    "embedding": {
+      "failed": "The embedding service could not process this. Try again.",
+      "quota_exhausted": "The embedding service's request quota is used up. It is worth retrying later; a daily quota resets the next day.",
+      "input_too_long": "A passage was longer than the embedding model accepts, so it was not sent rather than be cut short. Please report this.",
+      "invalid_key": "Embeddings are not set up on this server: the API key is missing or was rejected. Ask whoever runs it to check GEMINI_API_KEY, or to use EMBEDDING_PROVIDER=local.",
+      "unavailable": "The embedding service is not responding. Try again in a few minutes."
+    },
     "member": {
       "absent": "They are not a member of this workspace.",
       "duplicate": "They are already a member of this workspace.",

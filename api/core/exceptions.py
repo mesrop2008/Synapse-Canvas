@@ -58,6 +58,12 @@ class ErrorCode(StrEnum):
     AI_QUERY_NOT_FOUND = "ai.query_not_found"
     AI_QUERY_NOT_COMPLETED = "ai.query_not_completed"
 
+    EMBEDDING_FAILED = "embedding.failed"
+    EMBEDDING_QUOTA_EXHAUSTED = "embedding.quota_exhausted"
+    EMBEDDING_INPUT_TOO_LONG = "embedding.input_too_long"
+    EMBEDDING_INVALID_KEY = "embedding.invalid_key"
+    EMBEDDING_UNAVAILABLE = "embedding.unavailable"
+
 
 class AppError(Exception):
     status_code: int = 500
