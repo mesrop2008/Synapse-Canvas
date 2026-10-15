@@ -153,9 +153,10 @@ services:
       - source_files:/var/lib/synapse-sources
     command: arq api.worker.WorkerSettings
     # The image's check calls the API's port; this one asks Arq whether the
-    # worker has written its heartbeat to Redis lately.
+    # worker has written its heartbeat to Redis lately. Through the
+    # entrypoint, which supplies the generated signing key settings require.
     healthcheck:
-      test: ["CMD", "arq", "--check", "api.worker.WorkerSettings"]
+      test: ["CMD", "/usr/local/bin/entrypoint.sh", "arq", "--check", "api.worker.WorkerSettings"]
       interval: 60s
       timeout: 10s
       start_period: 30s
