@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { cancelQuery, cancelQueryOnUnload, createQuery, streamQuery } from '../api/ai';
 import { ApiError } from '../api/client';
 import { translate } from '../../i18n';
-import type { AIQuery, AIQueryInput, AIUsage } from '../types/api';
+import type { AIQuery, AIQueryInput, AIUsage, Citation } from '../types/api';
 
 export type AIStreamStatus = 'idle' | 'streaming' | 'done' | 'cancelled' | 'error';
 
@@ -13,6 +13,8 @@ export interface AIStream {
   /** The tokens so far, then the whole response once done. */
   text: string;
   usage: AIUsage | null;
+  /** Resolved by the server once the response is done. */
+  citations: Citation[];
   /** An ApiError whose `code` errorMessage() translates. */
   error: unknown;
   start: (input: AIQueryInput) => Promise<AIQuery | null>;
@@ -50,6 +52,7 @@ export function useAIStream(documentId: string): AIStream {
   const [query, setQuery] = useState<AIQuery | null>(null);
   const [text, setText] = useState('');
   const [usage, setUsage] = useState<AIUsage | null>(null);
+  const [citations, setCitations] = useState<Citation[]>([]);
   const [error, setError] = useState<unknown>(null);
 
   const running = useRef<Run | null>(null);
@@ -74,6 +77,7 @@ export function useAIStream(documentId: string): AIStream {
       setQuery(null);
       setText('');
       setUsage(null);
+      setCitations([]);
       setError(null);
 
       const end = (next: AIStreamStatus, cause: unknown = null) => {
@@ -118,6 +122,7 @@ export function useAIStream(documentId: string): AIStream {
                 case 'done':
                   setText(event.response);
                   setUsage(event.usage);
+                  setCitations(event.citations ?? []);
                   state.outcome = 'done';
                   return;
                 case 'cancelled':
@@ -165,6 +170,7 @@ export function useAIStream(documentId: string): AIStream {
     setQuery(null);
     setText('');
     setUsage(null);
+    setCitations([]);
     setError(null);
   }, []);
 
@@ -180,5 +186,5 @@ export function useAIStream(documentId: string): AIStream {
     return () => window.removeEventListener('pagehide', onPageHide);
   }, [documentId]);
 
-  return { status, query, text, usage, error, start, cancel, reset };
+  return { status, query, text, usage, citations, error, start, cancel, reset };
 }
