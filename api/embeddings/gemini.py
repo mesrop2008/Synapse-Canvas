@@ -44,7 +44,8 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
     name = "gemini"
     max_input_tokens = GEMINI_EMBEDDING_INPUT_LIMIT
     metered = True
-    # Gemini scores even unrelated text around 0.5 against a question.
+    # Gemini scores unrelated text 0.4 to 0.5 against a question, related
+    # text from about 0.65.
     default_min_similarity = 0.6
 
     def __init__(
