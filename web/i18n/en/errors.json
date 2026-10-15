@@ -46,6 +46,7 @@
     "embedding": {
       "failed": "The embedding service could not process this. Try again.",
       "quota_exhausted": "The embedding service's request quota is used up. It is worth retrying later; a daily quota resets the next day.",
+      "daily_limit": "This workspace has used up today's embedding requests. It is worth retrying after midnight UTC.",
       "input_too_long": "A passage was longer than the embedding model accepts, so it was not sent rather than be cut short. Please report this.",
       "invalid_key": "Embeddings are not set up on this server: the API key is missing or was rejected. Ask whoever runs it to check GEMINI_API_KEY, or to use EMBEDDING_PROVIDER=local.",
       "unavailable": "The embedding service is not responding. Try again in a few minutes."
@@ -75,7 +76,10 @@
       "empty": "This file has no text to read.",
       "too_large": "That file is larger than the upload limit.",
       "storage_quota": "This workspace has no room for that file. Delete a source to free some space.",
-      "not_failed": "Only a source that failed can be retried."
+      "not_failed": "Only a source that failed can be retried.",
+      "parse_failed": "This file could not be read: it may be damaged, or written in a way the reader does not understand. Trying again will not help; upload another copy.",
+      "no_text": "This PDF has no text layer, as a scan does. Text recognition (OCR) is not supported; upload a PDF whose text can be selected.",
+      "encrypted": "This file is protected by a password. Remove the password and upload it again."
     },
     "workspace": {
       "not_found": "That workspace does not exist, or you are not a member of it.",

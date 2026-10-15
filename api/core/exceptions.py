@@ -65,9 +65,13 @@ class ErrorCode(StrEnum):
     SOURCE_TOO_LARGE = "source.too_large"
     SOURCE_STORAGE_QUOTA = "source.storage_quota"
     SOURCE_NOT_FAILED = "source.not_failed"
+    SOURCE_PARSE_FAILED = "source.parse_failed"
+    SOURCE_NO_TEXT = "source.no_text"
+    SOURCE_ENCRYPTED = "source.encrypted"
 
     EMBEDDING_FAILED = "embedding.failed"
     EMBEDDING_QUOTA_EXHAUSTED = "embedding.quota_exhausted"
+    EMBEDDING_DAILY_LIMIT = "embedding.daily_limit"
     EMBEDDING_INPUT_TOO_LONG = "embedding.input_too_long"
     EMBEDDING_INVALID_KEY = "embedding.invalid_key"
     EMBEDDING_UNAVAILABLE = "embedding.unavailable"
