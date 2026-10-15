@@ -125,6 +125,9 @@ class Settings(BaseSettings):
     embedding_dimension: int = 1536
     embedding_timeout_seconds: float = 60.0
 
+    # Relative to the working directory; the containers use a volume.
+    source_storage_dir: str = "var/sources"
+
     # Comma-separated str, not list[str]: pydantic-settings JSON-decodes list
     # types before validators run.
     cors_origins_raw: str = Field(default="", alias="CORS_ORIGINS")

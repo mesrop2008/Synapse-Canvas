@@ -30,3 +30,6 @@ docs/
 
 # Local API log from the manual-testing walkthrough
 api.log
+
+# Uploaded sources, when the API runs on the host
+var/
