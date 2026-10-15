@@ -16,6 +16,7 @@ from api.schemas.workspace import (
 )
 from api.services import ai_usage, workspace_service
 from api.services import documents as document_service
+from api.services import sources as source_service
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
@@ -94,6 +95,10 @@ async def delete_workspace(
     documents = await document_service.list_documents(db, ctx.workspace.id)
 
     await workspace_service.delete_workspace(db, ctx.workspace)
+    # The rows went with the workspace; the files are not in the database.
+    await source_service.delete_workspace_files(
+        request.app.state.storage, ctx.workspace.id
+    )
 
     for document in documents:
         await request.app.state.hub.publish(
