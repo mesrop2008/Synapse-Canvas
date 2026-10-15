@@ -29,6 +29,7 @@ from api.schemas.document import DocumentRead, DocumentVersionConflict
 from api.services import email_service
 from api.services.ai_runner import GenerationRunner
 from api.services.documents import StaleDocumentVersionError
+from api.services.embedding_column import check_embedding_column
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     mail_check = asyncio.create_task(email_service.report_delivery_status())
     llm.report_status(app.state.ai.provider)
     embeddings.report_status(app.state.embeddings)
+    await check_embedding_column(get_engine(), app.state.embeddings.dimension)
     yield
     mail_check.cancel()
     # First, so a code queued just before shutdown still goes out.
