@@ -56,6 +56,9 @@ _W14_CHECKBOX = "{http://schemas.microsoft.com/office/word/2010/wordml}checkbox"
 _W14_CHECKED = "{http://schemas.microsoft.com/office/word/2010/wordml}checked"
 _W14_VAL = "{http://schemas.microsoft.com/office/word/2010/wordml}val"
 _HEADING = re.compile(r"^heading\s+(\d+)$", re.IGNORECASE)
+# Word's "List Bullet 2" is a second-level bullet by its name alone: its
+# numbering sits at level 0 and the style supplies the indent.
+_LIST_STYLE_DEPTH = re.compile(r"^list (?:bullet|number) (\d)$", re.IGNORECASE)
 _FALSE = frozenset({"0", "false", "off", "none"})
 _AUTO_LINE = 240
 
@@ -357,6 +360,9 @@ class _Reader:
         else:
             heading = _heading_level(style_name)
             numbering = None if heading else self._numbering(properties, style_id)
+            depth = _LIST_STYLE_DEPTH.match(style_name)
+            if numbering is not None and depth:
+                numbering = (max(numbering[0], int(depth.group(1)) - 1), *numbering[1:])
             if heading and self._numbering(properties, style_id) is not None:
                 self._drop(Dropped.HEADING_NUMBERS)
             attrs = self._paragraph_attrs(properties, numbered=numbering is not None)
