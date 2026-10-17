@@ -4,6 +4,7 @@ import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom'
 import { ApiError } from './api/client';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { SourceViewerProvider } from './components/sourceViewer/SourceViewer';
 import { AuthProvider } from './hooks/useAuth';
 import { I18nProvider } from './hooks/useI18n';
 import { ThemeProvider } from './hooks/useTheme';
@@ -62,7 +63,9 @@ export function App() {
       <ThemeProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <RouterProvider router={router} />
+            <SourceViewerProvider>
+              <RouterProvider router={router} />
+            </SourceViewerProvider>
           </AuthProvider>
         </QueryClientProvider>
       </ThemeProvider>

@@ -17,6 +17,7 @@ import { canEdit } from '../types/api';
 import { Alert } from './Alert';
 import { ConfirmDialog } from './ConfirmDialog';
 import { BookIcon, FileIcon, RetryIcon, TrashIcon, UploadIcon } from './icons';
+import { useSourceViewer } from './sourceViewer/SourceViewer';
 
 const ACCEPT = '.pdf,.docx,.txt,.md,.markdown';
 
@@ -46,6 +47,7 @@ export function SourcesPanel({ workspace }: { workspace: Workspace }) {
   const { uploads, start, dismiss } = useUploads(workspace.id);
   const remove = useDeleteSource(workspace.id);
   const retry = useRetrySource(workspace.id);
+  const openViewer = useSourceViewer();
 
   const writable = canEdit(workspace.role);
   const [pendingDelete, setPendingDelete] = useState<Source | null>(null);
@@ -143,6 +145,13 @@ export function SourcesPanel({ workspace }: { workspace: Workspace }) {
               retrying={retry.isPending && retry.variables === source.id}
               onRetry={() => retry.mutate(source.id)}
               onDelete={() => setPendingDelete(source)}
+              onOpen={() =>
+                openViewer({
+                  workspaceId: workspace.id,
+                  sourceId: source.id,
+                  filename: source.filename,
+                })
+              }
             />
           ))}
         </ul>
@@ -305,12 +314,14 @@ function SourceRow({
   retrying,
   onRetry,
   onDelete,
+  onOpen,
 }: {
   source: Source;
   writable: boolean;
   retrying: boolean;
   onRetry: () => void;
   onDelete: () => void;
+  onOpen: () => void;
 }) {
   const { t, locale, formatRelative } = useI18n();
   const facts = [
@@ -327,7 +338,9 @@ function SourceRow({
         <FileIcon size={18} />
       </span>
       <div className="row-main">
-        <span className="source-name">{source.filename}</span>
+        <button type="button" className="btn-link source-name" onClick={onOpen}>
+          {source.filename}
+        </button>
         <span className="meta">{facts.join(' · ')}</span>
         {source.status === 'failed' && (
           <p className="source-failure" role="status">
@@ -344,6 +357,15 @@ function SourceRow({
         )}
         {t(STATUS_LABELS[source.status])}
       </span>
+      <button
+        type="button"
+        className="btn btn-ghost btn-icon"
+        title={t('sources.open', { name: source.filename })}
+        aria-label={t('sources.open', { name: source.filename })}
+        onClick={onOpen}
+      >
+        <BookIcon />
+      </button>
       {writable && source.status === 'failed' && source.retryable && (
         <button
           type="button"

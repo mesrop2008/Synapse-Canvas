@@ -1,9 +1,9 @@
-import { Fragment, useState, type ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 
 import { useI18n } from '../hooks/useI18n';
 import type { AIQuery, Citation } from '../types/api';
 import { Alert } from './Alert';
-import { CitationDialog } from './CitationDialog';
+import { useSourceViewer } from './sourceViewer/SourceViewer';
 
 // As the server reads them: [1], [1, 2], [1; 3].
 const MARKERS = /\[(\d{1,3}(?:\s*[,;]\s*\d{1,3})*)\]/g;
@@ -40,7 +40,15 @@ interface CitedAnswerProps {
 
 export function CitedAnswer({ workspaceId, query, text, citations }: CitedAnswerProps) {
   const { t } = useI18n();
-  const [open, setOpen] = useState<Citation | null>(null);
+  const openViewer = useSourceViewer();
+  // The viewer opens at the passage, scrolled to it and highlighted.
+  const open = (citation: Citation) =>
+    openViewer({
+      workspaceId,
+      sourceId: citation.source_id,
+      filename: citation.filename,
+      citation,
+    });
   const searched = query.retrieved_chunk_ids !== null;
   const retrieved = query.retrieved_chunk_ids?.length ?? 0;
   const byMarker = new Map(citations.map((citation) => [citation.marker, citation]));
@@ -51,7 +59,7 @@ export function CitedAnswer({ workspaceId, query, text, citations }: CitedAnswer
       className="cite"
       data-unavailable={citation.available === false ? 'true' : undefined}
       aria-label={t('ai.citations.open', { marker: citation.marker })}
-      onClick={() => setOpen(citation)}
+      onClick={() => open(citation)}
     >
       {citation.marker}
     </button>
@@ -78,7 +86,7 @@ export function CitedAnswer({ workspaceId, query, text, citations }: CitedAnswer
                 <button
                   type="button"
                   className="btn-link cited-name"
-                  onClick={() => setOpen(citation)}
+                  onClick={() => open(citation)}
                 >
                   {citation.page_number !== null
                     ? t('ai.citations.item', {
@@ -91,14 +99,6 @@ export function CitedAnswer({ workspaceId, query, text, citations }: CitedAnswer
             ))}
           </ol>
         </section>
-      )}
-
-      {open && (
-        <CitationDialog
-          workspaceId={workspaceId}
-          citation={open}
-          onClose={() => setOpen(null)}
-        />
       )}
     </>
   );

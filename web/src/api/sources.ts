@@ -1,5 +1,5 @@
-import type { Source, SourceChunk } from '../types/api';
-import { request, upload } from './client';
+import type { Source, SourceChunk, SourceText } from '../types/api';
+import { download, request, upload, type Downloaded } from './client';
 
 const sources = (workspaceId: string) => `/workspaces/${workspaceId}/sources`;
 
@@ -22,6 +22,19 @@ export async function uploadSource(
   form.append('file', file, file.name);
   const { status, body } = await upload<Source>(sources(workspaceId), form, options);
   return { source: body, created: status === 201 };
+}
+
+export function getSource(workspaceId: string, sourceId: string): Promise<Source> {
+  return request<Source>('GET', `${sources(workspaceId)}/${sourceId}`);
+}
+
+export function getSourceText(workspaceId: string, sourceId: string): Promise<SourceText> {
+  return request<SourceText>('GET', `${sources(workspaceId)}/${sourceId}/text`);
+}
+
+/** The file as uploaded, through the session: never a link to storage. */
+export function getSourceFile(workspaceId: string, sourceId: string): Promise<Downloaded> {
+  return download(`${sources(workspaceId)}/${sourceId}/content`);
 }
 
 export function deleteSource(workspaceId: string, sourceId: string): Promise<void> {
