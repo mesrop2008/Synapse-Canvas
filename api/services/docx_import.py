@@ -275,6 +275,11 @@ class _Reader:
     document: Any
     dropped: set[Dropped] = field(default_factory=set)
     _counters: dict[tuple[str, int], int] = field(default_factory=dict)
+    _drops: int = 0
+
+    def _drop(self, feature: Dropped) -> None:
+        self.dropped.add(feature)
+        self._drops += 1
 
     def read(self) -> Node:
         self._report_headers_and_footers()
@@ -313,34 +318,47 @@ class _Reader:
             elif child.tag == qn("w:tbl"):
                 items.append(_Item("block", self.table(child)))
             elif child.tag == qn("w:altChunk"):
-                self.dropped.add(Dropped.EMBEDDED)
+                self._drop(Dropped.EMBEDDED)
         return _gather(items)
 
     def paragraph(self, p: Any) -> list[_Item]:
         properties = p.find(qn("w:pPr"))
-        style_id = _val(properties, "w:pStyle")
-        style_name = self._style_name(style_id)
         items: list[_Item] = []
-
         if properties is not None and _on(properties.find(qn("w:pageBreakBefore"))):
             items.append(_Item("page"))
 
+        drops_before = self._drops
         segments = self.inline(p)
-        text_only = "".join(
-            piece.get("text", "") if piece["type"] == "text" else "\n"
-            for segment in segments
-            for piece in segment
-        )
+        # A paragraph that held only a picture, say, leaves nothing behind.
+        if not (self._drops > drops_before and segments == [[]]):
+            items += self._paragraph_body(properties, segments)
 
+        if properties is not None:
+            section = properties.find(qn("w:sectPr"))
+            if section is not None:
+                self._drop(Dropped.SECTION_BREAK)
+                if _val(section, "w:type") not in ("continuous", "nextColumn"):
+                    items.append(_Item("page"))
+        return items
+
+    def _paragraph_body(self, properties: Any, segments: list[list[Node]]) -> list[_Item]:
+        style_id = _val(properties, "w:pStyle")
+        style_name = self._style_name(style_id)
+        items: list[_Item] = []
         if style_name in CODE_STYLES:
-            items.append(_Item("code", text=text_only))
+            text = "".join(
+                piece.get("text", "") if piece["type"] == "text" else "\n"
+                for segment in segments
+                for piece in segment
+            )
+            items.append(_Item("code", text=text))
         elif _is_rule(properties, segments):
             items.append(_Item("block", node("horizontalRule")))
         else:
             heading = _heading_level(style_name)
             numbering = None if heading else self._numbering(properties, style_id)
             if heading and self._numbering(properties, style_id) is not None:
-                self.dropped.add(Dropped.HEADING_NUMBERS)
+                self._drop(Dropped.HEADING_NUMBERS)
             attrs = self._paragraph_attrs(properties, numbered=numbering is not None)
             kind = "heading" if heading else "paragraph"
             extra = {"level": min(heading, MAX_HEADING)} if heading else {}
@@ -357,13 +375,6 @@ class _Reader:
                     items.append(_Item("quote", block))
                 else:
                     items.append(_Item("block", block))
-
-        if properties is not None:
-            section = properties.find(qn("w:sectPr"))
-            if section is not None:
-                self.dropped.add(Dropped.SECTION_BREAK)
-                if _val(section, "w:type") not in ("continuous", "nextColumn"):
-                    items.append(_Item("page"))
         return items
 
     def _list_item(
@@ -467,7 +478,7 @@ class _Reader:
                 multiple = round(int(line) / _AUTO_LINE, 2)
                 attrs["lineHeight"] = None if multiple == 1 else f"{multiple:g}"
             else:
-                self.dropped.add(Dropped.LINE_SPACING)
+                self._drop(Dropped.LINE_SPACING)
         return attrs
 
     def table(self, tbl: Any) -> Node:
@@ -535,16 +546,16 @@ class _Reader:
             elif tag == qn("w:hyperlink"):
                 yield from self._tokens(child, self._link(child))
             elif tag in (qn("w:ins"), qn("w:moveTo")):
-                self.dropped.add(Dropped.TRACKED_CHANGE)
+                self._drop(Dropped.TRACKED_CHANGE)
                 yield from self._tokens(child, link)
             elif tag in (qn("w:del"), qn("w:moveFrom")):
-                self.dropped.add(Dropped.TRACKED_CHANGE)
+                self._drop(Dropped.TRACKED_CHANGE)
             elif tag == qn("w:fldSimple"):
                 yield from self._tokens(child, link)
             elif tag in (f"{_MATH}oMath", f"{_MATH}oMathPara"):
-                self.dropped.add(Dropped.EQUATION)
+                self._drop(Dropped.EQUATION)
             elif tag == qn("w:commentRangeStart"):
-                self.dropped.add(Dropped.COMMENT)
+                self._drop(Dropped.COMMENT)
 
     def _link(self, hyperlink: Any) -> tuple[Node, ...]:
         relationship = hyperlink.get(qn("r:id"))
@@ -561,7 +572,7 @@ class _Reader:
     def _run(self, run: Any, link: tuple[Node, ...]) -> Iterator[Node | None]:
         properties = run.find(qn("w:rPr"))
         if properties is not None and _on(properties.find(qn("w:vanish"))):
-            self.dropped.add(Dropped.HIDDEN_TEXT)
+            self._drop(Dropped.HIDDEN_TEXT)
             return
         marks = ordered_marks([*link, *self._marks(properties)])
         for child in run:
@@ -578,22 +589,20 @@ class _Reader:
                 if kind == "page":
                     yield None
                 elif kind == "column":
-                    self.dropped.add(Dropped.COLUMN_BREAK)
+                    self._drop(Dropped.COLUMN_BREAK)
                 else:
                     yield {"type": "hardBreak"}
             elif tag == qn("w:cr"):
                 yield {"type": "hardBreak"}
             elif tag in (qn("w:drawing"), qn("w:pict")):
                 textbox = child.find(".//" + qn("w:txbxContent"))
-                self.dropped.add(
-                    Dropped.TEXT_BOX if textbox is not None else Dropped.IMAGE
-                )
+                self._drop(Dropped.TEXT_BOX if textbox is not None else Dropped.IMAGE)
             elif tag == qn("w:object"):
-                self.dropped.add(Dropped.EMBEDDED)
+                self._drop(Dropped.EMBEDDED)
             elif tag in (qn("w:footnoteReference"), qn("w:endnoteReference")):
-                self.dropped.add(Dropped.FOOTNOTE)
+                self._drop(Dropped.FOOTNOTE)
             elif tag == qn("w:commentReference"):
-                self.dropped.add(Dropped.COMMENT)
+                self._drop(Dropped.COMMENT)
             elif tag == qn("w:sym"):
                 char = child.get(qn("w:char"))
                 if char:
@@ -628,7 +637,7 @@ class _Reader:
             marks.append(mark("strike"))
         if _on(properties.find(qn("w:dstrike"))):
             marks.append(mark("strike"))
-            self.dropped.add(Dropped.TEXT_EFFECT)
+            self._drop(Dropped.TEXT_EFFECT)
         vertical = _val(properties, "w:vertAlign")
         if vertical == "superscript":
             marks.append(mark("superscript"))
@@ -671,7 +680,7 @@ class _Reader:
             "w:shadow",
         )
         if any(_on(properties.find(qn(tag))) for tag in effects):
-            self.dropped.add(Dropped.TEXT_EFFECT)
+            self._drop(Dropped.TEXT_EFFECT)
         return _merge_text_style(marks)
 
     def _report_headers_and_footers(self) -> None:
@@ -681,7 +690,7 @@ class _Reader:
                 if element is not None and any(
                     text.text and text.text.strip() for text in element.iter(qn("w:t"))
                 ):
-                    self.dropped.add(Dropped.HEADER_FOOTER)
+                    self._drop(Dropped.HEADER_FOOTER)
                     return
 
 
