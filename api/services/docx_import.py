@@ -52,9 +52,6 @@ _CFB_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 _ZIP_MAGIC = (b"PK\x03\x04", b"PK\x05\x06")
 _LINK_SCHEMES = ("http://", "https://", "mailto:")
 _MATH = "{http://schemas.openxmlformats.org/officeDocument/2006/math}"
-_W14_CHECKBOX = "{http://schemas.microsoft.com/office/word/2010/wordml}checkbox"
-_W14_CHECKED = "{http://schemas.microsoft.com/office/word/2010/wordml}checked"
-_W14_VAL = "{http://schemas.microsoft.com/office/word/2010/wordml}val"
 _HEADING = re.compile(r"^heading\s+(\d+)$", re.IGNORECASE)
 # Word's "List Bullet 2" is a second-level bullet by its name alone: its
 # numbering sits at level 0 and the style supplies the indent.
@@ -394,13 +391,19 @@ class _Reader:
         self._counters[(num_id, level)] = seen + 1
 
         if numbering.format == "bullet":
-            first = (block.get("content") or [{}])[0]
+            content = block.get("content") or []
+            first = content[0] if content else {}
             glyph = first.get("text", "")[:1] if first.get("type") == "text" else ""
             if glyph in CHECKED_GLYPHS or glyph == UNCHECKED:
-                first["text"] = first["text"][1:].lstrip(" ")
-                if not first["text"]:
-                    block["content"] = block["content"][1:]
-                if not block.get("content"):
+                first["text"] = first["text"][1:]
+                # Word's checkbox control puts the box in a run of its own,
+                # so the space after it opens the next one.
+                while content and content[0].get("type") == "text":
+                    content[0]["text"] = content[0]["text"].lstrip(" ")
+                    if content[0]["text"]:
+                        break
+                    content.pop(0)
+                if not content:
                     block.pop("content", None)
                 return _Item(
                     "list",
@@ -616,9 +619,6 @@ class _Reader:
                         yield _text(chr(int(char, 16) & 0xFFFF), marks)
                     except ValueError:
                         pass
-        sdt_check = _checkbox_state(run)
-        if sdt_check is not None:
-            yield _text(sdt_check, marks)
 
     def _marks(self, properties: Any, depth: int = 0) -> list[Node]:
         if properties is None:
@@ -736,19 +736,6 @@ def _is_rule(properties: Any, segments: list[list[Node]]) -> bool:
         return False
     borders = properties.find(qn("w:pBdr"))
     return borders is not None and borders.find(qn("w:bottom")) is not None
-
-
-def _checkbox_state(run: Any) -> str | None:
-    """A Word checkbox content control reads as the glyph export writes."""
-    parent = run.getparent()
-    if parent is None or parent.tag != qn("w:sdtContent"):
-        return None
-    sdt = parent.getparent()
-    box = sdt.find(f"{qn('w:sdtPr')}/{_W14_CHECKBOX}")
-    if box is None or len(run.findall(qn("w:t"))):
-        return None
-    checked = box.find(_W14_CHECKED)
-    return "☒" if checked is not None and checked.get(_W14_VAL) in ("1", "true") else "☐"
 
 
 def _text(value: str, marks: list[Node]) -> Node:
