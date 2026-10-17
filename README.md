@@ -170,10 +170,3 @@ commits after each batch. Redis keeps nothing across a restart, so the worker
 also queues again, once a minute, any source left pending.
 
 
-
-
-## Roadmap
-
-| Part | |
-|---|---|
-| 6 | Hardening and deployment |
