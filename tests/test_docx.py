@@ -16,7 +16,8 @@ from docx.oxml.ns import nsdecls
 from httpx import AsyncClient
 
 from api.core.config import get_settings
-from api.services.docx_export import content_disposition, export_filename, to_docx
+from api.core.downloads import content_disposition
+from api.services.docx_export import export_filename, to_docx
 from api.services.docx_format import DOCX_CONTENT_TYPE, attribute_names
 from api.services.docx_import import (
     CorruptDocumentError,

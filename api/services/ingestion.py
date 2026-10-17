@@ -19,6 +19,7 @@ from collections.abc import Iterator, Sequence
 from datetime import timedelta
 
 from sqlalchemy import and_, delete, func, or_, select, text, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 
 from api.core.config import get_settings
@@ -29,6 +30,7 @@ from api.embeddings.errors import EmbeddingError
 from api.models.enums import SourceStatus
 from api.models.source import Source
 from api.models.source_chunk import SourceChunk
+from api.models.source_text import SourceText
 from api.services import embedding_usage
 from api.services.chunking import ChunkDraft, chunk_text
 from api.services.embedding_usage import EmbeddingLimitError
@@ -86,7 +88,8 @@ async def _process(
 
     try:
         data = await storage.read(storage_path)
-        extracted = await _extract(data, content_type)
+        extracted = await extract_file(data, content_type)
+        await store_text(source_id, extracted)
         drafts = await asyncio.to_thread(
             chunk_text,
             extracted.text,
@@ -137,7 +140,7 @@ async def _process(
     )
 
 
-async def _extract(data: bytes, content_type: str) -> Extracted:
+async def extract_file(data: bytes, content_type: str) -> Extracted:
     settings = get_settings()
     if not settings.source_extract_isolated:
         return await asyncio.to_thread(extract, data, content_type)
@@ -148,6 +151,24 @@ async def _extract(data: bytes, content_type: str) -> Extracted:
         timeout=settings.source_extract_timeout_seconds,
         memory_bytes=settings.source_extract_memory_bytes,
     )
+
+
+async def store_text(source_id: uuid.UUID, extracted: Extracted) -> None:
+    """Replaces what an earlier run stored. A source deleted meanwhile raises
+    IntegrityError, as a passage stored for it would."""
+    statement = insert(SourceText).values(
+        source_id=source_id, text=extracted.text, page_starts=extracted.page_starts
+    )
+    statement = statement.on_conflict_do_update(
+        index_elements=[SourceText.source_id],
+        set_={
+            "text": statement.excluded.text,
+            "page_starts": statement.excluded.page_starts,
+        },
+    )
+    async with get_sessionmaker()() as db:
+        await db.execute(statement)
+        await db.commit()
 
 
 async def _keep_reusable(

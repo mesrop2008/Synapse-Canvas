@@ -12,12 +12,14 @@ import re
 import shutil
 import tempfile
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import BinaryIO
 
 from api.core.config import Settings
 
 _KEY = re.compile(r"^[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$")
+_STREAM_BLOCK = 256 * 1024
 
 
 def _check(key: str) -> str:
@@ -33,6 +35,11 @@ class SourceStorage(ABC):
 
     @abstractmethod
     async def read(self, key: str) -> bytes: ...
+
+    @abstractmethod
+    async def stream(self, key: str) -> AsyncIterator[bytes]:
+        """Opens the file now, so a missing one raises FileNotFoundError
+        before a response has started, and yields it in blocks."""
 
     @abstractmethod
     async def delete(self, key: str) -> None:
@@ -70,6 +77,18 @@ class LocalFileStorage(SourceStorage):
 
     async def read(self, key: str) -> bytes:
         return await asyncio.to_thread(self._path(key).read_bytes)
+
+    async def stream(self, key: str) -> AsyncIterator[bytes]:
+        handle = await asyncio.to_thread(self._path(key).open, "rb")
+
+        async def blocks() -> AsyncIterator[bytes]:
+            try:
+                while block := await asyncio.to_thread(handle.read, _STREAM_BLOCK):
+                    yield block
+            finally:
+                handle.close()
+
+        return blocks()
 
     async def delete(self, key: str) -> None:
         await asyncio.to_thread(self._path(key).unlink, missing_ok=True)
