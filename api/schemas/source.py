@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -48,6 +49,35 @@ class SourceRead(BaseModel):
             created_at=source.created_at,
             processed_at=source.processed_at,
         )
+
+
+class SourcePassageRead(BaseModel):
+    id: uuid.UUID
+    chunk_index: int
+    char_start: int = Field(description="Offset into `text`, where the passage starts.")
+    char_end: int
+    page_number: int | None = Field(description="The page the passage starts on.")
+    token_count: int
+
+
+class SourcePageRead(BaseModel):
+    number: int
+    start: int = Field(description="Offset into `text` where the page starts.")
+
+
+class SourceTextRead(BaseModel):
+    """The text a source's passages index into, and the passages: what the
+    AI can read of it."""
+
+    source_id: uuid.UUID
+    format: Literal["pdf", "docx", "markdown", "text"]
+    text: str
+    pages: list[SourcePageRead] = Field(description="Empty for formats without pages.")
+    passages: list[SourcePassageRead]
+    html: str | None = Field(
+        description="A Word file rendered for reading, escaped by the server; "
+        "null for other formats or when the file cannot be rendered."
+    )
 
 
 class SourceChunkRead(BaseModel):

@@ -4,6 +4,7 @@ the bytes have shown it is text."""
 
 from __future__ import annotations
 
+import codecs
 import hashlib
 import re
 import unicodedata
@@ -211,6 +212,23 @@ def decode_text(raw: bytes) -> str | None:
     if len(_CONTROL.findall(text)) > len(text) // 100:
         return None
     return text
+
+
+def text_charset(head: bytes) -> str | None:
+    """The encoding to declare when serving a text file, from its first
+    bytes: as decode_text reads it, so the browser shows what was indexed."""
+    if head.startswith(b"\xef\xbb\xbf"):
+        return "utf-8"
+    if head.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return "utf-16"
+    try:
+        # Incremental, so a character cut off at the end of `head` is fine.
+        codecs.getincrementaldecoder("utf-8")().decode(head, final=False)
+        return "utf-8"
+    except UnicodeDecodeError:
+        pass
+    guess = from_bytes(head).best()
+    return guess.encoding if guess is not None and guess.encoding else None
 
 
 _MAX_FILENAME = 255

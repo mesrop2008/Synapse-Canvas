@@ -11,7 +11,6 @@ import io
 import re
 import unicodedata
 from typing import Any, Protocol
-from urllib.parse import quote
 
 from docx import Document
 from docx.enum.style import WD_STYLE_TYPE
@@ -446,12 +445,3 @@ def export_filename(title: str, fallback: str) -> str:
     elif _RESERVED.match(stem):
         stem = f"_{stem}"
     return f"{stem}.docx"
-
-
-def content_disposition(filename: str, fallback: str) -> str:
-    """RFC 6266: an ASCII name for old clients, the real one in UTF-8."""
-    ascii_name = filename.encode("ascii", "ignore").decode().strip()
-    if not ascii_name.removesuffix(".docx").strip(" ._-"):
-        ascii_name = f"{fallback}.docx"
-    ascii_name = ascii_name.replace("\\", "_").replace('"', "_")
-    return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename)}"

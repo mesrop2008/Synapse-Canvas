@@ -4,9 +4,18 @@ import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, File, Request, Response, UploadFile, status
+from fastapi.responses import StreamingResponse
 
+from api.core.downloads import content_disposition
 from api.dependencies import DbSession, RequireEditor, RequireViewer
-from api.schemas.source import SourceChunkRead, SourceRead
+from api.schemas.source import (
+    SourceChunkRead,
+    SourcePageRead,
+    SourcePassageRead,
+    SourceRead,
+    SourceTextRead,
+)
+from api.services import source_viewer
 from api.services import sources as source_service
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/sources", tags=["sources"])
@@ -81,6 +90,77 @@ async def get_source(
 ) -> SourceRead:
     source = await source_service.get_source(db, ctx.workspace.id, source_id)
     return SourceRead.of(source)
+
+
+@router.get(
+    "/{source_id}/content",
+    response_class=StreamingResponse,
+    summary="The original file, to show in the browser",
+    responses={
+        **_RESPONSES,
+        200: {"description": "The file as uploaded, with the type sniffed at upload"},
+    },
+)
+async def get_content(
+    source_id: uuid.UUID, ctx: RequireViewer, db: DbSession, request: Request
+) -> StreamingResponse:
+    content = await source_viewer.open_content(
+        db, request.app.state.storage, ctx.workspace.id, source_id
+    )
+    source = content.source
+    return StreamingResponse(
+        content.blocks,
+        media_type=content.media_type,
+        headers={
+            "Content-Disposition": content_disposition(
+                source.filename, str(source.id), "inline"
+            ),
+            "Content-Length": str(source.size_bytes),
+            "Cache-Control": "private, no-store",
+            # Shown inline, a file must not run anything on the API's origin.
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+        },
+    )
+
+
+@router.get(
+    "/{source_id}/text",
+    response_model=SourceTextRead,
+    summary="The text extracted from a source, with its passages' offsets",
+    responses={
+        **_RESPONSES,
+        409: {"description": "Not read yet, or it could not be read"},
+        415: {"description": "A kind of file the viewer cannot show"},
+    },
+)
+async def get_text(
+    source_id: uuid.UUID, ctx: RequireViewer, db: DbSession, request: Request
+) -> SourceTextRead:
+    """A source read before its text was kept is read again on first use."""
+    view = await source_viewer.view(
+        db, request.app.state.storage, ctx.workspace.id, source_id
+    )
+    return SourceTextRead(
+        source_id=view.source.id,
+        format=view.format,
+        text=view.text,
+        pages=[
+            SourcePageRead(number=index + 1, start=start)
+            for index, start in enumerate(view.page_starts)
+        ],
+        passages=[
+            SourcePassageRead(
+                id=passage.id,
+                chunk_index=passage.chunk_index,
+                char_start=passage.char_start,
+                char_end=passage.char_end,
+                page_number=passage.page_number,
+                token_count=passage.token_count,
+            )
+            for passage in view.passages
+        ],
+        html=view.html,
+    )
 
 
 @router.get(

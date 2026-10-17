@@ -305,3 +305,28 @@ export interface SourceChunk {
   char_start: number;
   char_end: number;
 }
+
+/** One passage of a source: what the AI is given to read. */
+export interface SourcePassage {
+  id: string;
+  chunk_index: number;
+  /** Offsets into SourceText.text. */
+  char_start: number;
+  char_end: number;
+  page_number: number | null;
+  token_count: number;
+}
+
+export type SourceFormat = 'pdf' | 'docx' | 'markdown' | 'text';
+
+/** Mirrors SourceTextRead in api/schemas/source.py. */
+export interface SourceText {
+  source_id: string;
+  format: SourceFormat;
+  text: string;
+  /** Empty for formats without pages. */
+  pages: Array<{ number: number; start: number }>;
+  passages: SourcePassage[];
+  /** A Word file rendered and escaped by the server. */
+  html: string | null;
+}

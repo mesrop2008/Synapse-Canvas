@@ -8,6 +8,7 @@ import anyio
 from fastapi import APIRouter, File, Request, Response, UploadFile, status
 
 from api.core.config import get_settings
+from api.core.downloads import content_disposition
 from api.core.exceptions import AppError, ErrorCode
 from api.dependencies import DbSession, RequireEditor, RequireViewer
 from api.schemas.document import (
@@ -148,9 +149,7 @@ async def export_document(
         content=data,
         media_type=DOCX_CONTENT_TYPE,
         headers={
-            "Content-Disposition": docx_export.content_disposition(
-                filename, str(document.id)
-            ),
+            "Content-Disposition": content_disposition(filename, str(document.id)),
             "Cache-Control": "no-store",
         },
     )

@@ -58,13 +58,9 @@
     "item": "{filename}, p. {page}",
     "itemNoPage": "{filename}",
     "open": "Open the passage cited as [{marker}]",
-    "passageTitle": "Cited passage [{marker}]",
-    "page": "Page {page}",
-    "loading": "Loading the passage…",
     "unavailable": "This source has been deleted, so the passage is no longer available.",
     "notGrounded": "No passage of this workspace's sources matched the question, so this answer is not grounded in them.",
-    "noneCited": "The answer cites none of the {count} passages found in the sources.",
-    "close": "Close"
+    "noneCited": "The answer cites none of the {count} passages found in the sources."
   },
   "history": {
     "title": "Earlier answers",

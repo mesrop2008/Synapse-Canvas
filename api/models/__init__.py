@@ -11,6 +11,7 @@ from api.models.rate_limit import RateLimitBucket
 from api.models.refresh_token import RefreshToken
 from api.models.source import Source
 from api.models.source_chunk import SourceChunk
+from api.models.source_text import SourceText
 from api.models.user import User
 from api.models.workspace import Workspace
 from api.models.workspace_member import WorkspaceMember
@@ -26,6 +27,7 @@ __all__ = [
     "RefreshToken",
     "Source",
     "SourceChunk",
+    "SourceText",
     "User",
     "Workspace",
     "WorkspaceMember",

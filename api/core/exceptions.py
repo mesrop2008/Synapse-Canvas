@@ -82,6 +82,8 @@ class ErrorCode(StrEnum):
     SOURCE_NO_TEXT = "source.no_text"
     SOURCE_ENCRYPTED = "source.encrypted"
     SOURCE_CHUNK_NOT_FOUND = "source.chunk_not_found"
+    SOURCE_NOT_VIEWABLE = "source.not_viewable"
+    SOURCE_TEXT_UNAVAILABLE = "source.text_unavailable"
 
     RETRIEVAL_MIXED_MODELS = "retrieval.mixed_models"
     RETRIEVAL_MODEL_MISMATCH = "retrieval.model_mismatch"
