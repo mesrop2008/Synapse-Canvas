@@ -308,6 +308,37 @@ export async function openStream(
   return response;
 }
 
+export interface Downloaded {
+  blob: Blob;
+  /** The server's name for the file, from Content-Disposition. */
+  filename: string | null;
+}
+
+/** RFC 6266: the UTF-8 `filename*` when there is one, else `filename`. */
+export function dispositionFilename(header: string | null): string | null {
+  if (!header) return null;
+  const extended = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(header);
+  if (extended) {
+    try {
+      return decodeURIComponent(extended[1]!.trim());
+    } catch {
+      // Malformed escapes: fall back to the plain name.
+    }
+  }
+  const plain = /filename\s*=\s*"([^"]*)"|filename\s*=\s*([^;]+)/i.exec(header);
+  return (plain?.[1] ?? plain?.[2])?.trim() || null;
+}
+
+/** A file behind the session, which a plain link cannot carry. */
+export async function download(path: string): Promise<Downloaded> {
+  const response = await sendWithSession('GET', path, {});
+  if (!response.ok) throw await failure(response);
+  return {
+    blob: await response.blob(),
+    filename: dispositionFilename(response.headers.get('Content-Disposition')),
+  };
+}
+
 /** Outlives the page, for `pagehide`. No refresh: there is no time for one. */
 export function sendOnUnload(method: Method, path: string): void {
   send(method, path, accessToken, { keepalive: true }).catch(() => {});

@@ -4,6 +4,7 @@ import {
   createDocument,
   deleteDocument,
   getDocument,
+  importDocument,
   listDocuments,
 } from '../api/documents';
 
@@ -37,6 +38,23 @@ export function useCreateDocument(workspaceId: string) {
     mutationFn: (title: string) => createDocument(workspaceId, title),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: documentKeys.list(workspaceId) }),
+  });
+}
+
+export function useImportDocument(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => importDocument(workspaceId, file),
+    onSuccess: (imported) => {
+      queryClient.setQueryData(
+        documentKeys.detail(workspaceId, imported.document.id),
+        imported.document,
+      );
+      return queryClient.invalidateQueries({
+        queryKey: documentKeys.list(workspaceId),
+        exact: true,
+      });
+    },
   });
 }
 

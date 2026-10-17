@@ -144,7 +144,12 @@ def create_app() -> FastAPI:
                 "POST",
                 re.compile(r"/workspaces/[^/]+/sources/?"),
                 settings.source_max_file_bytes + 64 * 1024,
-            )
+            ),
+            (
+                "POST",
+                re.compile(r"/workspaces/[^/]+/documents/import/?"),
+                settings.docx_import_max_bytes + 64 * 1024,
+            ),
         ],
     )
 
@@ -161,6 +166,8 @@ def create_app() -> FastAPI:
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
+            # The client names an exported file from it.
+            expose_headers=["Content-Disposition"],
         )
 
     # Per app, not per module: one per worker, and tests can run two.

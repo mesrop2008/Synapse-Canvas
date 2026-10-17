@@ -1,10 +1,11 @@
 import type {
   DocumentDetail,
+  DocumentImport,
   DocumentSummary,
   DocumentVersionConflict,
   ProseMirrorDoc,
 } from '../types/api';
-import { ApiError, request } from './client';
+import { ApiError, download, request, upload, type Downloaded } from './client';
 
 export function listDocuments(workspaceId: string): Promise<DocumentSummary[]> {
   return request<DocumentSummary[]>('GET', `/workspaces/${workspaceId}/documents`);
@@ -56,6 +57,23 @@ export function deleteDocument(
     'DELETE',
     `/workspaces/${workspaceId}/documents/${documentId}`,
   );
+}
+
+export function exportDocument(workspaceId: string, documentId: string): Promise<Downloaded> {
+  return download(`/workspaces/${workspaceId}/documents/${documentId}/export`);
+}
+
+export async function importDocument(
+  workspaceId: string,
+  file: File,
+  onProgress?: (fraction: number) => void,
+): Promise<DocumentImport> {
+  const form = new FormData();
+  form.append('file', file);
+  const reply = await upload<DocumentImport>(`/workspaces/${workspaceId}/documents/import`, form, {
+    onProgress,
+  });
+  return reply.body;
 }
 
 /** Checked structurally, not by status: callers need `current` to exist. */

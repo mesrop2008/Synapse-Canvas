@@ -58,6 +58,13 @@ class DocumentRead(DocumentSummaryRead):
     content: dict[str, Any]
 
 
+class DocumentImportRead(BaseModel):
+    document: DocumentRead
+    dropped: list[str] = Field(
+        description="Codes for what the file held that the editor cannot, and left out."
+    )
+
+
 class DocumentVersionConflict(BaseModel):
     """`current` lets the losing client re-sync without another request."""
 

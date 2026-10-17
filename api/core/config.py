@@ -139,6 +139,9 @@ class Settings(BaseSettings):
     # A source pending this long has lost its job and is queued again.
     source_requeue_after_seconds: int = 60
 
+    # Word import parses inside the request; the expansion cap above applies.
+    docx_import_max_bytes: int = 10 * 1024 * 1024
+
     # By the embedding provider's count. The cap stays under its input limit.
     chunk_target_tokens: int = 600
     chunk_overlap_tokens: int = 80

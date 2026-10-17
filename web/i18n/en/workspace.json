@@ -34,5 +34,9 @@
     "removeMessage": "{name} loses access to this workspace and everything in it. Their documents stay.",
     "removeConfirm": "Remove",
     "removeFailed": "Could not remove that person."
-  }
+  },
+  "importDocument": "Import Word file",
+  "importing": "Importing…",
+  "importLabel": "Word document to import",
+  "importFailed": "Could not import that file."
 }

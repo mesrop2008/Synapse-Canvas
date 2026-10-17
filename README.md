@@ -6,8 +6,9 @@ material, and query an LLM that answers with citations from those sources.
 **Part 5 of 6** — auth, workspaces, documents edited live over a WebSocket, an AI
 assistant whose responses stream over server-sent events and are inserted as
 ordinary versioned edits, and uploaded sources it answers from with citations.
-Password recovery by emailed code. A word-processor toolbar. English and
-Russian. 461 backend tests and 50 client tests.
+Password recovery by emailed code. A word-processor toolbar, and Word
+import and export. English and Russian. 502 backend tests and 50 client
+tests.
 
 ## Stack
 
@@ -26,7 +27,7 @@ Russian. 461 backend tests and 50 client tests.
 | Editor | Tiptap 3 |
 | LLM | Gemini via `google-genai`, or a scripted fake |
 | Embeddings | `gemini-embedding-001`, or a local sentence-transformers model |
-| File parsing | pypdf, python-docx |
+| File parsing | pypdf, python-docx (also Word import and export) |
 | Tests | pytest, httpx; Vitest and jsdom for the client |
 
 ## Quick start
@@ -141,6 +142,59 @@ client also checks the version in `init`, so a new client talking to an
 old server stops too. Either way the page offers a reload, and nothing is
 applied or sent. Documents saved under an older version still open: new
 attributes take their defaults.
+
+## Word import and export
+
+**Export** — every document has an **Export to Word** button (any role):
+`GET /workspaces/{id}/documents/{document_id}/export` answers with the
+`.docx` itself, named after the title. **Import** — editors and owners
+choose **Import Word file** on the workspace page:
+`POST /workspaces/{id}/documents/import` reads the file and creates a new
+document named after it, and answers with the document and `dropped`, the
+codes of whatever the file held that the editor cannot; the page then says
+in the reader's language what was left out.
+
+Both run inside the request, on a worker thread: at the sizes allowed
+(`DOCX_IMPORT_MAX_BYTES`, 10 MiB) that takes well under a second. A very
+large document would want the Arq worker and a download link instead.
+
+Only `.docx` is read. A Word 97-2003 `.doc` is refused with
+`import.legacy_doc` and a hint to save it as `.docx`; nothing converts
+it. The type comes from the bytes, not the name: a `.doc` and a
+password-protected `.docx` share one container, and the streams inside it
+tell them apart (`import.encrypted`). Damaged files are `import.corrupt`;
+the ZIP checks are the same as for uploaded sources.
+
+The importer walks the document's XML itself. mammoth, which turns a
+`.docx` into clean HTML, was the alternative, but by design it leaves out
+alignment, colour, fonts, sizes, highlight, spacing and indent -- half of
+what export writes -- and python-docx's own paragraph and run objects skip
+content controls and tracked insertions, losing their text.
+
+### What survives the trip
+
+A document exported and imported again comes back identical. From other
+Word documents:
+
+| | Export writes | Import reads |
+|---|---|---|
+| Headings 1–6 | Heading 1–6 styles | Heading styles; Title as heading 1. Heading numbers are **dropped** |
+| Alignment, indent | Paragraph alignment; half an inch per indent level | Same; indents round to the nearest level, up to 8 |
+| Line spacing | As a multiple | Multiples; exact and at-least spacing **dropped** |
+| Bold, italic, underline, strikethrough, superscript, subscript | Run formatting | Same, also from character styles; double strikethrough becomes single |
+| Inline code | An "Inline Code" character style | That style |
+| Text colour, font, size | Run formatting | Same; theme fonts and colours are not resolved |
+| Highlight | Shading, in any colour | Shading, or Word's 16 highlight colours |
+| Links | Hyperlinks | Web and mail links; others keep their text only |
+| Bulleted and numbered lists, nested | A numbering definition per list, so each restarts | Levels, formats (numbers, letters, roman), starts, continued numbering, and Word's "List Bullet 2"-style names |
+| Checklists | Bulleted items opening ☐ or ☒ | Those, and Word's checkbox content controls |
+| Quotes, code blocks | Quote and "Code Block" styles | Those and Word's similar styles |
+| Horizontal line | An empty paragraph with a bottom border | The same, as Word's own `---` makes |
+| Tables | Grid style, merged cells, a repeating header row | Merges both ways and the header row; ragged rows are padded |
+| Page break | A real page break | Page breaks and "page break before"; a section break becomes a page break and is reported |
+| Pictures, text boxes, equations, embedded objects, footnotes, comments, headers and footers, hidden text, column breaks, text effects | — | **Dropped**, and named |
+| Tracked changes | — | Insertions kept, deletions removed, and reported |
+| Page size, margins, paragraph spacing, first-line indent, custom styles | Word's defaults | Not read and not reported: page layout, which the editor does not model |
 
 ## AI assistant
 

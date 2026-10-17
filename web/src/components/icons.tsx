@@ -122,6 +122,12 @@ export const UploadIcon = (props: IconProps) => (
   </Svg>
 );
 
+export const DownloadIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" />
+  </Svg>
+);
+
 export const RetryIcon = (props: IconProps) => (
   <Svg {...props}>
     <path d="M20 11a8 8 0 1 0-2.3 5.7" />

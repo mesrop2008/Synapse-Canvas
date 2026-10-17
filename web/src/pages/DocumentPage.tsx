@@ -1,20 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useBlocker, useParams } from 'react-router-dom';
+import { Link, useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { EditorContent, useEditor, type EditorEvents } from '@tiptap/react';
 import { Placeholder } from '@tiptap/extensions';
 import { Step } from '@tiptap/pm/transform';
 
-import { describeFailure, errorMessage } from '../api/errors';
+import { exportDocument } from '../api/documents';
+import { describeFailure, errorMessage, failed, type FailedRequest } from '../api/errors';
 import { AIPanel } from '../components/AIPanel';
 import { Alert } from '../components/Alert';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ConnectionIndicator } from '../components/ConnectionIndicator';
 import { EditorToolbar } from '../components/EditorToolbar';
+import { ImportedNotice, droppedFrom } from '../components/ImportedNotice';
 import { LinkDialog } from '../components/LinkDialog';
 import { PeerList } from '../components/PeerList';
 import { ShortcutsDialog } from '../components/ShortcutsDialog';
-import { ChevronRightIcon } from '../components/icons';
+import { ChevronRightIcon, DownloadIcon } from '../components/icons';
+import { saveFile } from '../download';
 import { DialogShortcuts } from '../editor/dialogShortcuts';
 import { schemaExtensions } from '../editor/extensions';
 import { RemoteCursors, setRemotePeers } from '../editor/remoteCursors';
@@ -71,6 +74,15 @@ interface DocumentEditorProps {
 }
 
 const CURSOR_THROTTLE_MS = 150;
+// Long enough for the last keystrokes to reach the server before export.
+const SETTLE_WAIT_MS = 3_000;
+
+async function settled(isSettled: () => boolean): Promise<void> {
+  const deadline = Date.now() + SETTLE_WAIT_MS;
+  while (!isSettled() && Date.now() < deadline) {
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+  }
+}
 
 function DocumentEditor({
   workspaceId,
@@ -83,6 +95,11 @@ function DocumentEditor({
   const [reloaded, setReloaded] = useState<ReloadReason | null>(null);
   const [dialog, setDialog] = useState<'link' | 'shortcuts' | null>(null);
   const closeDialog = useCallback(() => setDialog(null), []);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<FailedRequest | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const dropped = droppedFrom(location.state);
 
   // Set while applying a peer's edit, so it is not sent back out.
   const applyingRemote = useRef(false);
@@ -216,6 +233,20 @@ function DocumentEditor({
       titleSave.isDirty && currentLocation.pathname !== nextLocation.pathname,
   );
 
+  async function handleExport() {
+    setExporting(true);
+    setExportError(null);
+    try {
+      await settled(socket.isSettled);
+      const file = await exportDocument(workspaceId, loaded.id);
+      saveFile(file.blob, file.filename ?? `${loaded.id}.docx`);
+    } catch (cause) {
+      setExportError(failed(cause, 'document.export.failed'));
+    } finally {
+      setExporting(false);
+    }
+  }
+
   function handleTitleChange(next: string) {
     setTitle(next);
     if (writable && live) titleSave.schedule();
@@ -229,6 +260,18 @@ function DocumentEditor({
           <ChevronRightIcon size={14} />
           <Link to={`/workspaces/${workspaceId}`}>{workspaceName}</Link>
         </nav>
+
+        {dropped.length > 0 && (
+          <ImportedNotice
+            dropped={dropped}
+            // Cleared from history, so a reload does not repeat it.
+            onDismiss={() => navigate(location.pathname, { replace: true, state: null })}
+          />
+        )}
+
+        {exportError && (
+          <Alert onDismiss={() => setExportError(null)}>{describeFailure(exportError)}</Alert>
+        )}
 
         {reloaded && (
           <Alert kind="warn" onDismiss={() => setReloaded(null)}>
@@ -294,6 +337,15 @@ function DocumentEditor({
           <div className="doc-status">
             <PeerList peers={socket.peers} />
             {!writable && <span className="badge">{t('document.readOnly')}</span>}
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              disabled={exporting}
+              onClick={handleExport}
+            >
+              <DownloadIcon />
+              {exporting ? t('document.export.exporting') : t('document.export.button')}
+            </button>
             <ConnectionIndicator state={socket.state} version={socket.version} />
           </div>
         </div>

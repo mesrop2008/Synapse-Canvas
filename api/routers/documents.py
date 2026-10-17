@@ -1,18 +1,26 @@
 from __future__ import annotations
 
 import uuid
+from functools import partial
+from typing import Annotated
 
-from fastapi import APIRouter, Request, status
+import anyio
+from fastapi import APIRouter, File, Request, Response, UploadFile, status
 
+from api.core.config import get_settings
+from api.core.exceptions import AppError, ErrorCode
 from api.dependencies import DbSession, RequireEditor, RequireViewer
 from api.schemas.document import (
     DocumentCreate,
+    DocumentImportRead,
     DocumentRead,
     DocumentSummaryRead,
     DocumentUpdate,
     DocumentVersionConflict,
 )
 from api.services import documents as document_service
+from api.services import docx_export, docx_import
+from api.services.docx_format import DOCX_CONTENT_TYPE
 
 # WorkspaceAccess resolves the workspace from a path param of this exact name.
 router = APIRouter(prefix="/workspaces/{workspace_id}/documents", tags=["documents"])
@@ -47,6 +55,50 @@ async def create_document(
     return DocumentRead.model_validate(document)
 
 
+@router.post(
+    "/import",
+    response_model=DocumentImportRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a document from a Word (.docx) file (editor or owner)",
+    responses={
+        **_EDITOR_RESPONSES,
+        413: {"description": "Over DOCX_IMPORT_MAX_BYTES"},
+        415: {"description": "Not a .docx; a Word 97-2003 .doc has its own code"},
+        422: {"description": "Damaged, password-protected or empty"},
+    },
+)
+async def import_document(
+    file: Annotated[UploadFile, File(description="A Word document (.docx)")],
+    ctx: RequireEditor,
+    db: DbSession,
+) -> DocumentImportRead:
+    """Parsed inside the request: at the sizes allowed that takes well under a
+    second. `dropped` names what the file held that the editor cannot."""
+    settings = get_settings()
+    data = docx_import.read_upload(file.file, settings.docx_import_max_bytes)
+    imported = await anyio.to_thread.run_sync(
+        partial(
+            docx_import.import_docx,
+            data,
+            max_uncompressed_bytes=settings.source_max_uncompressed_bytes,
+        )
+    )
+    title = docx_import.choose_title(file.filename, imported)
+    if title is None:
+        raise AppError("Nothing to name the document after", code=ErrorCode.IMPORT_EMPTY)
+    document = await document_service.create_document(
+        db,
+        workspace_id=ctx.workspace.id,
+        created_by=ctx.user.id,
+        title=title,
+        content=imported.content,
+    )
+    return DocumentImportRead(
+        document=DocumentRead.model_validate(document),
+        dropped=[code.value for code in imported.dropped],
+    )
+
+
 @router.get(
     "",
     response_model=list[DocumentSummaryRead],
@@ -71,6 +123,37 @@ async def get_document(
 ) -> DocumentRead:
     document = await document_service.get_document(db, ctx.workspace.id, document_id)
     return DocumentRead.model_validate(document)
+
+
+@router.get(
+    "/{document_id}/export",
+    response_class=Response,
+    summary="Download the document as a Word (.docx) file",
+    responses={
+        **_VIEWER_RESPONSES,
+        200: {"content": {DOCX_CONTENT_TYPE: {}}, "description": "The .docx file"},
+    },
+)
+async def export_document(
+    document_id: uuid.UUID, ctx: RequireViewer, db: DbSession
+) -> Response:
+    """Built inside the request; see the README for when that stops being
+    the right call."""
+    document = await document_service.get_document(db, ctx.workspace.id, document_id)
+    data = await anyio.to_thread.run_sync(
+        docx_export.to_docx, document.content, document.title
+    )
+    filename = docx_export.export_filename(document.title, str(document.id))
+    return Response(
+        content=data,
+        media_type=DOCX_CONTENT_TYPE,
+        headers={
+            "Content-Disposition": docx_export.content_disposition(
+                filename, str(document.id)
+            ),
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.patch(

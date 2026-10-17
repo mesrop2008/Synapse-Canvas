@@ -44,6 +44,14 @@
       "stale": "This document changed while you were working on it.",
       "schema_mismatch": "This page runs a different version of the editor from the server. Reload the page to keep editing."
     },
+    "import": {
+      "unsupported_type": "Only Word documents (.docx) can be imported.",
+      "legacy_doc": "This is an older Word document (.doc), which cannot be imported. Open it in Word and save it as .docx, then import that.",
+      "encrypted": "This document is protected by a password. Remove the password in Word, save it, and import it again.",
+      "corrupt": "This document could not be read: it may be damaged. Open it in Word and save a fresh copy, then try again.",
+      "too_large": "That file is larger than the import limit.",
+      "empty": "This file is empty."
+    },
     "realtime": {
       "invalid_ticket": "Could not join the document's live session. Reload the page.",
       "idle": "The live connection went quiet and was closed.",

@@ -45,6 +45,13 @@ class ErrorCode(StrEnum):
     DOCUMENT_STALE = "document.stale"
     DOCUMENT_SCHEMA_MISMATCH = "document.schema_mismatch"
 
+    IMPORT_UNSUPPORTED_TYPE = "import.unsupported_type"
+    IMPORT_LEGACY_DOC = "import.legacy_doc"
+    IMPORT_ENCRYPTED = "import.encrypted"
+    IMPORT_CORRUPT = "import.corrupt"
+    IMPORT_TOO_LARGE = "import.too_large"
+    IMPORT_EMPTY = "import.empty"
+
     REALTIME_INVALID_TICKET = "realtime.invalid_ticket"
     REALTIME_IDLE = "realtime.idle"
     REALTIME_UNSUPPORTED_FRAME = "realtime.unsupported_frame"

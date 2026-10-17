@@ -34,5 +34,9 @@
     "removeTitle": "Убрать участника?",
     "removeConfirm": "Убрать",
     "removeFailed": "Не удалось убрать этого человека."
-  }
+  },
+  "importDocument": "Импорт из Word",
+  "importing": "Импорт…",
+  "importLabel": "Документ Word для импорта",
+  "importFailed": "Не удалось импортировать файл."
 }

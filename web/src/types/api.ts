@@ -84,6 +84,13 @@ export interface DocumentDetail extends DocumentSummary {
   content: ProseMirrorDoc;
 }
 
+/** From importing a .docx. `dropped` names, as codes, what the file held
+ *  that the editor cannot; see api/services/docx_import.py. */
+export interface DocumentImport {
+  document: DocumentDetail;
+  dropped: string[];
+}
+
 /** The 409 body from PATCH: the state the client has to re-sync to. */
 export interface DocumentVersionConflict {
   code: string;
