@@ -13,7 +13,11 @@ from typing import Any
 
 Node = dict[str, Any]
 
-LEAF_TYPES = frozenset({"hardBreak", "horizontalRule", "image"})
+# The client's is in web/src/editor/schema.json, which lists every node, mark
+# and attribute; tests/test_editor_schema.py keeps the two in step.
+SCHEMA_VERSION = 2
+
+LEAF_TYPES = frozenset({"hardBreak", "horizontalRule", "pageBreak", "image"})
 TEXTBLOCK_TYPES = frozenset({"paragraph", "heading", "codeBlock"})
 
 
@@ -121,7 +125,7 @@ class _Builder:
             if fence:
                 self.emit("\n```")
             return
-        if kind == "horizontalRule":
+        if kind in ("horizontalRule", "pageBreak"):
             self.separate()
             self.emit(prefix + "---")
             return
@@ -134,9 +138,12 @@ class _Builder:
             child_prefix, child_marker = prefix, ""
             if kind == "bulletList":
                 child_marker = "- "
+            elif kind == "taskList":
+                checked = child.get("attrs", {}).get("checked")
+                child_marker = "- [x] " if checked else "- [ ] "
             elif kind == "orderedList":
                 child_marker = f"{start + index}. "
-            elif kind == "listItem":
+            elif kind in ("listItem", "taskItem"):
                 if index == 0:
                     child_marker = marker
                 else:

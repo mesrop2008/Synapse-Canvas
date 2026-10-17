@@ -1,0 +1,35 @@
+{
+  "version": 2,
+  "nodes": {
+    "blockquote": { "attrs": [], "leaf": false },
+    "bulletList": { "attrs": [], "leaf": false },
+    "codeBlock": { "attrs": ["language"], "leaf": false },
+    "doc": { "attrs": [], "leaf": false },
+    "hardBreak": { "attrs": [], "leaf": true },
+    "heading": { "attrs": ["indent", "level", "lineHeight", "textAlign"], "leaf": false },
+    "horizontalRule": { "attrs": [], "leaf": true },
+    "listItem": { "attrs": [], "leaf": false },
+    "orderedList": { "attrs": ["start", "type"], "leaf": false },
+    "pageBreak": { "attrs": [], "leaf": true },
+    "paragraph": { "attrs": ["indent", "lineHeight", "textAlign"], "leaf": false },
+    "table": { "attrs": [], "leaf": false },
+    "tableCell": { "attrs": ["align", "colspan", "colwidth", "rowspan"], "leaf": false },
+    "tableHeader": { "attrs": ["align", "colspan", "colwidth", "rowspan"], "leaf": false },
+    "tableRow": { "attrs": [], "leaf": false },
+    "taskItem": { "attrs": ["checked"], "leaf": false },
+    "taskList": { "attrs": [], "leaf": false },
+    "text": { "attrs": [], "leaf": true }
+  },
+  "marks": {
+    "bold": [],
+    "code": [],
+    "highlight": ["color"],
+    "italic": [],
+    "link": ["class", "href", "rel", "target", "title"],
+    "strike": [],
+    "subscript": [],
+    "superscript": [],
+    "textStyle": ["color", "fontFamily", "fontSize"],
+    "underline": []
+  }
+}
