@@ -525,3 +525,63 @@ def test_the_title_comes_from_the_file_then_the_properties_then_the_text() -> No
     assert choose_title(None, imported) == "From the properties"
     untitled = read(to_docx(every, ""))
     assert choose_title("", untitled) == "Every node and mark"
+
+
+def test_numbering_that_continues_past_a_paragraph_keeps_counting() -> None:
+    document = Document()
+    for text in ("one", "two"):
+        document.add_paragraph(text, style="List Number")
+    document.add_paragraph("an aside")
+    document.add_paragraph("three", style="List Number")
+
+    first, _, second = read(docx_bytes(document)).content["content"]
+
+    assert (first["type"], first["attrs"]["start"]) == ("orderedList", 1)
+    assert (second["type"], second["attrs"]["start"]) == ("orderedList", 3)
+
+
+def test_a_word_checkbox_makes_a_checklist_item() -> None:
+    """As Word writes one: the box in a content control, in its own run and
+    font, and the item's text after it."""
+    w14 = "http://schemas.microsoft.com/office/word/2010/wordml"
+    document = Document()
+    for state, glyph, text in (("1", "☒", " Done"), ("0", "☐", " Open")):
+        paragraph = document.add_paragraph(style="List Bullet")
+        paragraph._p.append(
+            parse_xml(
+                f'<w:sdt {nsdecls("w")} xmlns:w14="{w14}"><w:sdtPr><w14:checkbox>'
+                f'<w14:checked w14:val="{state}"/></w14:checkbox></w:sdtPr>'
+                '<w:sdtContent><w:r><w:rPr><w:rFonts w:ascii="MS Gothic" '
+                f'w:hAnsi="MS Gothic"/></w:rPr><w:t>{glyph}</w:t></w:r></w:sdtContent>'
+                "</w:sdt>"
+            )
+        )
+        paragraph.add_run(text)
+
+    items = read(docx_bytes(document)).content["content"][0]
+
+    assert items["type"] == "taskList"
+    assert [item["attrs"]["checked"] for item in items["content"]] == [True, False]
+    assert items["content"][0]["content"][0]["content"] == [
+        {"type": "text", "text": "Done"}
+    ]
+
+
+def test_section_breaks_and_page_break_before_become_page_breaks() -> None:
+    document = body_xml(
+        "<w:pPr><w:sectPr/></w:pPr><w:r><w:t>end of section one</w:t></w:r>",
+        "<w:pPr><w:pageBreakBefore/></w:pPr><w:r><w:t>on a new page</w:t></w:r>",
+        '<w:pPr><w:sectPr><w:type w:val="continuous"/></w:sectPr></w:pPr>'
+        "<w:r><w:t>continuous</w:t></w:r>",
+    )
+
+    imported = read(docx_bytes(document))
+
+    assert kinds(imported.content) == [
+        "paragraph",
+        "pageBreak",
+        "pageBreak",
+        "paragraph",
+        "paragraph",
+    ]
+    assert imported.dropped == [Dropped.SECTION_BREAK]
