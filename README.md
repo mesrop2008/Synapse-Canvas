@@ -7,7 +7,7 @@ material, and query an LLM that answers with citations from those sources.
 assistant whose responses stream over server-sent events and are inserted as
 ordinary versioned edits, and uploaded sources it answers from with citations.
 Password recovery by emailed code. A word-processor toolbar, and Word
-import and export. English and Russian. 499 backend tests and 50 client
+import and export. English and Russian. 502 backend tests and 50 client
 tests.
 
 ## Stack
