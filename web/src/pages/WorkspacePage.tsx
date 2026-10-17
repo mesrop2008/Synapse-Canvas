@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { errorMessage } from '../api/errors';
 import { Alert } from '../components/Alert';
@@ -12,11 +12,13 @@ import {
   PencilIcon,
   PlusIcon,
   TrashIcon,
+  UploadIcon,
 } from '../components/icons';
 import {
   useCreateDocument,
   useDeleteDocument,
   useDocuments,
+  useImportDocument,
 } from '../hooks/useDocuments';
 import { useI18n } from '../hooks/useI18n';
 import { useRenameWorkspace, useWorkspace } from '../hooks/useWorkspaces';
@@ -38,6 +40,9 @@ export function WorkspacePage() {
   const create = useCreateDocument(workspaceId);
   const remove = useDeleteDocument(workspaceId);
   const rename = useRenameWorkspace(workspaceId);
+  const importer = useImportDocument(workspaceId);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   const [title, setTitle] = useState('');
   const [pendingDelete, setPendingDelete] = useState<DocumentSummary | null>(null);
@@ -70,6 +75,18 @@ export function WorkspacePage() {
       setTitle('');
     } catch {
       // Surfaced from create.error below.
+    }
+  }
+
+  async function handleImport(file: File | undefined) {
+    if (!file) return;
+    try {
+      const imported = await importer.mutateAsync(file);
+      navigate(`/workspaces/${workspaceId}/documents/${imported.document.id}`, {
+        state: { dropped: imported.dropped },
+      });
+    } catch {
+      // Surfaced from importer.error below.
     }
   }
 
@@ -168,7 +185,35 @@ export function WorkspacePage() {
             <PlusIcon />
             {create.isPending ? t('workspace.creating') : t('workspace.newDocument')}
           </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={importer.isPending}
+            onClick={() => fileInput.current?.click()}
+          >
+            <UploadIcon />
+            {importer.isPending ? t('workspace.importing') : t('workspace.importDocument')}
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            hidden
+            aria-label={t('workspace.importLabel')}
+            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              // Cleared, so choosing the same file again still fires.
+              event.target.value = '';
+              void handleImport(file);
+            }}
+          />
         </form>
+      )}
+
+      {importer.error && (
+        <Alert onDismiss={() => importer.reset()}>
+          {errorMessage(importer.error, 'workspace.importFailed')}
+        </Alert>
       )}
 
       {rename.error && (

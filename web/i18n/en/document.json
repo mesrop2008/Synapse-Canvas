@@ -172,5 +172,30 @@
   "outdated": {
     "message": "This page was built for a different version of the editor from the one the server runs, so editing is paused to keep the document intact.",
     "reload": "Reload page"
+  },
+  "export": {
+    "button": "Export to Word",
+    "exporting": "Exporting…",
+    "failed": "Could not export this document."
+  },
+  "import": {
+    "dropped": "Imported from Word. Some of it has no place in the editor and was left out: {features}.",
+    "features": {
+      "image": "pictures and drawings",
+      "text_box": "text boxes",
+      "equation": "equations",
+      "embedded": "embedded objects",
+      "footnote": "footnotes and endnotes",
+      "comment": "comments",
+      "tracked_change": "tracked changes (insertions were kept, deletions removed)",
+      "header_footer": "headers and footers",
+      "hidden_text": "hidden text",
+      "text_effect": "text effects such as small capitals and shadows",
+      "line_spacing": "exact line spacing",
+      "heading_numbers": "heading numbers",
+      "section_break": "section breaks (page breaks were kept)",
+      "column_break": "column breaks",
+      "other": "other content"
+    }
   }
 }
