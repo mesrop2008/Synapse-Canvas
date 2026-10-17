@@ -41,7 +41,8 @@
     },
     "document": {
       "not_found": "That document does not exist, or you cannot open it.",
-      "stale": "This document changed while you were working on it."
+      "stale": "This document changed while you were working on it.",
+      "schema_mismatch": "This page runs a different version of the editor from the server. Reload the page to keep editing."
     },
     "realtime": {
       "invalid_ticket": "Could not join the document's live session. Reload the page.",

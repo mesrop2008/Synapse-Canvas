@@ -29,6 +29,7 @@ from api.schemas.realtime import (
 )
 from api.services import presence
 from api.services import documents as document_service
+from api.services.prosemirror import SCHEMA_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ CLOSE_INVALID_TICKET = 4401
 CLOSE_FORBIDDEN = 4403
 CLOSE_NOT_FOUND = 4404
 CLOSE_IDLE = 4408
+CLOSE_SCHEMA_MISMATCH = 4426
 CLOSE_TOO_MANY_EDITS = 4429
 CLOSE_TOO_LARGE = 1009
 CLOSE_UNSUPPORTED_FRAME = 1003
@@ -75,8 +77,10 @@ class EditorSession:
         workspace_id: uuid.UUID,
         user: User,
         role: WorkspaceRole,
+        client_schema: int | None,
     ) -> None:
         self._websocket = websocket
+        self._client_schema = client_schema
         self._hub = hub
         self._redis = redis
         self._document_id = document_id
@@ -104,6 +108,8 @@ class EditorSession:
 
     async def run(self) -> None:
         try:
+            if not await self._schema_matches():
+                return
             if not await self._send_init():
                 return
             await self._hub.join(self._connection)
@@ -131,6 +137,17 @@ class EditorSession:
         if self._websocket.client_state is WebSocketState.CONNECTED:
             await self._websocket.close(code=code, reason=reason.value)
 
+    async def _schema_matches(self) -> bool:
+        """A client on another schema replays steps it cannot parse, and one
+        that drops what it does not know would save the document back without
+        it. Refused before it sees any content; a client built before
+        versioning declares nothing and is refused too."""
+        if self._client_schema == SCHEMA_VERSION:
+            return True
+        await self._send({"type": "schema_mismatch", "schema_version": SCHEMA_VERSION})
+        await self._close(CLOSE_SCHEMA_MISMATCH, ErrorCode.DOCUMENT_SCHEMA_MISMATCH)
+        return False
+
     async def _send_init(self) -> bool:
         """Full state every time: a reconnecting client may have nothing."""
         async with get_sessionmaker()() as db:
@@ -149,6 +166,7 @@ class EditorSession:
         await self._send(
             {
                 "type": "init",
+                "schema_version": SCHEMA_VERSION,
                 "version": document.version,
                 "content": document.content,
                 "title": document.title,

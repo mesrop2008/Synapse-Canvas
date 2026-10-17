@@ -43,6 +43,7 @@ class ErrorCode(StrEnum):
 
     DOCUMENT_NOT_FOUND = "document.not_found"
     DOCUMENT_STALE = "document.stale"
+    DOCUMENT_SCHEMA_MISMATCH = "document.schema_mismatch"
 
     REALTIME_INVALID_TICKET = "realtime.invalid_ticket"
     REALTIME_IDLE = "realtime.idle"

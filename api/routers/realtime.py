@@ -71,6 +71,9 @@ async def document_socket(
     websocket: WebSocket,
     document_id: uuid.UUID,
     ticket: str | None = Query(default=None),
+    schema: int | None = Query(
+        default=None, description="The editor schema version the client was built with."
+    ),
 ) -> None:
     """No `Depends(get_db)`: a request-scoped session would pin a pooled
     connection per idle editor. `EditorSession` opens one per operation."""
@@ -93,5 +96,6 @@ async def document_socket(
         workspace_id=workspace_id,
         user=user,
         role=role,
+        client_schema=schema,
     )
     await session.run()

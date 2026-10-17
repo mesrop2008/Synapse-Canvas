@@ -26,6 +26,7 @@ from api.models.enums import WorkspaceRole
 from api.realtime.hub import DocumentHub
 from api.services import documents as document_service
 from api.services import presence
+from api.services.prosemirror import SCHEMA_VERSION
 from tests.conftest import _TEST_DATABASE_URL, new_redis, websocket_app
 
 
@@ -159,8 +160,11 @@ def ticket_for(client: TestClient, fixture: Fixture, token: str) -> str:
     return response.json()["ticket"]
 
 
-def socket_url(fixture: Fixture, ticket: str) -> str:
-    return f"/ws/documents/{fixture.document_id}?ticket={ticket}"
+def socket_url(
+    fixture: Fixture, ticket: str, schema: int | None = SCHEMA_VERSION
+) -> str:
+    url = f"/ws/documents/{fixture.document_id}?ticket={ticket}"
+    return url if schema is None else f"{url}&schema={schema}"
 
 
 async def _document_state(document_id: uuid.UUID) -> tuple[int, dict[str, Any]]:
