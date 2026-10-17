@@ -10,11 +10,6 @@ import { Color, FontFamily, FontSize, TextStyle } from '@tiptap/extension-text-s
 
 import { BlockFormat } from './blockFormat';
 import { PageBreak } from './pageBreak';
-import manifest from './schema.json';
-
-/** Bumped whenever a node, mark or attribute changes. The server sends its
- *  own in `init`, and a mismatched client stops before applying anything. */
-export const SCHEMA_VERSION: number = manifest.version;
 
 export const ALIGNMENTS = ['left', 'center', 'right', 'justify'] as const;
 

@@ -1,4 +1,5 @@
-import { mergeAttributes, Node } from '@tiptap/core';
+import { canInsertNode, isNodeSelection, mergeAttributes, Node } from '@tiptap/core';
+import { TextSelection } from '@tiptap/pm/state';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -46,10 +47,32 @@ export const PageBreak = Node.create<PageBreakOptions>({
 
   addCommands() {
     return {
+      // A page cannot break inside a table cell. The cursor always ends in
+      // a paragraph after the break, made if need be: left on the break, the
+      // next insert would replace it.
       setPageBreak:
         () =>
-        ({ chain }) =>
-          chain().insertContent({ type: this.name }).run(),
+        ({ chain, state, editor }) => {
+          if (editor.isActive('table') || !canInsertNode(state, this.type)) return false;
+          const insert = isNodeSelection(state.selection)
+            ? chain().insertContentAt(state.selection.to, { type: this.name })
+            : chain().insertContent({ type: this.name });
+          return insert
+            .command(({ tr, dispatch }) => {
+              if (!dispatch) return true;
+              const { $to } = tr.selection;
+              // In text already when the break split a paragraph.
+              if (!$to.parent.isTextblock) {
+                if (!$to.nodeAfter?.isTextblock) {
+                  tr.insert($to.pos, state.schema.nodes.paragraph!.create());
+                }
+                tr.setSelection(TextSelection.create(tr.doc, $to.pos + 1));
+              }
+              tr.scrollIntoView();
+              return true;
+            })
+            .run();
+        },
     };
   },
 

@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useBlocker, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { EditorContent, useEditor, type EditorEvents } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
 import { Step } from '@tiptap/pm/transform';
 
@@ -11,8 +10,13 @@ import { AIPanel } from '../components/AIPanel';
 import { Alert } from '../components/Alert';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ConnectionIndicator } from '../components/ConnectionIndicator';
+import { EditorToolbar } from '../components/EditorToolbar';
+import { LinkDialog } from '../components/LinkDialog';
 import { PeerList } from '../components/PeerList';
+import { ShortcutsDialog } from '../components/ShortcutsDialog';
 import { ChevronRightIcon } from '../components/icons';
+import { DialogShortcuts } from '../editor/dialogShortcuts';
+import { schemaExtensions } from '../editor/extensions';
 import { RemoteCursors, setRemotePeers } from '../editor/remoteCursors';
 import { documentKeys, useDocument } from '../hooks/useDocuments';
 import {
@@ -24,7 +28,6 @@ import { useI18n } from '../hooks/useI18n';
 import { useTitleSave } from '../hooks/useTitleSave';
 import { useWorkspace } from '../hooks/useWorkspaces';
 import { canEdit } from '../types/api';
-import type { MessageKey } from '../../i18n';
 import type { DocumentDetail, ProseMirrorDoc } from '../types/api';
 
 export function DocumentPage() {
@@ -78,6 +81,8 @@ function DocumentEditor({
   const { t, locale } = useI18n();
   const [title, setTitle] = useState(loaded.title);
   const [reloaded, setReloaded] = useState<ReloadReason | null>(null);
+  const [dialog, setDialog] = useState<'link' | 'shortcuts' | null>(null);
+  const closeDialog = useCallback(() => setDialog(null), []);
 
   // Set while applying a peer's edit, so it is not sent back out.
   const applyingRemote = useRef(false);
@@ -90,12 +95,13 @@ function DocumentEditor({
   const editor = useEditor(
     {
       extensions: [
-        StarterKit.configure({
-          // Undo must not revert peers' edits.
-          undoRedo: false,
-        }),
+        ...schemaExtensions({ pageBreakLabel: t('document.toolbar.pageBreak') }),
         Placeholder.configure({ placeholder: t('document.placeholder') }),
         RemoteCursors,
+        DialogShortcuts.configure({
+          onLink: () => setDialog('link'),
+          onHelp: () => setDialog('shortcuts'),
+        }),
       ],
       content: loaded.content,
       editable: false, // until the socket says it is live
@@ -157,6 +163,7 @@ function DocumentEditor({
   const live = socket.state === 'live';
   const gone =
     socket.state === 'deleted' || socket.state === 'unavailable';
+  const outdated = socket.state === 'outdated';
 
   const titleSave = useTitleSave({
     workspaceId,
@@ -246,7 +253,20 @@ function DocumentEditor({
           </Alert>
         )}
 
-        {writable && !live && !gone && (
+        {outdated && (
+          <Alert kind="warn">
+            {t('document.outdated.message')}{' '}
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => window.location.reload()}
+            >
+              {t('document.outdated.reload')}
+            </button>
+          </Alert>
+        )}
+
+        {writable && !live && !gone && !outdated && (
           <Alert kind="warn">
             {t(
               socket.state === 'offline'
@@ -278,7 +298,14 @@ function DocumentEditor({
           </div>
         </div>
 
-        {writable && editor && <Toolbar editor={editor} disabled={!live} />}
+        {writable && editor && (
+          <EditorToolbar
+            editor={editor}
+            disabled={!live}
+            onLink={() => setDialog('link')}
+            onHelp={() => setDialog('shortcuts')}
+          />
+        )}
 
         <div className="paper">
           <EditorContent editor={editor} />
@@ -298,6 +325,11 @@ function DocumentEditor({
         />
       )}
 
+      {dialog === 'link' && editor && live && (
+        <LinkDialog editor={editor} onClose={closeDialog} />
+      )}
+      {dialog === 'shortcuts' && <ShortcutsDialog onClose={closeDialog} />}
+
       {blocker.state === 'blocked' && (
         <ConfirmDialog
           title={t('document.leaveTitle')}
@@ -310,89 +342,5 @@ function DocumentEditor({
         />
       )}
     </main>
-  );
-}
-
-type TiptapEditor = NonNullable<ReturnType<typeof useEditor>>;
-
-/** Enough to exercise what StarterKit provides. */
-function Toolbar({
-  editor,
-  disabled,
-}: {
-  editor: TiptapEditor;
-  disabled: boolean;
-}) {
-  const { t } = useI18n();
-
-  const actions: Array<{ key: string; label: MessageKey; isActive: boolean; run: () => void }> =
-    useMemo(
-      () => [
-        {
-          key: 'bold',
-          label: 'document.toolbar.bold',
-          isActive: editor.isActive('bold'),
-          run: () => editor.chain().focus().toggleBold().run(),
-        },
-        {
-          key: 'italic',
-          label: 'document.toolbar.italic',
-          isActive: editor.isActive('italic'),
-          run: () => editor.chain().focus().toggleItalic().run(),
-        },
-        {
-          key: 'h1',
-          label: 'document.toolbar.h1',
-          isActive: editor.isActive('heading', { level: 1 }),
-          run: () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
-        },
-        {
-          key: 'h2',
-          label: 'document.toolbar.h2',
-          isActive: editor.isActive('heading', { level: 2 }),
-          run: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-        },
-        {
-          key: 'bullets',
-          label: 'document.toolbar.bullets',
-          isActive: editor.isActive('bulletList'),
-          run: () => editor.chain().focus().toggleBulletList().run(),
-        },
-        {
-          key: 'numbered',
-          label: 'document.toolbar.numbered',
-          isActive: editor.isActive('orderedList'),
-          run: () => editor.chain().focus().toggleOrderedList().run(),
-        },
-        {
-          key: 'quote',
-          label: 'document.toolbar.quote',
-          isActive: editor.isActive('blockquote'),
-          run: () => editor.chain().focus().toggleBlockquote().run(),
-        },
-        {
-          key: 'code',
-          label: 'document.toolbar.code',
-          isActive: editor.isActive('codeBlock'),
-          run: () => editor.chain().focus().toggleCodeBlock().run(),
-        },
-      ],
-      [editor],
-    );
-
-  return (
-    <div className="toolbar">
-      {actions.map((action) => (
-        <button
-          key={action.key}
-          type="button"
-          aria-pressed={action.isActive}
-          disabled={disabled}
-          onClick={action.run}
-        >
-          {t(action.label)}
-        </button>
-      ))}
-    </div>
   );
 }

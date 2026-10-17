@@ -125,6 +125,8 @@ export interface DocumentOperation {
 
 export interface InitMessage {
   type: 'init';
+  /** Absent from a server that predates schema versioning. */
+  schema_version?: number;
   version: number;
   content: ProseMirrorDoc;
   title: string;
@@ -146,6 +148,7 @@ export type ServerMessage =
   | { type: 'peer_left'; user_id: string }
   | { type: 'deleted'; user_id: string }
   | { type: 'pong' }
+  | { type: 'schema_mismatch'; schema_version: number }
   | { type: 'error'; code: string };
 
 export type ClientMessage =

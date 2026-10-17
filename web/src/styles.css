@@ -1252,43 +1252,212 @@ a.user-chip:hover {
 }
 
 .toolbar {
-  display: inline-flex;
-  flex-wrap: wrap;
+  position: sticky;
+  top: calc(var(--topbar-h) + 8px);
+  z-index: 10;
+  display: flex;
+  align-items: center;
   gap: 2px;
   margin: 18px 0 20px;
   padding: 4px;
   border-radius: var(--r-md);
   background: var(--surface-2);
   border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
 }
 
-.toolbar button {
+.toolbar-row {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.toolbar-trailing {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  padding-left: 4px;
+  border-left: 1px solid var(--border);
+}
+
+.tool-group {
+  flex: none;
+  padding: 0 4px;
+}
+
+.toolbar-row > .tool-group + .tool-group {
+  border-left: 1px solid var(--border);
+}
+
+.tool-group-items {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tool {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
   height: 32px;
-  padding: 0 12px;
+  padding: 0;
   border: none;
   border-radius: 7px;
   background: none;
   color: var(--text-2);
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 560;
   cursor: pointer;
   transition: background-color 0.13s, color 0.13s, box-shadow 0.13s;
 }
 
-.toolbar button:hover:not(:disabled) {
+.tool:hover:not(:disabled):not([aria-disabled='true']) {
+  color: var(--text);
+  background: var(--raised);
+}
+
+.tool:disabled,
+.tool[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tool[aria-pressed='true'],
+.tool[aria-expanded='true'] {
+  background: var(--raised);
+  color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.tool:focus-visible,
+.tool-colour:focus-within,
+.tool-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.tool-colour input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.tool-select {
+  height: 32px;
+  max-width: 150px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tool-select:hover:not(:disabled) {
+  background: var(--raised);
   color: var(--text);
 }
 
-.toolbar button:disabled {
+.tool-select:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-.toolbar button[aria-pressed='true'] {
-  background: var(--raised);
-  color: var(--accent);
-  box-shadow: var(--shadow-sm);
+.tool-select-narrow {
+  max-width: 84px;
+}
+
+.toolbar-overflow {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  gap: 10px;
+  width: min(340px, calc(100vw - 32px));
+  max-height: 70vh;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.toolbar-overflow .tool-group {
+  padding: 0;
+}
+
+.toolbar-overflow .tool-group-items {
+  flex-wrap: wrap;
+}
+
+.toolbar-overflow .tool-select {
+  max-width: none;
+}
+
+.tool-group-label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-3);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.shortcut-groups {
+  display: grid;
+  gap: 18px;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.shortcut-group-title {
+  margin-bottom: 6px;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.shortcut-list {
+  display: grid;
+  margin: 0;
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.shortcut-row dd {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+}
+
+kbd {
+  min-width: 24px;
+  padding: 2px 6px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: center;
 }
 
 .paper {
@@ -1382,6 +1551,89 @@ a.user-chip:hover {
 .tiptap a {
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.tiptap mark {
+  padding: 0 1px;
+  border-radius: 2px;
+  background: #fde68a;
+  color: inherit;
+}
+
+.tiptap ul[data-type='taskList'] {
+  padding-left: 0.2em;
+  list-style: none;
+}
+
+.tiptap ul[data-type='taskList'] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55em;
+}
+
+.tiptap ul[data-type='taskList'] li > label {
+  flex: none;
+  margin-top: 0.1em;
+}
+
+.tiptap ul[data-type='taskList'] li > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.tiptap ul[data-type='taskList'] li[data-checked='true'] > div {
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+
+.tiptap .tableWrapper {
+  overflow-x: auto;
+}
+
+.tiptap table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.tiptap th,
+.tiptap td {
+  position: relative;
+  min-width: 3em;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  vertical-align: top;
+}
+
+.tiptap th {
+  background: var(--surface-2);
+  font-weight: 640;
+  text-align: left;
+}
+
+.tiptap th > * + *,
+.tiptap td > * + * {
+  margin-top: 0.4em;
+}
+
+.tiptap .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--accent-soft);
+  pointer-events: none;
+}
+
+.tiptap .page-break {
+  position: relative;
+  height: 0;
+  margin: 2.2em 0;
+  border-top: 2px dashed var(--border-strong);
+  cursor: default;
+}
+
+.tiptap .page-break.ProseMirror-selectednode {
+  border-top-color: var(--accent);
 }
 
 .tiptap p.is-editor-empty:first-child::before {
