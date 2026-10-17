@@ -16,6 +16,7 @@ from sqlalchemy.pool import NullPool
 from api.models import User, Workspace
 from api.services import documents as document_service
 from tests.conftest import _TEST_DATABASE_URL, TestUser
+from tests.editor_fixtures import load as load_fixture
 
 PARAGRAPH = {
     "type": "doc",
@@ -139,6 +140,30 @@ async def test_patch_content_increments_the_version(
     assert body["content"] == PARAGRAPH
     assert body["title"] == document["title"]
     assert body["updated_at"] > document["updated_at"]
+
+
+async def test_every_node_and_mark_survives_save_and_reload(
+    client: AsyncClient,
+    editor: TestUser,
+    shared_workspace: dict[str, Any],
+    document: dict[str, Any],
+) -> None:
+    """Page breaks, tables, task lists and every mark, exactly as the client
+    wrote them: the server keeps content opaque."""
+    every = load_fixture("every-node.json")
+    saved = await client.patch(
+        docs_url(shared_workspace, document["id"]),
+        json={"version": document["version"], "content": every},
+        headers=editor.headers,
+    )
+    assert saved.status_code == 200, saved.text
+
+    reloaded = await client.get(
+        docs_url(shared_workspace, document["id"]), headers=editor.headers
+    )
+
+    assert reloaded.json()["content"] == every
+    assert {"type": "pageBreak"} in reloaded.json()["content"]["content"]
 
 
 async def test_patch_title_alone_leaves_content_intact(
