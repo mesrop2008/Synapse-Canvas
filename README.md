@@ -6,7 +6,8 @@ material, and query an LLM that answers with citations from those sources.
 **Part 5 of 6** — auth, workspaces, documents edited live over a WebSocket, an AI
 assistant whose responses stream over server-sent events and are inserted as
 ordinary versioned edits, and uploaded sources it answers from with citations.
-Password recovery by emailed code. English and Russian. 450 backend tests.
+Password recovery by emailed code. A word-processor toolbar. English and
+Russian. 461 backend tests and 50 client tests.
 
 ## Stack
 
@@ -26,7 +27,7 @@ Password recovery by emailed code. English and Russian. 450 backend tests.
 | LLM | Gemini via `google-genai`, or a scripted fake |
 | Embeddings | `gemini-embedding-001`, or a local sentence-transformers model |
 | File parsing | pypdf, python-docx |
-| Tests | pytest, httpx |
+| Tests | pytest, httpx; Vitest and jsdom for the client |
 
 ## Quick start
 
@@ -102,7 +103,44 @@ Settings are commented in [`.env.example`](.env.example).
 | Worker on the host | `arq api.worker.WorkerSettings` |
 | Worker logs | `docker compose logs -f worker` |
 | Tests | `pytest` |
+| Client tests | `npm test --prefix web` |
 
+
+## Editor
+
+Editors and owners get a toolbar over the document: text style, font and
+size, bold, italic, underline, strikethrough, inline code, superscript and
+subscript, text and highlight colour, links, alignment, line spacing and
+indent, bulleted, numbered and check lists (nested with Tab or the indent
+button), quotes, code blocks, horizontal lines, tables and page breaks.
+While the cursor is in a table, a table group adds and removes rows and
+columns, merges and splits cells and toggles the header row. On a narrow
+screen the groups that do not fit move into a **More** menu. The keyboard
+button, or Ctrl+/ (⌘/ on a Mac), lists every shortcut; Ctrl+Enter inserts a
+page break.
+
+Everything is a Tiptap extension from the official set, except two of our
+own: the page break, an atomic node that docx export turns into a real page
+break, and indent and line height, which are paragraph attributes as Word
+keeps them (Tiptap's own line height marks the text instead).
+
+### Editor schema versions
+
+Every node, mark and attribute is listed in
+[`web/src/editor/schema.json`](web/src/editor/schema.json) under a version
+number, and `SCHEMA_VERSION` in `api/services/prosemirror.py` must match it;
+the client tests fail when the extensions and the list disagree, and the
+API tests when the two numbers do. **Changing the schema means bumping
+both.**
+
+A client declares its version when it opens a document's socket. The
+server refuses any other version, or none, before sending the document:
+an outdated tab would otherwise replay steps it cannot parse, or drop the
+nodes it does not know and save the document back without them. The
+client also checks the version in `init`, so a new client talking to an
+old server stops too. Either way the page offers a reload, and nothing is
+applied or sent. Documents saved under an older version still open: new
+attributes take their defaults.
 
 ## AI assistant
 
