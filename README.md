@@ -6,9 +6,9 @@ material, and query an LLM that answers with citations from those sources.
 **Part 5 of 6** — auth, workspaces, documents edited live over a WebSocket, an AI
 assistant whose responses stream over server-sent events and are inserted as
 ordinary versioned edits, and uploaded sources it answers from with citations.
-Password recovery by emailed code. A word-processor toolbar, and Word
-import and export. English and Russian. 502 backend tests and 50 client
-tests.
+Password recovery by emailed code. A word-processor toolbar, Word import
+and export, and a viewer that opens a citation at the passage it cites.
+English and Russian. 515 backend tests and 65 client tests.
 
 ## Stack
 
@@ -21,7 +21,7 @@ tests.
 | Presence, pub/sub, job queue | Redis |
 | Background jobs | Arq |
 | Validation | Pydantic v2 |
-| Client | React 18, TypeScript, Vite |
+| Client | React 18, TypeScript, Vite; react-pdf for the source viewer |
 | Routing | React Router |
 | Server state | TanStack Query |
 | Editor | Tiptap 3 |
@@ -349,6 +349,39 @@ than from the model.
 
 With `LLM_PROVIDER=fake` the scripted reply cites the first passage it was
 sent, so a keyless setup shows citations end to end.
+
+### The source viewer
+
+Every source in the Sources panel opens in a side panel, and so does every
+citation in an answer: at the cited passage, scrolled into view and
+highlighted. A PDF is drawn page by page (react-pdf, loaded only when one
+is opened) and opens on the cited page; plain text and Markdown are shown
+as the text the passages were cut from, so their offsets point exactly; a
+Word file is shown as the server renders it. The panel pages, zooms,
+searches the whole file and downloads the original, and lists the
+**indexed passages** -- what the AI reads of the file -- tinted in the
+text, so a user can see what was left out. A kind of file it cannot show,
+or a PDF that will not open, is offered as a download instead.
+
+`GET /workspaces/{id}/sources/{source_id}/content` streams the file as
+uploaded, for any member: its sniffed type (text with the charset it was
+read in), shown inline, with a sandboxing CSP. `GET .../text` returns the
+extracted text, page starts and every passage's offsets, and for a Word
+file escaped HTML built by the server. Both go through the same
+membership check as everything else; no storage path or static URL ever
+reaches the client, which would let a link outlive a revoked membership.
+
+The worker now keeps the text it extracts, in `source_texts`. A source
+processed before that has none; the first time it is opened it is read
+again, in the worker's isolated parser, and kept.
+
+A PDF's passages come from pypdf on the server and its pages from pdf.js
+in the browser, which space text differently, and a Word file's rendering
+joins blocks differently from its extracted text: in both, passages are
+found by their words, ignoring whitespace, case and the bars between
+extracted table cells, and a passage running onto the next page is
+followed there. Highlights use the CSS Custom Highlight API; a browser
+without it still scrolls to the passage, unmarked.
 
 ### Not done yet
 
