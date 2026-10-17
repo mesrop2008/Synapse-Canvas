@@ -68,6 +68,18 @@ class ArchiveRejectedError(SourceFileError):
     code = ErrorCode.SOURCE_ARCHIVE
 
 
+class DocxEncryptedError(UnsupportedTypeError):
+    detail = "The document's parts are encrypted"
+
+
+class DocxDamagedError(UnsupportedTypeError):
+    detail = "The ZIP or its manifest cannot be read"
+
+
+class DocxBombError(ArchiveRejectedError):
+    detail = "The file expands far past its size"
+
+
 class EmptyFileError(SourceFileError):
     status_code = 422
     detail = "The file is empty"
@@ -121,7 +133,7 @@ def sniff(data: BinaryIO, filename: str, *, max_uncompressed_bytes: int) -> Snif
     if b"%PDF-" in head[:1024]:
         return Sniffed("pdf", PDF)
     if head.startswith(_ZIP_MAGIC):
-        _check_docx(data, max_uncompressed_bytes)
+        check_docx(data, max_uncompressed_bytes)
         data.seek(0)
         return Sniffed("docx", DOCX)
     if head.startswith(_ARCHIVE_MAGIC) or head[_TAR_MAGIC_OFFSET:].startswith(b"ustar"):
@@ -135,7 +147,7 @@ def sniff(data: BinaryIO, filename: str, *, max_uncompressed_bytes: int) -> Snif
     return Sniffed("text", MARKDOWN if markdown else PLAIN_TEXT)
 
 
-def _check_docx(data: BinaryIO, max_uncompressed_bytes: int) -> None:
+def check_docx(data: BinaryIO, max_uncompressed_bytes: int) -> None:
     """A ZIP is accepted only as a Word document whose contents expand to a
     believable size. zipfile reads no more than the declared size of an
     entry, so checking the declared sizes bounds what parsing can inflate."""
@@ -143,26 +155,26 @@ def _check_docx(data: BinaryIO, max_uncompressed_bytes: int) -> None:
         with zipfile.ZipFile(data) as archive:
             entries = archive.infolist()
             if len(entries) > _MAX_ZIP_ENTRIES:
-                raise ArchiveRejectedError("The file has too many parts to be a document")
+                raise DocxBombError("The file has too many parts to be a document")
             total = 0
             for entry in entries:
                 if entry.flag_bits & 0x1:
-                    raise UnsupportedTypeError("Encrypted documents are not supported")
+                    raise DocxEncryptedError()
                 total += entry.file_size
                 if (
                     entry.file_size > _RATIO_CHECK_FROM
                     and entry.file_size > entry.compress_size * _MAX_ENTRY_RATIO
                 ):
-                    raise ArchiveRejectedError("The file expands suspiciously")
+                    raise DocxBombError()
             if total > max_uncompressed_bytes:
-                raise ArchiveRejectedError("The file expands suspiciously")
+                raise DocxBombError()
 
             names = {entry.filename for entry in entries}
             if "[Content_Types].xml" not in names or "word/document.xml" not in names:
                 raise ArchiveRejectedError()
             types = ElementTree.fromstring(archive.read("[Content_Types].xml"))
     except (zipfile.BadZipFile, ElementTree.ParseError, KeyError, EOFError) as exc:
-        raise UnsupportedTypeError() from exc
+        raise DocxDamagedError() from exc
 
     main = {
         override.get("ContentType")
