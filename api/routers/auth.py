@@ -49,9 +49,7 @@ async def register(
 ) -> AcceptedResponse:
     # Always 202: a 409 would reveal which addresses have accounts.
     await auth_service.register_user(db, payload, locale)
-    return AcceptedResponse(
-        detail="If that address can receive mail, a verification code is on its way."
-    )
+    return AcceptedResponse(code="auth.verification_sent")
 
 
 @router.post(
@@ -87,9 +85,7 @@ async def resend_verification(
 ) -> AcceptedResponse:
     # Always 202, and the 429 applies to every address alike.
     await auth_service.resend_verification(db, payload.email, locale)
-    return AcceptedResponse(
-        detail="If that address needs verifying, a new code is on its way."
-    )
+    return AcceptedResponse(code="auth.verification_resent")
 
 
 @router.post(
@@ -112,7 +108,7 @@ async def request_password_reset(
 ) -> AcceptedResponse:
     # Always 202, and each 429 applies to every address alike.
     await password_reset.request_code(db, payload.email, locale)
-    return AcceptedResponse(detail="If the email exists, a code has been sent.")
+    return AcceptedResponse(code="auth.reset_code_sent")
 
 
 @router.post(

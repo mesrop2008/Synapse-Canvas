@@ -585,7 +585,7 @@ async def test_unverified_user_cannot_be_added_to_a_workspace(
         headers=owner.headers,
     )
     assert response.status_code == 409
-    assert "verified" in response.json()["detail"].lower()
+    assert response.json()["code"] == "member.unverified"
 
 
 async def test_verified_user_can_be_added_normally(

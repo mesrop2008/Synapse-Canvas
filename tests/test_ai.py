@@ -331,7 +331,7 @@ async def test_a_provider_failure_ends_failed_with_its_code(
     assert stream.text == "Alpha beta "
     assert stream.last == (
         "error",
-        {"code": failure.code.value, "detail": failure.detail},
+        {"code": failure.code.value},
     )
     row = await load_query(query["id"])
     assert row.status is AIQueryStatus.FAILED
@@ -507,7 +507,7 @@ async def test_the_daily_token_ceiling_returns_429(
 
     assert refused.status_code == 429
     assert refused.json()["code"] == "ai.daily_limit"
-    assert "50" in refused.json()["detail"]
+    assert refused.json()["params"]["limit"] == 50
     assert int(refused.headers["Retry-After"]) > 0
     assert app.state.ai.provider.started == 0
 

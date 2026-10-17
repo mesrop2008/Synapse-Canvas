@@ -43,6 +43,12 @@
       "not_found": "That document does not exist, or you cannot open it.",
       "stale": "This document changed while you were working on it."
     },
+    "realtime": {
+      "invalid_ticket": "Could not join the document's live session. Reload the page.",
+      "idle": "The live connection went quiet and was closed.",
+      "unsupported_frame": "The live connection received something it could not read.",
+      "too_many_edits": "Edits are arriving faster than the server accepts. Slow down a little."
+    },
     "embedding": {
       "failed": "The embedding service could not process this. Try again.",
       "quota_exhausted": "The embedding service's request quota is used up for now; a daily quota resets the next day.",

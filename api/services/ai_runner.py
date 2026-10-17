@@ -19,7 +19,7 @@ from collections.abc import Sequence
 from redis.asyncio import Redis
 
 from api.core.config import get_settings
-from api.core.exceptions import ErrorCode
+from api.core.exceptions import ErrorCode, error_body
 from api.db.session import get_sessionmaker
 from api.llm.base import LLMProvider, LLMRequest, Usage, estimate_tokens
 from api.llm.errors import ProviderError
@@ -85,11 +85,7 @@ class GenerationRunner:
         pump = asyncio.create_task(_pump(self.provider, request, queue))
         produced: list[str] = []
         # Stands if this task is cancelled, which only shutdown does.
-        outcome = Outcome(
-            AIQueryStatus.FAILED,
-            error_code=ErrorCode.AI_INTERRUPTED,
-            detail="The server restarted during the generation",
-        )
+        outcome = Outcome(AIQueryStatus.FAILED, error_code=ErrorCode.AI_INTERRUPTED)
         try:
             outcome = await self._relay(query_id, queue, produced)
         except Exception:
@@ -132,9 +128,8 @@ class GenerationRunner:
                     AIQueryStatus.COMPLETED, response="".join(produced), usage=item
                 )
             if isinstance(item, ProviderError):
-                return Outcome(
-                    AIQueryStatus.FAILED, error_code=item.code, detail=item.detail
-                )
+                logger.info("Provider refused %s: %s", query_id, item.detail)
+                return Outcome(AIQueryStatus.FAILED, error_code=item.code)
             if isinstance(item, Exception):
                 logger.error("Provider raised for %s", query_id, exc_info=item)
                 return Outcome(AIQueryStatus.FAILED, error_code=ErrorCode.AI_FAILED)
@@ -212,4 +207,4 @@ def _terminal_event(outcome: Outcome) -> tuple[ai_buffer.EventType, dict[str, ob
     if outcome.status is AIQueryStatus.CANCELLED:
         return "cancelled", {}
     code = outcome.error_code or ErrorCode.AI_FAILED
-    return "error", {"code": code.value, "detail": outcome.detail or code.value}
+    return "error", error_body(code)

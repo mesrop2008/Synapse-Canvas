@@ -280,7 +280,7 @@ async def test_viewer_cannot_patch(
 
     # 403, not 404: a viewer is a member and already knows the document exists.
     assert response.status_code == 403
-    assert "editor" in response.json()["detail"]
+    assert response.json()["code"] == "workspace.role_too_low"
 
 
 async def test_refused_patch_writes_nothing(
@@ -370,7 +370,7 @@ async def test_non_member_gets_404_everywhere(
 
     response = await getattr(client, method)(url, **kwargs)
     assert response.status_code == 404
-    assert response.json()["detail"] == "Workspace not found"
+    assert response.json()["code"] == "workspace.not_found"
 
 
 async def test_unauthenticated_requests_are_401(
@@ -403,7 +403,7 @@ async def test_stale_version_is_409_with_the_servers_state(
 
     assert stale.status_code == 409
     body = stale.json()
-    assert "modified" in body["detail"]
+    assert body["code"] == "document.stale"
     # Enough for the client to replace its editor state without another GET.
     assert body["current"]["version"] == 2
     assert body["current"]["content"] == PARAGRAPH

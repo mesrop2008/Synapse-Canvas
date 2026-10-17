@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse
 
 from api import embeddings, llm
 from api.core.config import get_settings
-from api.core.exceptions import AppError, ErrorCode
+from api.core.exceptions import AppError, ErrorCode, error_body
 from api.core.logging import configure_logging
 from api.core.middleware import (
     BodySizeLimitMiddleware,
@@ -64,7 +64,7 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
         headers.setdefault("WWW-Authenticate", "Bearer")
     return JSONResponse(
         status_code=exc.status_code,
-        content={"code": exc.code.value, "detail": exc.detail},
+        content=error_body(exc.code, exc.params),
         headers=headers or None,
     )
 
@@ -74,9 +74,7 @@ async def stale_document_version_handler(
 ) -> JSONResponse:
     """Includes the server's row, so the client re-syncs without another GET."""
     body = DocumentVersionConflict(
-        code=exc.code.value,
-        detail=exc.detail,
-        current=DocumentRead.model_validate(exc.current),
+        code=exc.code.value, current=DocumentRead.model_validate(exc.current)
     )
     return JSONResponse(status_code=exc.status_code, content=body.model_dump(mode="json"))
 
@@ -93,32 +91,24 @@ _EMBEDDING_STATUS = {
 async def embedding_error_handler(request: Request, exc: EmbeddingError) -> JSONResponse:
     return JSONResponse(
         status_code=_EMBEDDING_STATUS.get(exc.code, 502),
-        content={"code": exc.code.value, "detail": exc.detail},
+        content=error_body(exc.code),
     )
 
 
 async def validation_error_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
-    return JSONResponse(
-        status_code=422,
-        content={
-            "code": ErrorCode.REQUEST_INVALID.value,
-            "detail": jsonable_encoder(exc.errors()),
-        },
-    )
+    """Where and which rule, without pydantic's English `msg`."""
+    fields = [{"loc": error["loc"], "type": error["type"]} for error in exc.errors()]
+    body = error_body(ErrorCode.REQUEST_INVALID)
+    body["fields"] = jsonable_encoder(fields)
+    return JSONResponse(status_code=422, content=body)
 
 
 async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
     # A stack trace leaks table names, paths and versions.
     logger.exception("Unhandled error on %s %s", request.method, request.url.path)
-    return JSONResponse(
-        status_code=500,
-        content={
-            "code": ErrorCode.SERVER_ERROR.value,
-            "detail": "Internal server error",
-        },
-    )
+    return JSONResponse(status_code=500, content=error_body(ErrorCode.SERVER_ERROR))
 
 
 def create_app() -> FastAPI:

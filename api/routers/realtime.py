@@ -6,7 +6,7 @@ import uuid
 
 from fastapi import APIRouter, Query, WebSocket
 
-from api.core.exceptions import NotFoundError
+from api.core.exceptions import ErrorCode, NotFoundError
 from api.core.redis import get_redis
 from api.db.session import get_sessionmaker
 from api.dependencies import CurrentUser, DbSession
@@ -77,7 +77,9 @@ async def document_socket(
     resolved = await _redeem(document_id, ticket)
     if resolved is None:
         # Closing before accept fails the handshake with HTTP 403.
-        await websocket.close(code=CLOSE_INVALID_TICKET, reason="Invalid ticket")
+        await websocket.close(
+            code=CLOSE_INVALID_TICKET, reason=ErrorCode.REALTIME_INVALID_TICKET.value
+        )
         return
 
     user, role, workspace_id = resolved

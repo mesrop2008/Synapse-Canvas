@@ -27,7 +27,7 @@ async def test_login_is_throttled_per_ip(client: AsyncClient, rate_limits) -> No
         "/auth/login", json={"email": email, "password": "wrong-password"}
     )
     assert response.status_code == 429
-    assert response.json()["detail"] == "Too many requests. Please try again later."
+    assert response.json() == {"code": "rate_limit.exceeded"}
 
 
 async def test_throttled_response_carries_retry_after(

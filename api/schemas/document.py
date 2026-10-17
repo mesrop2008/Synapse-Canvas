@@ -62,5 +62,4 @@ class DocumentVersionConflict(BaseModel):
     """`current` lets the losing client re-sync without another request."""
 
     code: str
-    detail: str
     current: DocumentRead

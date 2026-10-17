@@ -112,9 +112,9 @@ async def enforce(
 
     if 0 < usage.max_concurrent_queries <= usage.streaming_queries:
         raise AIUsageLimitError(
-            f"This workspace already has {usage.streaming_queries} AI responses "
-            "in progress, the most allowed at once. Wait for one to finish.",
+            "The workspace has as many generations running as it may",
             code=ErrorCode.AI_CONCURRENCY_LIMIT,
+            params={"running": usage.streaming_queries},
         )
 
     if usage.daily_token_limit > 0 and (
@@ -122,9 +122,12 @@ async def enforce(
     ):
         retry_after = int((usage.resets_at - datetime.now(UTC)).total_seconds()) + 1
         raise AIUsageLimitError(
-            f"This workspace has used {usage.tokens_used} of its "
-            f"{usage.daily_token_limit} AI tokens today, and this request needs "
-            f"about {estimated_tokens}. The budget resets at 00:00 UTC.",
+            "The request would exceed the workspace's daily token budget",
             headers={"Retry-After": str(retry_after)},
             code=ErrorCode.AI_DAILY_LIMIT,
+            params={
+                "used": usage.tokens_used,
+                "limit": usage.daily_token_limit,
+                "needed": estimated_tokens,
+            },
         )

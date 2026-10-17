@@ -298,7 +298,7 @@ def test_a_viewer_cannot_edit(live: Fixture) -> None:
             websocket.send_json(edit(1, "Sneaky"))
             refusal = websocket.receive_json()
             assert refusal["type"] == "error"
-            assert refusal["code"] == "forbidden"
+            assert refusal["code"] == "workspace.role_too_low"
 
             # Still connected, still receiving: read-only, not disconnected.
             websocket.send_json({"type": "ping"})
@@ -678,8 +678,10 @@ def test_too_many_edits_closes_the_socket(live: Fixture) -> None:
                     assert websocket.receive_json()["type"] == "edit_ack"
 
                 websocket.send_json(edit(3, "One too many"))
-                with pytest.raises(WebSocketDisconnect):
+                with pytest.raises(WebSocketDisconnect) as closed:
                     websocket.receive_json()
+                assert closed.value.code == 4429
+                assert closed.value.reason == "realtime.too_many_edits"
     finally:
         settings.ws_edit_rate_limit = original
 
@@ -694,10 +696,10 @@ def test_a_malformed_frame_is_reported_without_closing(live: Fixture) -> None:
             assert websocket.receive_json()["type"] == "init"
 
             websocket.send_text("not json")
-            assert websocket.receive_json()["code"] == "malformed"
+            assert websocket.receive_json()["code"] == "request.invalid"
 
             websocket.send_json({"type": "edit", "base_version": 1})
-            assert websocket.receive_json()["code"] == "malformed"
+            assert websocket.receive_json()["code"] == "request.invalid"
 
             websocket.send_json({"type": "ping"})
             assert websocket.receive_json() == {"type": "pong"}
