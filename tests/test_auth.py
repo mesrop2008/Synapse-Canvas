@@ -31,7 +31,7 @@ async def test_register_accepts_and_reveals_nothing(
 
     assert response.status_code == 202
     body = response.json()
-    assert set(body) == {"detail"}  # nothing but a generic message
+    assert body == {"code": "auth.verification_sent"}  # the same for every address
     assert "hashed_password" not in response.text
     assert "ada@example.com" not in response.text  # not even the address echoed
 
@@ -170,9 +170,9 @@ async def test_login_rejects_unknown_email(client: AsyncClient) -> None:
         "/auth/login", json={"email": "nobody@example.com", "password": "whatever123"}
     )
     assert response.status_code == 401
-    # Identical wording to the wrong-password case: the response must not
-    # reveal whether the account exists.
-    assert response.json()["detail"] == "Incorrect email or password"
+    # The same code as a wrong password: the response must not reveal
+    # whether the account exists.
+    assert response.json() == {"code": "auth.invalid_credentials"}
 
 
 async def test_me_returns_the_authenticated_user(
@@ -206,7 +206,7 @@ async def test_me_rejects_an_expired_token(
         "/auth/me", headers={"Authorization": "Bearer " + expired}
     )
     assert response.status_code == 401
-    assert "expired" in response.json()["detail"].lower()
+    assert response.json()["code"] == "auth.token_expired"
 
 
 async def test_me_rejects_a_refresh_token(

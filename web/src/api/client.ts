@@ -1,7 +1,7 @@
 /** Holds the session and, on a 401, refreshes once and replays. */
 
 import { getActiveLocale, translate } from '../../i18n';
-import type { ErrorBody, TokenPair } from '../types/api';
+import type { ErrorBody, ErrorParams, TokenPair } from '../types/api';
 
 export const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
@@ -16,7 +16,8 @@ let accessToken: string | null = null;
 export class ApiError extends Error {
   constructor(
     readonly status: number,
-    readonly detail: string,
+    /** Shown only when `code` has no translation. */
+    message: string,
     /** e.g. the server's row alongside a PATCH 409. */
     readonly body: unknown,
     /** Null when the response is not the API's own, e.g. a proxy's. */
@@ -24,8 +25,12 @@ export class ApiError extends Error {
     /** Seconds from a 429's Retry-After. */
     readonly retryAfter: number | null = null,
   ) {
-    super(detail);
+    super(message);
     this.name = 'ApiError';
+  }
+
+  get params(): ErrorParams | undefined {
+    return (this.body as ErrorBody | null)?.params;
   }
 }
 
@@ -118,16 +123,7 @@ async function send(
   });
 }
 
-/** Flattens both FastAPI shapes: `{detail: "..."}` and `{detail: [{msg}]}`. */
-function describe(status: number, body: unknown): string {
-  const detail = (body as ErrorBody | null)?.detail;
-  if (typeof detail === 'string') return detail;
-  if (Array.isArray(detail)) {
-    const messages = detail
-      .map((item) => (item as { msg?: string }).msg)
-      .filter((msg): msg is string => Boolean(msg));
-    if (messages.length) return messages.join('; ');
-  }
+function describe(status: number): string {
   return translate('errors.status', { status });
 }
 
@@ -199,7 +195,7 @@ async function failure(response: Response): Promise<ApiError> {
   const parsed = await readBody(response);
   return new ApiError(
     response.status,
-    describe(response.status, parsed),
+    describe(response.status),
     parsed,
     errorCode(parsed),
     retryAfterSeconds(response),
@@ -279,7 +275,7 @@ export async function upload<T>(
   if (reply.status < 200 || reply.status >= 300) {
     throw new ApiError(
       reply.status,
-      describe(reply.status, reply.body),
+      describe(reply.status),
       reply.body,
       errorCode(reply.body),
       reply.retryAfter,

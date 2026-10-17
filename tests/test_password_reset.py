@@ -62,7 +62,7 @@ async def test_a_code_is_emailed_and_buys_a_reset_token(
 ) -> None:
     requested = await _request(client, account.email)
     assert requested.status_code == 202
-    assert requested.json() == {"detail": "If the email exists, a code has been sent."}
+    assert requested.json() == {"code": "auth.reset_code_sent"}
 
     outbox = await capture_email.outbox()
     assert [m["to"] for m in outbox] == [account.email]

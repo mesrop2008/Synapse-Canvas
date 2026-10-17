@@ -7,8 +7,8 @@ from enum import StrEnum
 
 
 class ErrorCode(StrEnum):
-    """Part of the API contract: the client translates these, and renaming one
-    drops released clients back to the English `detail`."""
+    """Part of the API contract: responses carry only these, and the client
+    words them. Renaming one leaves released clients with generic text."""
 
     SERVER_ERROR = "server.error"
     REQUEST_INVALID = "request.invalid"
@@ -43,6 +43,12 @@ class ErrorCode(StrEnum):
 
     DOCUMENT_NOT_FOUND = "document.not_found"
     DOCUMENT_STALE = "document.stale"
+    DOCUMENT_SCHEMA_MISMATCH = "document.schema_mismatch"
+
+    REALTIME_INVALID_TICKET = "realtime.invalid_ticket"
+    REALTIME_IDLE = "realtime.idle"
+    REALTIME_UNSUPPORTED_FRAME = "realtime.unsupported_frame"
+    REALTIME_TOO_MANY_EDITS = "realtime.too_many_edits"
 
     AI_FAILED = "ai.failed"
     AI_RATE_LIMITED = "ai.rate_limited"
@@ -81,7 +87,13 @@ class ErrorCode(StrEnum):
     EMBEDDING_UNAVAILABLE = "embedding.unavailable"
 
 
+Params = dict[str, int | str]
+
+
 class AppError(Exception):
+    """`detail` is for logs and tracebacks and never leaves the server; the
+    response is `code`, plus `params` for numbers the client may show."""
+
     status_code: int = 500
     detail: str = "Internal server error"
     code: ErrorCode = ErrorCode.SERVER_ERROR
@@ -92,11 +104,20 @@ class AppError(Exception):
         headers: dict[str, str] | None = None,
         *,
         code: ErrorCode | None = None,
+        params: Params | None = None,
     ) -> None:
         self.detail = detail or self.__class__.detail
         self.code = code or self.__class__.code
         self.headers = headers
+        self.params = params
         super().__init__(self.detail)
+
+
+def error_body(code: ErrorCode | str, params: Params | None = None) -> dict[str, object]:
+    body: dict[str, object] = {"code": str(code)}
+    if params:
+        body["params"] = params
+    return body
 
 
 class AuthenticationError(AppError):

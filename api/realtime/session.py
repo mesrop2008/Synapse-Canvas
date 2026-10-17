@@ -16,7 +16,7 @@ from redis.asyncio import Redis
 from starlette.websockets import WebSocket, WebSocketDisconnect, WebSocketState
 
 from api.core.config import get_settings
-from api.core.exceptions import NotFoundError
+from api.core.exceptions import ErrorCode, NotFoundError, error_body
 from api.db.session import get_sessionmaker
 from api.models.enums import WorkspaceRole
 from api.models.user import User
@@ -29,6 +29,7 @@ from api.schemas.realtime import (
 )
 from api.services import presence
 from api.services import documents as document_service
+from api.services.prosemirror import SCHEMA_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ CLOSE_INVALID_TICKET = 4401
 CLOSE_FORBIDDEN = 4403
 CLOSE_NOT_FOUND = 4404
 CLOSE_IDLE = 4408
+CLOSE_SCHEMA_MISMATCH = 4426
 CLOSE_TOO_MANY_EDITS = 4429
 CLOSE_TOO_LARGE = 1009
 CLOSE_UNSUPPORTED_FRAME = 1003
@@ -75,8 +77,10 @@ class EditorSession:
         workspace_id: uuid.UUID,
         user: User,
         role: WorkspaceRole,
+        client_schema: int | None,
     ) -> None:
         self._websocket = websocket
+        self._client_schema = client_schema
         self._hub = hub
         self._redis = redis
         self._document_id = document_id
@@ -104,6 +108,8 @@ class EditorSession:
 
     async def run(self) -> None:
         try:
+            if not await self._schema_matches():
+                return
             if not await self._send_init():
                 return
             await self._hub.join(self._connection)
@@ -124,12 +130,23 @@ class EditorSession:
         if self._websocket.client_state is WebSocketState.CONNECTED:
             await self._websocket.send_json(payload)
 
-    async def _send_error(self, code: str, detail: str) -> None:
-        await self._send({"type": "error", "code": code, "detail": detail})
+    async def _send_error(self, code: ErrorCode) -> None:
+        await self._send({"type": "error", **error_body(code)})
 
-    async def _close(self, code: int, reason: str) -> None:
+    async def _close(self, code: int, reason: ErrorCode) -> None:
         if self._websocket.client_state is WebSocketState.CONNECTED:
-            await self._websocket.close(code=code, reason=reason)
+            await self._websocket.close(code=code, reason=reason.value)
+
+    async def _schema_matches(self) -> bool:
+        """A client on another schema replays steps it cannot parse, and one
+        that drops what it does not know would save the document back without
+        it. Refused before it sees any content; a client built before
+        versioning declares nothing and is refused too."""
+        if self._client_schema == SCHEMA_VERSION:
+            return True
+        await self._send({"type": "schema_mismatch", "schema_version": SCHEMA_VERSION})
+        await self._close(CLOSE_SCHEMA_MISMATCH, ErrorCode.DOCUMENT_SCHEMA_MISMATCH)
+        return False
 
     async def _send_init(self) -> bool:
         """Full state every time: a reconnecting client may have nothing."""
@@ -138,7 +155,7 @@ class EditorSession:
                 db, self._workspace_id, self._document_id
             )
         if document is None:
-            await self._close(CLOSE_NOT_FOUND, "Document not found")
+            await self._close(CLOSE_NOT_FOUND, ErrorCode.DOCUMENT_NOT_FOUND)
             return False
 
         peers = [
@@ -149,6 +166,7 @@ class EditorSession:
         await self._send(
             {
                 "type": "init",
+                "schema_version": SCHEMA_VERSION,
                 "version": document.version,
                 "content": document.content,
                 "title": document.title,
@@ -172,7 +190,7 @@ class EditorSession:
                 frame = await asyncio.wait_for(self._websocket.receive(), timeout)
             except asyncio.TimeoutError:
                 # Several missed pings: dead in a way TCP has not noticed.
-                await self._close(CLOSE_IDLE, "No heartbeat")
+                await self._close(CLOSE_IDLE, ErrorCode.REALTIME_IDLE)
                 return
 
             if frame["type"] == "websocket.disconnect":
@@ -180,12 +198,14 @@ class EditorSession:
 
             raw = frame.get("text")
             if raw is None:
-                await self._close(CLOSE_UNSUPPORTED_FRAME, "Text frames only")
+                await self._close(
+                    CLOSE_UNSUPPORTED_FRAME, ErrorCode.REALTIME_UNSUPPORTED_FRAME
+                )
                 return
 
             # Backstop; uvicorn's --ws-max-size and the proxy should cap too.
             if len(raw.encode("utf-8")) > max_bytes:
-                await self._close(CLOSE_TOO_LARGE, "Message too large")
+                await self._close(CLOSE_TOO_LARGE, ErrorCode.REQUEST_TOO_LARGE)
                 return
 
             if not await self._dispatch(raw):
@@ -194,8 +214,8 @@ class EditorSession:
     async def _dispatch(self, raw: str) -> bool:
         try:
             message = CLIENT_MESSAGE_ADAPTER.validate_python(json.loads(raw))
-        except (json.JSONDecodeError, ValidationError) as exc:
-            await self._send_error("malformed", str(exc)[:500])
+        except (json.JSONDecodeError, ValidationError):
+            await self._send_error(ErrorCode.REQUEST_INVALID)
             return True
 
         if isinstance(message, PingMessage):
@@ -224,13 +244,11 @@ class EditorSession:
 
     async def _handle_edit(self, message: EditMessage) -> bool:
         if not self._role.satisfies(WorkspaceRole.EDITOR):
-            await self._send_error(
-                "forbidden", "Your role on this workspace is read-only"
-            )
+            await self._send_error(ErrorCode.ROLE_TOO_LOW)
             return True
 
         if not self._budget.take():
-            await self._close(CLOSE_TOO_MANY_EDITS, "Too many edits")
+            await self._close(CLOSE_TOO_MANY_EDITS, ErrorCode.REALTIME_TOO_MANY_EDITS)
             return False
 
         operation = {"steps": message.operation.steps}
@@ -257,7 +275,7 @@ class EditorSession:
                 )
                 return True
             except NotFoundError:
-                await self._close(CLOSE_NOT_FOUND, "Document not found")
+                await self._close(CLOSE_NOT_FOUND, ErrorCode.DOCUMENT_NOT_FOUND)
                 return False
 
         await self._send({"type": "edit_ack", "version": applied.version})

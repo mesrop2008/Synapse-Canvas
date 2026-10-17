@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -68,7 +68,12 @@ class PasswordResetConfirmRequest(BaseModel):
     new_password: Password
 
 
+AcceptedCode = Literal[
+    "auth.verification_sent", "auth.verification_resent", "auth.reset_code_sent"
+]
+
+
 class AcceptedResponse(BaseModel):
     """The same whatever happened, so it reveals no registration."""
 
-    detail: str
+    code: AcceptedCode

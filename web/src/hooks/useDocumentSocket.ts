@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ApiError } from '../api/client';
-import { createWsTicket, documentSocketUrl } from '../api/realtime';
+import { CLOSE_SCHEMA_MISMATCH, createWsTicket, documentSocketUrl } from '../api/realtime';
+import { SCHEMA_VERSION } from '../editor/schemaVersion';
 import type {
   InitMessage,
   PeerPresence,
@@ -10,14 +11,20 @@ import type {
   WorkspaceRole,
 } from '../types/api';
 
-/** `deleted` and `unavailable` are terminal: the hook stops retrying. */
+/** `deleted`, `unavailable` and `outdated` are terminal: the hook stops
+ *  retrying. `outdated`: this build and the server disagree on the editor
+ *  schema, so nothing either sends can be trusted to parse; only a reload
+ *  helps. */
 export type ConnectionState =
   | 'connecting'
   | 'live'
   | 'reconnecting'
   | 'offline'
   | 'deleted'
-  | 'unavailable';
+  | 'unavailable'
+  | 'outdated';
+
+type TerminalState = Extract<ConnectionState, 'deleted' | 'unavailable' | 'outdated'>;
 
 /** Why local state was dropped. `rejected`: another edit won the race.
  *  `diverged`: a peer's steps could not be replayed on this copy. */
@@ -165,7 +172,7 @@ export function useDocumentSocket(
 
   /** Give up for good. Nothing here is recoverable by waiting. */
   const stop = useCallback(
-    (reason: 'deleted' | 'unavailable') => {
+    (reason: TerminalState) => {
       closed.current = true;
       generation.current += 1;
       if (sendTimer.current !== null) window.clearTimeout(sendTimer.current);
@@ -202,6 +209,12 @@ export function useDocumentSocket(
     (message: ServerMessage) => {
       switch (message.type) {
         case 'init': {
+          // Checked before anything is applied: the content itself may hold
+          // nodes this build cannot parse.
+          if (message.schema_version !== SCHEMA_VERSION) {
+            stop('outdated');
+            return;
+          }
           attempts.current = 0;
           versionRef.current = message.version;
           setVersion(message.version);
@@ -270,6 +283,9 @@ export function useDocumentSocket(
         case 'deleted':
           stop('deleted');
           return;
+        case 'schema_mismatch':
+          stop('outdated');
+          return;
         case 'error':
           // Not retryable.
           console.warn('[synapse] the server refused a message', message);
@@ -323,8 +339,12 @@ export function useDocumentSocket(
           }, HEARTBEAT_MS);
         };
 
-        ws.onclose = () => {
+        ws.onclose = (event) => {
           if (attempt !== generation.current) return;
+          if (event.code === CLOSE_SCHEMA_MISMATCH) {
+            stop('outdated');
+            return;
+          }
           socket.current = null;
           setPeers([]);
           scheduleRetry();

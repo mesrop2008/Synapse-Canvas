@@ -48,7 +48,6 @@ class Outcome:
     status: AIQueryStatus
     response: str | None = None
     error_code: ErrorCode | None = None
-    detail: str | None = None
     usage: Usage | None = None
     citations: list[Citation] | None = None
 

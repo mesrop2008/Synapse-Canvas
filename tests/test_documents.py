@@ -16,6 +16,7 @@ from sqlalchemy.pool import NullPool
 from api.models import User, Workspace
 from api.services import documents as document_service
 from tests.conftest import _TEST_DATABASE_URL, TestUser
+from tests.editor_fixtures import load as load_fixture
 
 PARAGRAPH = {
     "type": "doc",
@@ -139,6 +140,30 @@ async def test_patch_content_increments_the_version(
     assert body["content"] == PARAGRAPH
     assert body["title"] == document["title"]
     assert body["updated_at"] > document["updated_at"]
+
+
+async def test_every_node_and_mark_survives_save_and_reload(
+    client: AsyncClient,
+    editor: TestUser,
+    shared_workspace: dict[str, Any],
+    document: dict[str, Any],
+) -> None:
+    """Page breaks, tables, task lists and every mark, exactly as the client
+    wrote them: the server keeps content opaque."""
+    every = load_fixture("every-node.json")
+    saved = await client.patch(
+        docs_url(shared_workspace, document["id"]),
+        json={"version": document["version"], "content": every},
+        headers=editor.headers,
+    )
+    assert saved.status_code == 200, saved.text
+
+    reloaded = await client.get(
+        docs_url(shared_workspace, document["id"]), headers=editor.headers
+    )
+
+    assert reloaded.json()["content"] == every
+    assert {"type": "pageBreak"} in reloaded.json()["content"]["content"]
 
 
 async def test_patch_title_alone_leaves_content_intact(
@@ -280,7 +305,7 @@ async def test_viewer_cannot_patch(
 
     # 403, not 404: a viewer is a member and already knows the document exists.
     assert response.status_code == 403
-    assert "editor" in response.json()["detail"]
+    assert response.json()["code"] == "workspace.role_too_low"
 
 
 async def test_refused_patch_writes_nothing(
@@ -370,7 +395,7 @@ async def test_non_member_gets_404_everywhere(
 
     response = await getattr(client, method)(url, **kwargs)
     assert response.status_code == 404
-    assert response.json()["detail"] == "Workspace not found"
+    assert response.json()["code"] == "workspace.not_found"
 
 
 async def test_unauthenticated_requests_are_401(
@@ -403,7 +428,7 @@ async def test_stale_version_is_409_with_the_servers_state(
 
     assert stale.status_code == 409
     body = stale.json()
-    assert "modified" in body["detail"]
+    assert body["code"] == "document.stale"
     # Enough for the client to replace its editor state without another GET.
     assert body["current"]["version"] == 2
     assert body["current"]["content"] == PARAGRAPH

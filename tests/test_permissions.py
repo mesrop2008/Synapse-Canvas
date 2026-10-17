@@ -24,7 +24,7 @@ async def test_viewer_cannot_rename_a_workspace(
     # 403, not 404: the viewer is a member and already knows this workspace
     # exists, so hiding it would be misleading rather than protective.
     assert response.status_code == 403
-    assert "owner" in response.json()["detail"]
+    assert response.json()["code"] == "workspace.role_too_low"
 
 
 async def test_editor_cannot_rename_a_workspace(
@@ -133,7 +133,7 @@ async def test_non_member_gets_404_on_every_workspace_route(
     )
 
     assert response.status_code == 404, "%s %s leaked existence" % (method, suffix)
-    assert response.json()["detail"] == "Workspace not found"
+    assert response.json()["code"] == "workspace.not_found"
 
 
 async def test_non_member_sees_the_same_404_as_for_a_nonexistent_workspace(
@@ -193,7 +193,7 @@ async def test_owner_cannot_be_removed_from_their_own_workspace(
     )
 
     assert response.status_code == 409
-    assert "owner cannot be removed" in response.json()["detail"]
+    assert response.json()["code"] == "member.is_owner"
 
     members = await client.get(
         "/workspaces/%s/members" % shared_workspace["id"], headers=owner.headers
@@ -258,7 +258,7 @@ async def test_adding_an_unregistered_email_returns_404(
     assert response.status_code == 404
     # Distinguishable from the workspace 404: the caller is a proven owner
     # here, so there is no workspace existence left to protect.
-    assert response.json()["detail"] == "No user with that email address"
+    assert response.json()["code"] == "member.unknown_email"
 
 
 async def test_adding_the_same_member_twice_returns_409(

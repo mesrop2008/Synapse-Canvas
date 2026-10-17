@@ -195,7 +195,7 @@ async def test_wildcard_cors_origin_is_refused_at_startup(
 async def test_every_client_facing_failure_carries_a_code(
     client: AsyncClient, owner: TestUser, viewer: TestUser, shared_workspace: dict
 ) -> None:
-    """The client translates `code`; `detail` stays English for other callers."""
+    """The client words `code`; no sentence comes with it."""
     from api.core.exceptions import ErrorCode
 
     workspace_id = shared_workspace["id"]
@@ -271,7 +271,7 @@ async def test_every_client_facing_failure_carries_a_code(
         assert response.status_code == status, response.text
         body = response.json()
         assert body["code"] == code.value, body
-        assert body["detail"], "detail must survive alongside the code"
+        assert "detail" not in body, body
 
 
 async def test_the_stale_version_409_keeps_its_payload(

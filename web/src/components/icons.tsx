@@ -1,8 +1,8 @@
 /** Inline rather than an icon package: this is the whole set the app needs. */
 
-type IconProps = { size?: number; className?: string };
+export type IconProps = { size?: number; className?: string };
 
-function Svg({
+export function Svg({
   size = 16,
   className,
   children,

@@ -22,7 +22,7 @@ export interface TokenPair {
 }
 
 export interface AcceptedResponse {
-  detail: string;
+  code: 'auth.verification_sent' | 'auth.verification_resent' | 'auth.reset_code_sent';
 }
 
 export interface PasswordResetGrant {
@@ -87,14 +87,17 @@ export interface DocumentDetail extends DocumentSummary {
 /** The 409 body from PATCH: the state the client has to re-sync to. */
 export interface DocumentVersionConflict {
   code: string;
-  detail: string;
   current: DocumentDetail;
 }
 
+export type ErrorParams = Record<string, string | number>;
+
+/** The API sends codes, never sentences: see api/core/exceptions.py. */
 export interface ErrorBody {
-  /** See api/core/exceptions.py. */
   code?: string;
-  detail: unknown;
+  params?: ErrorParams;
+  /** On `request.invalid`: which field broke which rule. */
+  fields?: Array<{ loc: Array<string | number>; type: string }>;
 }
 
 /* Real-time protocol: mirrors api/schemas/realtime.py and api/realtime/session.py. */
@@ -122,6 +125,8 @@ export interface DocumentOperation {
 
 export interface InitMessage {
   type: 'init';
+  /** Absent from a server that predates schema versioning. */
+  schema_version?: number;
   version: number;
   content: ProseMirrorDoc;
   title: string;
@@ -143,7 +148,8 @@ export type ServerMessage =
   | { type: 'peer_left'; user_id: string }
   | { type: 'deleted'; user_id: string }
   | { type: 'pong' }
-  | { type: 'error'; code: string; detail: string };
+  | { type: 'schema_mismatch'; schema_version: number }
+  | { type: 'error'; code: string };
 
 export type ClientMessage =
   | {
@@ -236,7 +242,7 @@ export type AIStreamEvent =
   | { type: 'token'; text: string }
   /** `response` is the whole text, authoritative over the tokens. */
   | { type: 'done'; response: string; usage: AIUsage; citations: Citation[] }
-  | { type: 'error'; code: string; detail: string }
+  | { type: 'error'; code: string }
   | { type: 'cancelled' };
 
 export interface WorkspaceUsage {

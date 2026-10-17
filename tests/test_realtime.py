@@ -26,7 +26,9 @@ from api.models.enums import WorkspaceRole
 from api.realtime.hub import DocumentHub
 from api.services import documents as document_service
 from api.services import presence
+from api.services.prosemirror import SCHEMA_VERSION
 from tests.conftest import _TEST_DATABASE_URL, new_redis, websocket_app
+from tests.editor_fixtures import load as load_fixture
 
 
 def step(text: str, at: int = 1) -> dict[str, Any]:
@@ -159,8 +161,11 @@ def ticket_for(client: TestClient, fixture: Fixture, token: str) -> str:
     return response.json()["ticket"]
 
 
-def socket_url(fixture: Fixture, ticket: str) -> str:
-    return f"/ws/documents/{fixture.document_id}?ticket={ticket}"
+def socket_url(
+    fixture: Fixture, ticket: str, schema: int | None = SCHEMA_VERSION
+) -> str:
+    url = f"/ws/documents/{fixture.document_id}?ticket={ticket}"
+    return url if schema is None else f"{url}&schema={schema}"
 
 
 async def _document_state(document_id: uuid.UUID) -> tuple[int, dict[str, Any]]:
@@ -203,6 +208,7 @@ def test_a_ticket_opens_the_socket_once(live: Fixture) -> None:
         with client.websocket_connect(socket_url(live, ticket)) as websocket:
             init = websocket.receive_json()
             assert init["type"] == "init"
+            assert init["schema_version"] == SCHEMA_VERSION
             assert init["version"] == 1
             assert init["peers"] == []
             assert init["you"]["user_id"] == str(live.owner_id)
@@ -288,6 +294,126 @@ def test_an_edit_is_acked_logged_and_broadcast(live: Fixture) -> None:
     assert asyncio.run(_logged_versions(live.document_id)) == [1, 2]
 
 
+async def _store(document_id: uuid.UUID, content: dict[str, Any]) -> int:
+    engine = create_async_engine(_TEST_DATABASE_URL, poolclass=NullPool)
+    try:
+        async with AsyncSession(engine, expire_on_commit=False) as session:
+            document = await session.get(Document, document_id)
+            assert document is not None
+            applied = await document_service.update_document(
+                session,
+                workspace_id=document.workspace_id,
+                document_id=document_id,
+                expected_version=document.version,
+                content=content,
+            )
+            return applied.version
+    finally:
+        await engine.dispose()
+
+
+async def _logged_operation(document_id: uuid.UUID, version: int) -> dict[str, Any]:
+    engine = create_async_engine(_TEST_DATABASE_URL, poolclass=NullPool)
+    try:
+        async with AsyncSession(engine) as session:
+            return (
+                await session.execute(
+                    select(DocumentChange.operation).where(
+                        DocumentChange.document_id == document_id,
+                        DocumentChange.version == version,
+                    )
+                )
+            ).scalar_one()
+    finally:
+        await engine.dispose()
+
+
+def test_a_version_2_edit_to_an_older_document_goes_through_unchanged(
+    live: Fixture,
+) -> None:
+    """A document saved before the schema grew takes an edit inserting a page
+    break and a table; the peer, the log and the stored row all get exactly
+    what the client sent, and a reload returns it."""
+    base = asyncio.run(_store(live.document_id, load_fixture("v1-document.json")))
+    change = load_fixture("v2-edit.json")
+
+    with websocket_app() as client:
+        author = ticket_for(client, live, live.editor_token)
+        watcher = ticket_for(client, live, live.viewer_token)
+
+        with client.websocket_connect(socket_url(live, watcher)) as viewer:
+            assert viewer.receive_json()["type"] == "init"
+
+            with client.websocket_connect(socket_url(live, author)) as editor:
+                opened = editor.receive_json()
+                assert opened["content"] == load_fixture("v1-document.json")
+                assert viewer.receive_json()["type"] == "presence"
+
+                editor.send_json(
+                    {
+                        "type": "edit",
+                        "base_version": base,
+                        "operation": {"steps": change["steps"], "doc": change["doc"]},
+                    }
+                )
+                assert editor.receive_json() == {"type": "edit_ack", "version": base + 1}
+
+                relayed = viewer.receive_json()
+                assert relayed["operation"] == {"steps": change["steps"]}
+
+        reloaded = client.get(
+            f"/workspaces/{live.workspace_id}/documents/{live.document_id}",
+            headers=live.auth(live.viewer_token),
+        )
+
+    assert asyncio.run(_logged_operation(live.document_id, base + 1)) == {
+        "steps": change["steps"]
+    }
+    version, content = asyncio.run(_document_state(live.document_id))
+    assert (version, content) == (base + 1, change["doc"])
+    assert reloaded.json()["content"] == change["doc"]
+    assert {"type": "pageBreak"} in content["content"]
+
+
+@pytest.mark.parametrize("declared", [SCHEMA_VERSION - 1, SCHEMA_VERSION + 1, None])
+def test_a_client_on_another_schema_is_refused_before_it_sees_the_document(
+    live: Fixture, declared: int | None
+) -> None:
+    """`None` is a client built before versioning, which declares nothing."""
+    with websocket_app() as client:
+        ticket = ticket_for(client, live, live.editor_token)
+
+        with client.websocket_connect(socket_url(live, ticket, declared)) as websocket:
+            assert websocket.receive_json() == {
+                "type": "schema_mismatch",
+                "schema_version": SCHEMA_VERSION,
+            }
+            with pytest.raises(WebSocketDisconnect) as closed:
+                websocket.receive_json()
+
+    assert closed.value.code == 4426
+    assert closed.value.reason == "document.schema_mismatch"
+    assert asyncio.run(_document_state(live.document_id))[0] == 1
+
+
+def test_a_refused_client_is_not_sent_its_peers_edits(live: Fixture) -> None:
+    with websocket_app() as client:
+        outdated = ticket_for(client, live, live.viewer_token)
+        author = ticket_for(client, live, live.editor_token)
+
+        with client.websocket_connect(socket_url(live, outdated, 1)) as stale:
+            assert stale.receive_json()["type"] == "schema_mismatch"
+
+            with client.websocket_connect(socket_url(live, author)) as editor:
+                assert editor.receive_json()["type"] == "init"
+                editor.send_json(edit(1, "After the refusal"))
+                assert editor.receive_json()["type"] == "edit_ack"
+
+            # Closed straight after the refusal: no presence, no edit.
+            with pytest.raises(WebSocketDisconnect):
+                stale.receive_json()
+
+
 def test_a_viewer_cannot_edit(live: Fixture) -> None:
     with websocket_app() as client:
         ticket = ticket_for(client, live, live.viewer_token)
@@ -298,7 +424,7 @@ def test_a_viewer_cannot_edit(live: Fixture) -> None:
             websocket.send_json(edit(1, "Sneaky"))
             refusal = websocket.receive_json()
             assert refusal["type"] == "error"
-            assert refusal["code"] == "forbidden"
+            assert refusal["code"] == "workspace.role_too_low"
 
             # Still connected, still receiving: read-only, not disconnected.
             websocket.send_json({"type": "ping"})
@@ -678,8 +804,10 @@ def test_too_many_edits_closes_the_socket(live: Fixture) -> None:
                     assert websocket.receive_json()["type"] == "edit_ack"
 
                 websocket.send_json(edit(3, "One too many"))
-                with pytest.raises(WebSocketDisconnect):
+                with pytest.raises(WebSocketDisconnect) as closed:
                     websocket.receive_json()
+                assert closed.value.code == 4429
+                assert closed.value.reason == "realtime.too_many_edits"
     finally:
         settings.ws_edit_rate_limit = original
 
@@ -694,10 +822,10 @@ def test_a_malformed_frame_is_reported_without_closing(live: Fixture) -> None:
             assert websocket.receive_json()["type"] == "init"
 
             websocket.send_text("not json")
-            assert websocket.receive_json()["code"] == "malformed"
+            assert websocket.receive_json()["code"] == "request.invalid"
 
             websocket.send_json({"type": "edit", "base_version": 1})
-            assert websocket.receive_json()["code"] == "malformed"
+            assert websocket.receive_json()["code"] == "request.invalid"
 
             websocket.send_json({"type": "ping"})
             assert websocket.receive_json() == {"type": "pong"}

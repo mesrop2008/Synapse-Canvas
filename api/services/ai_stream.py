@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator
 from redis.asyncio import Redis
 
 from api.core.config import get_settings
-from api.core.exceptions import ErrorCode
+from api.core.exceptions import ErrorCode, error_body
 from api.db.session import get_sessionmaker
 from api.models.ai_query import AIQuery
 from api.models.enums import AIQueryStatus
@@ -48,7 +48,7 @@ def terminal_from_row(query: AIQuery) -> Event:
     if query.status is AIQueryStatus.CANCELLED:
         return Event("", "cancelled", {})
     code = query.error_code or ErrorCode.AI_FAILED.value
-    return Event("", "error", {"code": code, "detail": code})
+    return Event("", "error", error_body(code))
 
 
 async def _abandon(query_id: uuid.UUID) -> Event:

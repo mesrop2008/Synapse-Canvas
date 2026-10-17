@@ -129,7 +129,7 @@ export function useAIStream(documentId: string): AIStream {
                   state.outcome = 'cancelled';
                   return;
                 case 'error':
-                  failure = new ApiError(0, event.detail, event, event.code);
+                  failure = new ApiError(0, event.code, event, event.code);
                   state.outcome = 'error';
                   return;
               }

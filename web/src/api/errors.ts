@@ -1,4 +1,10 @@
-import { getActiveLocale, lookup, translate, type MessageKey } from '../../i18n';
+import {
+  getActiveLocale,
+  interpolate,
+  lookup,
+  translate,
+  type MessageKey,
+} from '../../i18n';
 import { ApiError } from './client';
 
 /** Worded at render time, so a language switch reaches errors on screen. */
@@ -18,8 +24,8 @@ export function describeFailure(failure: FailedRequest): string {
   return errorMessage(failure.cause, failure.fallback);
 }
 
-/** Translates `code`; the English `detail` is the fallback for a code this
- *  client does not know yet. */
+/** Translates `code`, filling in its `params`; a code this client does not
+ *  know yet reads as the HTTP status. */
 export function errorMessage(
   error: unknown,
   fallback: MessageKey = 'errors.generic',
@@ -27,7 +33,7 @@ export function errorMessage(
   if (error instanceof ApiError) {
     if (error.code) {
       const translated = lookup(getActiveLocale(), `errors.api.${error.code}`);
-      if (translated) return translated;
+      if (translated) return interpolate(translated, error.params);
     }
     return error.message;
   }

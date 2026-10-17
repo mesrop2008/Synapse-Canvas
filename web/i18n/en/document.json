@@ -11,14 +11,83 @@
   "leaveCancel": "Keep editing",
   "backToWorkspace": "Back to the workspace",
   "toolbar": {
+    "label": "Formatting",
+    "more": "More formatting",
+    "shortcuts": "Keyboard shortcuts",
+    "withShortcut": "{action} ({keys})",
+    "groups": {
+      "block": "Text style",
+      "font": "Font",
+      "marks": "Character",
+      "colour": "Colour",
+      "paragraph": "Paragraph",
+      "lists": "Lists",
+      "insert": "Insert",
+      "table": "Table"
+    },
+    "blockType": "Text style",
+    "blocks": {
+      "paragraph": "Normal text",
+      "h1": "Heading 1",
+      "h2": "Heading 2",
+      "h3": "Heading 3",
+      "codeBlock": "Code block"
+    },
+    "fontFamily": "Font",
+    "fontDefault": "Default font",
+    "fonts": {
+      "arial": "Arial",
+      "calibri": "Calibri",
+      "georgia": "Georgia",
+      "timesNewRoman": "Times New Roman",
+      "verdana": "Verdana",
+      "courierNew": "Courier New"
+    },
+    "fontSize": "Font size",
+    "fontSizeDefault": "Size",
+    "points": "{size} pt",
     "bold": "Bold",
     "italic": "Italic",
-    "h1": "H1",
-    "h2": "H2",
-    "bullets": "Bullets",
-    "numbered": "Numbered",
-    "quote": "Quote",
-    "code": "Code"
+    "underline": "Underline",
+    "strike": "Strikethrough",
+    "code": "Inline code",
+    "superscript": "Superscript",
+    "subscript": "Subscript",
+    "link": "Link",
+    "textColour": "Text colour",
+    "clearColour": "Remove text colour",
+    "highlight": "Highlight",
+    "clearHighlight": "Remove highlight",
+    "align": {
+      "left": "Align left",
+      "center": "Centre",
+      "right": "Align right",
+      "justify": "Justify"
+    },
+    "lineHeight": "Line spacing",
+    "lineHeightDefault": "Spacing",
+    "indent": "Increase indent",
+    "outdent": "Decrease indent",
+    "bulletList": "Bulleted list",
+    "orderedList": "Numbered list",
+    "taskList": "Checklist",
+    "blockquote": "Quote",
+    "codeBlock": "Code block",
+    "horizontalRule": "Horizontal line",
+    "table": "Insert table",
+    "pageBreak": "Page break",
+    "tableTools": {
+      "addRowBefore": "Insert row above",
+      "addRowAfter": "Insert row below",
+      "deleteRow": "Delete row",
+      "addColumnBefore": "Insert column left",
+      "addColumnAfter": "Insert column right",
+      "deleteColumn": "Delete column",
+      "mergeCells": "Merge cells",
+      "splitCell": "Split cell",
+      "toggleHeaderRow": "Header row",
+      "deleteTable": "Delete table"
+    }
   },
   "save": {
     "failed": "Could not rename this document."
@@ -30,7 +99,8 @@
     "offline": "Offline",
     "version": "v{version}",
     "deleted": "Deleted",
-    "unavailable": "Unavailable"
+    "unavailable": "Unavailable",
+    "outdated": "Outdated"
   },
   "peers": {
     "label": "{count} other people in this document"
@@ -46,5 +116,61 @@
   "gone": {
     "deleted": "This document was deleted by someone else in the workspace. Nothing more can be saved to it.",
     "unavailable": "This document is no longer available to you. It may have been deleted, or your access to the workspace may have changed."
+  },
+  "link": {
+    "title": "Link",
+    "urlLabel": "Web or email address",
+    "placeholder": "example.com",
+    "apply": "Apply",
+    "remove": "Remove link",
+    "invalid": "Enter a web address, like example.com, or an email address."
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "groups": {
+      "text": "Text",
+      "paragraph": "Paragraphs",
+      "blocks": "Lists and blocks"
+    },
+    "keys": {
+      "mod": "Ctrl",
+      "modMac": "⌘",
+      "shift": "Shift",
+      "alt": "Alt",
+      "altMac": "⌥",
+      "enter": "Enter"
+    },
+    "actions": {
+      "bold": "Bold",
+      "italic": "Italic",
+      "underline": "Underline",
+      "strike": "Strikethrough",
+      "code": "Inline code",
+      "superscript": "Superscript",
+      "subscript": "Subscript",
+      "highlight": "Highlight",
+      "link": "Link",
+      "heading1": "Heading 1",
+      "heading2": "Heading 2",
+      "heading3": "Heading 3",
+      "alignLeft": "Align left",
+      "alignCenter": "Centre",
+      "alignRight": "Align right",
+      "alignJustify": "Justify",
+      "indent": "Increase indent",
+      "outdent": "Decrease indent",
+      "bulletList": "Bulleted list",
+      "orderedList": "Numbered list",
+      "taskList": "Checklist",
+      "blockquote": "Quote",
+      "codeBlock": "Code block",
+      "lineBreak": "Line break",
+      "pageBreak": "Page break",
+      "shortcuts": "This list"
+    }
+  },
+  "outdated": {
+    "message": "This page was built for a different version of the editor from the one the server runs, so editing is paused to keep the document intact.",
+    "reload": "Reload page"
   }
 }

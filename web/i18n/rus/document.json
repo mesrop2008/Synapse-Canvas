@@ -11,14 +11,83 @@
   "leaveCancel": "Остаться",
   "backToWorkspace": "Назад в рабочее пространство",
   "toolbar": {
-    "bold": "Жирный",
+    "label": "Форматирование",
+    "more": "Ещё форматирование",
+    "shortcuts": "Сочетания клавиш",
+    "withShortcut": "{action} ({keys})",
+    "groups": {
+      "block": "Стиль текста",
+      "font": "Шрифт",
+      "marks": "Начертание",
+      "colour": "Цвет",
+      "paragraph": "Абзац",
+      "lists": "Списки",
+      "insert": "Вставка",
+      "table": "Таблица"
+    },
+    "blockType": "Стиль текста",
+    "blocks": {
+      "paragraph": "Обычный текст",
+      "h1": "Заголовок 1",
+      "h2": "Заголовок 2",
+      "h3": "Заголовок 3",
+      "codeBlock": "Блок кода"
+    },
+    "fontFamily": "Шрифт",
+    "fontDefault": "Шрифт по умолчанию",
+    "fonts": {
+      "arial": "Arial",
+      "calibri": "Calibri",
+      "georgia": "Georgia",
+      "timesNewRoman": "Times New Roman",
+      "verdana": "Verdana",
+      "courierNew": "Courier New"
+    },
+    "fontSize": "Размер шрифта",
+    "fontSizeDefault": "Размер",
+    "points": "{size} пт",
+    "bold": "Полужирный",
     "italic": "Курсив",
-    "h1": "H1",
-    "h2": "H2",
-    "bullets": "Список",
-    "numbered": "Нумерация",
-    "quote": "Цитата",
-    "code": "Код"
+    "underline": "Подчёркнутый",
+    "strike": "Зачёркнутый",
+    "code": "Код в строке",
+    "superscript": "Надстрочный",
+    "subscript": "Подстрочный",
+    "link": "Ссылка",
+    "textColour": "Цвет текста",
+    "clearColour": "Убрать цвет текста",
+    "highlight": "Выделение цветом",
+    "clearHighlight": "Убрать выделение",
+    "align": {
+      "left": "По левому краю",
+      "center": "По центру",
+      "right": "По правому краю",
+      "justify": "По ширине"
+    },
+    "lineHeight": "Междустрочный интервал",
+    "lineHeightDefault": "Интервал",
+    "indent": "Увеличить отступ",
+    "outdent": "Уменьшить отступ",
+    "bulletList": "Маркированный список",
+    "orderedList": "Нумерованный список",
+    "taskList": "Список задач",
+    "blockquote": "Цитата",
+    "codeBlock": "Блок кода",
+    "horizontalRule": "Горизонтальная линия",
+    "table": "Вставить таблицу",
+    "pageBreak": "Разрыв страницы",
+    "tableTools": {
+      "addRowBefore": "Вставить строку выше",
+      "addRowAfter": "Вставить строку ниже",
+      "deleteRow": "Удалить строку",
+      "addColumnBefore": "Вставить столбец слева",
+      "addColumnAfter": "Вставить столбец справа",
+      "deleteColumn": "Удалить столбец",
+      "mergeCells": "Объединить ячейки",
+      "splitCell": "Разделить ячейку",
+      "toggleHeaderRow": "Строка заголовка",
+      "deleteTable": "Удалить таблицу"
+    }
   },
   "save": {
     "failed": "Не удалось переименовать документ."
@@ -30,7 +99,8 @@
     "offline": "Нет связи",
     "version": "v{version}",
     "deleted": "Удалён",
-    "unavailable": "Недоступен"
+    "unavailable": "Недоступен",
+    "outdated": "Устарело"
   },
   "peers": {
     "label": "Ещё {count} человек в этом документе"
@@ -46,5 +116,61 @@
   "gone": {
     "deleted": "Документ удалил кто-то другой в рабочем пространстве. Сохранить в него больше нечего.",
     "unavailable": "Документ вам больше недоступен. Возможно, его удалили, либо изменился ваш доступ к рабочему пространству."
+  },
+  "link": {
+    "title": "Ссылка",
+    "urlLabel": "Веб-адрес или эл. почта",
+    "placeholder": "example.com",
+    "apply": "Применить",
+    "remove": "Убрать ссылку",
+    "invalid": "Введите веб-адрес, например example.com, или адрес электронной почты."
+  },
+  "shortcuts": {
+    "title": "Сочетания клавиш",
+    "groups": {
+      "text": "Текст",
+      "paragraph": "Абзацы",
+      "blocks": "Списки и блоки"
+    },
+    "keys": {
+      "mod": "Ctrl",
+      "modMac": "⌘",
+      "shift": "Shift",
+      "alt": "Alt",
+      "altMac": "⌥",
+      "enter": "Enter"
+    },
+    "actions": {
+      "bold": "Полужирный",
+      "italic": "Курсив",
+      "underline": "Подчёркнутый",
+      "strike": "Зачёркнутый",
+      "code": "Код в строке",
+      "superscript": "Надстрочный",
+      "subscript": "Подстрочный",
+      "highlight": "Выделение цветом",
+      "link": "Ссылка",
+      "heading1": "Заголовок 1",
+      "heading2": "Заголовок 2",
+      "heading3": "Заголовок 3",
+      "alignLeft": "По левому краю",
+      "alignCenter": "По центру",
+      "alignRight": "По правому краю",
+      "alignJustify": "По ширине",
+      "indent": "Увеличить отступ",
+      "outdent": "Уменьшить отступ",
+      "bulletList": "Маркированный список",
+      "orderedList": "Нумерованный список",
+      "taskList": "Список задач",
+      "blockquote": "Цитата",
+      "codeBlock": "Блок кода",
+      "lineBreak": "Перенос строки",
+      "pageBreak": "Разрыв страницы",
+      "shortcuts": "Этот список"
+    }
+  },
+  "outdated": {
+    "message": "Эта страница собрана для другой версии редактора, чем работает на сервере, поэтому редактирование приостановлено, чтобы не повредить документ.",
+    "reload": "Обновить страницу"
   }
 }

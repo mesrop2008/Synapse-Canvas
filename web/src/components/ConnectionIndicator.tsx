@@ -9,6 +9,7 @@ const LABELS: Record<ConnectionState, MessageKey> = {
   offline: 'document.connection.offline',
   deleted: 'document.connection.deleted',
   unavailable: 'document.connection.unavailable',
+  outdated: 'document.connection.outdated',
 };
 
 export function ConnectionIndicator({

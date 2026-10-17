@@ -61,7 +61,7 @@ async def test_reuse_revokes_the_whole_family(
 
     replayed = await _refresh(client, owner.refresh_token)
     assert replayed.status_code == 401
-    assert "All sessions have been ended" in replayed.json()["detail"]
+    assert replayed.json()["code"] == "auth.refresh_revoked"
 
     assert (await _refresh(client, rotated)).status_code == 401
 
@@ -92,7 +92,7 @@ async def test_refresh_rejects_a_token_with_an_unknown_jti(
 
     response = await _refresh(client, forged)
     assert response.status_code == 401
-    assert "not recognised" in response.json()["detail"]
+    assert response.json()["code"] == "auth.refresh_unknown"
 
 
 async def test_refresh_rejects_a_token_whose_row_has_expired(
