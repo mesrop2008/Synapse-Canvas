@@ -161,6 +161,8 @@ def create_app() -> FastAPI:
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
+            # The client names an exported file from it.
+            expose_headers=["Content-Disposition"],
         )
 
     # Per app, not per module: one per worker, and tests can run two.

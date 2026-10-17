@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Request, status
+import anyio
+from fastapi import APIRouter, Request, Response, status
 
 from api.dependencies import DbSession, RequireEditor, RequireViewer
 from api.schemas.document import (
@@ -13,6 +14,8 @@ from api.schemas.document import (
     DocumentVersionConflict,
 )
 from api.services import documents as document_service
+from api.services import docx_export
+from api.services.docx_format import DOCX_CONTENT_TYPE
 
 # WorkspaceAccess resolves the workspace from a path param of this exact name.
 router = APIRouter(prefix="/workspaces/{workspace_id}/documents", tags=["documents"])
@@ -71,6 +74,37 @@ async def get_document(
 ) -> DocumentRead:
     document = await document_service.get_document(db, ctx.workspace.id, document_id)
     return DocumentRead.model_validate(document)
+
+
+@router.get(
+    "/{document_id}/export",
+    response_class=Response,
+    summary="Download the document as a Word (.docx) file",
+    responses={
+        **_VIEWER_RESPONSES,
+        200: {"content": {DOCX_CONTENT_TYPE: {}}, "description": "The .docx file"},
+    },
+)
+async def export_document(
+    document_id: uuid.UUID, ctx: RequireViewer, db: DbSession
+) -> Response:
+    """Built inside the request; see the README for when that stops being
+    the right call."""
+    document = await document_service.get_document(db, ctx.workspace.id, document_id)
+    data = await anyio.to_thread.run_sync(
+        docx_export.to_docx, document.content, document.title
+    )
+    filename = docx_export.export_filename(document.title, str(document.id))
+    return Response(
+        content=data,
+        media_type=DOCX_CONTENT_TYPE,
+        headers={
+            "Content-Disposition": docx_export.content_disposition(
+                filename, str(document.id)
+            ),
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.patch(
