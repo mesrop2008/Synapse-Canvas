@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link, useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { EditorContent, useEditor, type EditorEvents } from '@tiptap/react';
@@ -14,6 +14,7 @@ import { ConnectionIndicator } from '../components/ConnectionIndicator';
 import { EditorToolbar } from '../components/EditorToolbar';
 import { ImportedNotice, droppedFrom } from '../components/ImportedNotice';
 import { LinkDialog } from '../components/LinkDialog';
+import { PanelResizer, usePanelWidth } from '../components/PanelResizer';
 import { PeerList } from '../components/PeerList';
 import { ShortcutsDialog } from '../components/ShortcutsDialog';
 import { ChevronRightIcon, DownloadIcon } from '../components/icons';
@@ -101,6 +102,8 @@ function DocumentEditor({
   const navigate = useNavigate();
   const dropped = droppedFrom(location.state);
 
+  const layoutRef = useRef<HTMLElement>(null);
+  const [panelWidth, setPanelWidth] = usePanelWidth();
   // Set while applying a peer's edit, so it is not sent back out.
   const applyingRemote = useRef(false);
   const lastCursorSentAt = useRef(0);
@@ -253,7 +256,11 @@ function DocumentEditor({
   }
 
   return (
-    <main className={writable ? 'container doc-layout' : 'container container-reading'}>
+    <main
+      ref={layoutRef}
+      className={writable ? 'container doc-layout' : 'container container-reading'}
+      style={writable ? ({ '--ai-width': `${panelWidth}px` } as CSSProperties) : undefined}
+    >
       <div className="doc-main">
         <nav className="crumbs">
           <Link to="/workspaces">{t('layout.workspaces')}</Link>
@@ -363,6 +370,15 @@ function DocumentEditor({
           <EditorContent editor={editor} />
         </div>
       </div>
+
+      {writable && editor && (
+        <PanelResizer
+          layout={layoutRef}
+          width={panelWidth}
+          onResize={setPanelWidth}
+          label={t('ai.resize')}
+        />
+      )}
 
       {writable && editor && (
         <AIPanel

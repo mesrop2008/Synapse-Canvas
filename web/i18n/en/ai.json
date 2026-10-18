@@ -1,5 +1,6 @@
 {
   "title": "AI assistant",
+  "resize": "Resize the assistant panel",
   "modeLabel": "What the AI should do",
   "modes": {
     "continue": "Continue",
