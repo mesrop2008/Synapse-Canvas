@@ -13,7 +13,7 @@ router = APIRouter(prefix="/workspaces/{workspace_id}/search", tags=["sources"])
 _RESPONSES: dict[int | str, dict[str, Any]] = {
     401: {"description": "Missing or invalid access token"},
     404: {"description": "No such workspace, or caller is not a member"},
-    409: {"description": "The workspace's passages come from another embedding model"},
+    409: {"description": "The workspace's chunks come from another embedding model"},
     429: {"description": "Over the workspace's daily embedding requests"},
 }
 
@@ -21,7 +21,7 @@ _RESPONSES: dict[int | str, dict[str, Any]] = {
 @router.post(
     "",
     response_model=SearchResults,
-    summary="The passages of the workspace's sources closest to a query",
+    summary="The chunks of the workspace's sources closest to a query",
     responses=_RESPONSES,
 )
 async def search(

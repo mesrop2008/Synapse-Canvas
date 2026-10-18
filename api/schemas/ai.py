@@ -71,7 +71,7 @@ class AIQueryRead(BaseModel):
     completed_at: datetime | None
     retrieved_chunk_ids: list[uuid.UUID] | None = Field(
         default=None,
-        description="Passages sent with the prompt, [1] first. Null when the mode does "
+        description="Chunks sent with the prompt, [1] first. Null when the mode does "
         "not search sources; empty when the search found nothing.",
     )
     citations: list[CitationRead] = Field(default_factory=list)

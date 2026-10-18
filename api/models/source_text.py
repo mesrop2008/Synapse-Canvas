@@ -10,7 +10,7 @@ from api.db.base import Base, TimestampMixin
 
 
 class SourceText(TimestampMixin, Base):
-    """The text extracted from a source, which its passages' `char_start` and
+    """The text extracted from a source, which its chunks' `char_start` and
     `char_end` index into. Its own table, so listing sources never loads it."""
 
     __tablename__ = "source_texts"

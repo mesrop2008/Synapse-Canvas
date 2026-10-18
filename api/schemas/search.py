@@ -19,7 +19,7 @@ class SearchHit(BaseModel):
     source_id: uuid.UUID
     filename: str
     content: str
-    page_number: int | None = Field(description="The page the passage starts on.")
+    page_number: int | None = Field(description="The page the chunk starts on.")
     char_start: int = Field(description="Offset into the text extracted from the source.")
     char_end: int
     similarity: float = Field(description="Cosine similarity to the query, -1 to 1.")
@@ -40,7 +40,7 @@ class SearchHit(BaseModel):
 
 class SearchResults(BaseModel):
     results: list[SearchHit]
-    min_similarity: float = Field(description="Passages scoring below this are left out.")
+    min_similarity: float = Field(description="Chunks scoring below this are left out.")
     searched: bool = Field(
         description="False when the workspace has no ready sources to search."
     )

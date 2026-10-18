@@ -11,8 +11,8 @@ from api.dependencies import DbSession, RequireEditor, RequireViewer
 from api.schemas.source import (
     SourceChunkRead,
     SourcePageRead,
-    SourcePassageRead,
     SourceRead,
+    SourceTextChunkRead,
     SourceTextRead,
 )
 from api.services import source_viewer
@@ -126,7 +126,7 @@ async def get_content(
 @router.get(
     "/{source_id}/text",
     response_model=SourceTextRead,
-    summary="The text extracted from a source, with its passages' offsets",
+    summary="The text extracted from a source, with its chunks' offsets",
     responses={
         **_RESPONSES,
         409: {"description": "Not read yet, or it could not be read"},
@@ -148,16 +148,16 @@ async def get_text(
             SourcePageRead(number=index + 1, start=start)
             for index, start in enumerate(view.page_starts)
         ],
-        passages=[
-            SourcePassageRead(
-                id=passage.id,
-                chunk_index=passage.chunk_index,
-                char_start=passage.char_start,
-                char_end=passage.char_end,
-                page_number=passage.page_number,
-                token_count=passage.token_count,
+        chunks=[
+            SourceTextChunkRead(
+                id=chunk.id,
+                chunk_index=chunk.chunk_index,
+                char_start=chunk.char_start,
+                char_end=chunk.char_end,
+                page_number=chunk.page_number,
+                token_count=chunk.token_count,
             )
-            for passage in view.passages
+            for chunk in view.chunks
         ],
         html=view.html,
     )
@@ -166,8 +166,8 @@ async def get_text(
 @router.get(
     "/{source_id}/chunks/{chunk_id}",
     response_model=SourceChunkRead,
-    summary="One passage of a source, as a citation points at it",
-    responses={404: {"description": "The source or the passage is gone"}},
+    summary="One chunk of a source, as a citation points at it",
+    responses={404: {"description": "The source or the chunk is gone"}},
 )
 async def get_chunk(
     source_id: uuid.UUID, chunk_id: uuid.UUID, ctx: RequireViewer, db: DbSession
@@ -181,7 +181,7 @@ async def get_chunk(
 @router.delete(
     "/{source_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a source, its passages and its file (editor or owner)",
+    summary="Delete a source, its chunks and its file (editor or owner)",
     responses=_EDITOR_RESPONSES,
 )
 async def delete_source(
