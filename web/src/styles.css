@@ -1646,11 +1646,55 @@ kbd {
 
 /* --- AI panel ------------------------------------------------------------- */
 
+/* A wider panel takes the page's empty margins first, then the editor's room. */
+.container.doc-layout {
+  max-width: calc(var(--page-max) - 380px + var(--ai-width, 480px));
+}
+
 .doc-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  gap: 28px;
+  grid-template-columns: minmax(0, 1fr) 12px min(var(--ai-width, 480px), 60%);
+  column-gap: 8px;
   align-items: start;
+}
+
+.panel-resizer {
+  position: sticky;
+  top: calc(var(--topbar-h) + 20px);
+  height: calc(100vh - var(--topbar-h) - 40px);
+  display: flex;
+  justify-content: center;
+  cursor: col-resize;
+  touch-action: none;
+  border-radius: var(--r-sm);
+}
+
+.panel-resizer::after {
+  content: '';
+  width: 2px;
+  height: 100%;
+  border-radius: 999px;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.panel-resizer:hover::after,
+.panel-resizer[data-dragging]::after {
+  background: var(--border-strong);
+}
+
+.panel-resizer:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+.panel-resizer:focus-visible::after {
+  background: var(--accent);
+}
+
+/* No text selection while dragging across the editor. */
+.doc-layout:has(.panel-resizer[data-dragging]) {
+  user-select: none;
 }
 
 .doc-main {
@@ -1658,6 +1702,7 @@ kbd {
 }
 
 .ai-panel {
+  container-type: inline-size;
   position: sticky;
   top: calc(var(--topbar-h) + 20px);
   display: flex;
@@ -1806,6 +1851,13 @@ kbd {
   font-size: 13.5px;
 }
 
+/* Side by side only where each column still fits a readable line. */
+@container (max-width: 560px) {
+  .ai-compare {
+    grid-template-columns: 1fr;
+  }
+}
+
 .ai-caret {
   display: inline-block;
   width: 7px;
@@ -1834,6 +1886,15 @@ kbd {
 @media (max-width: 1080px) {
   .doc-layout {
     grid-template-columns: minmax(0, 1fr);
+    row-gap: 28px;
+  }
+
+  .container.doc-layout {
+    max-width: var(--page-max);
+  }
+
+  .panel-resizer {
+    display: none;
   }
 
   .ai-panel {
