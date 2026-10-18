@@ -2103,12 +2103,12 @@ kbd {
   max-width: 620px;
 }
 
-.passage-source {
+.chunk-source {
   margin: 0 0 12px;
   font-size: 14px;
 }
 
-.passage {
+.chunk {
   margin: 0;
   max-height: 50vh;
   overflow: auto;
@@ -2334,11 +2334,11 @@ kbd {
   box-shadow: var(--shadow-md);
 }
 
-::highlight(source-passage-even) {
+::highlight(source-chunk-even) {
   background-color: rgba(110, 104, 240, 0.16);
 }
 
-::highlight(source-passage-odd) {
+::highlight(source-chunk-odd) {
   background-color: rgba(30, 150, 90, 0.16);
 }
 
@@ -2359,11 +2359,11 @@ kbd {
   border-radius: 2px;
 }
 
-.textLayer mark.viewer-passage-even {
+.textLayer mark.viewer-chunk-even {
   background: rgba(90, 84, 232, 0.12);
 }
 
-.textLayer mark.viewer-passage-odd {
+.textLayer mark.viewer-chunk-odd {
   background: rgba(18, 132, 74, 0.12);
 }
 
@@ -2406,7 +2406,7 @@ kbd {
   font-size: 14px;
 }
 
-.viewer-passages {
+.viewer-chunks {
   display: grid;
   gap: 6px;
   margin: 10px 0 0;
@@ -2414,7 +2414,7 @@ kbd {
   list-style: none;
 }
 
-.viewer-passage {
+.viewer-chunk {
   display: grid;
   gap: 3px;
   width: 100%;
@@ -2428,22 +2428,22 @@ kbd {
   cursor: pointer;
 }
 
-.viewer-passage:hover {
+.viewer-chunk:hover {
   border-color: var(--border-strong);
 }
 
-.viewer-passage[aria-current='true'] {
+.viewer-chunk[aria-current='true'] {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
 }
 
-.viewer-passage-meta {
+.viewer-chunk-meta {
   color: var(--text-3);
   font-size: 12px;
   font-weight: 600;
 }
 
-.viewer-passage-text {
+.viewer-chunk-text {
   display: -webkit-box;
   overflow: hidden;
   font-size: 13px;

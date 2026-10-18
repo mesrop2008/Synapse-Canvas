@@ -11,14 +11,14 @@ export interface ViewState {
   /** The search match to show, of those found. */
   current: number;
   onMatches: (count: number) => void;
-  showPassages: boolean;
+  showChunks: boolean;
   zoom: number;
 }
 
 interface DomViewProps extends ViewState {
   text: SourceText;
   /** A Word file's rendering. Without it the extracted text is shown, in
-   *  which passages' offsets point exactly. */
+   *  which chunks' offsets point exactly. */
   html: string | null;
 }
 
@@ -35,11 +35,11 @@ function locate(
   if (exact) return { start, end };
   if (!haystack) return null;
   const near = Math.round((start / Math.max(text.text.length, 1)) * haystack.text.length);
-  return haystack.findPassage(text.text.slice(start, end), { near });
+  return haystack.findChunk(text.text.slice(start, end), { near });
 }
 
 /** Text, Markdown and Word files: the text in the page, highlighted. */
-export function DomView({ text, html, target, query, current, onMatches, showPassages, zoom }: DomViewProps) {
+export function DomView({ text, html, target, query, current, onMatches, showChunks, zoom }: DomViewProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const haystack = useRef<Haystack | null>(null);
@@ -52,19 +52,19 @@ export function DomView({ text, html, target, query, current, onMatches, showPas
   useLayoutEffect(() => {
     const element = root.current;
     if (!element) return;
-    const passages = showPassages
-      ? text.passages.map((passage) => ({
-          passage,
-          span: locate(haystack.current, text, exact, passage.char_start, passage.char_end),
+    const chunks = showChunks
+      ? text.chunks.map((chunk) => ({
+          chunk,
+          span: locate(haystack.current, text, exact, chunk.char_start, chunk.char_end),
         }))
       : [];
     const parity = (even: boolean) =>
-      passages
-        .filter(({ passage, span }) => span && passage.chunk_index % 2 === (even ? 0 : 1))
+      chunks
+        .filter(({ chunk, span }) => span && chunk.chunk_index % 2 === (even ? 0 : 1))
         .map(({ span }) => span!);
-    paint('source-passage-even', rangesFor(element, parity(true)));
-    paint('source-passage-odd', rangesFor(element, parity(false)));
-  }, [showPassages, text, exact, html]);
+    paint('source-chunk-even', rangesFor(element, parity(true)));
+    paint('source-chunk-odd', rangesFor(element, parity(false)));
+  }, [showChunks, text, exact, html]);
 
   useLayoutEffect(() => {
     const element = root.current;

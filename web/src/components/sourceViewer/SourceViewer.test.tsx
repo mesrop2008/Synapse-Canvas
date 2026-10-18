@@ -35,13 +35,13 @@ const source = (contentType: string): Source => ({
   processed_at: '2026-10-18T00:00:01Z',
 });
 
-const TEXT = 'First passage about heat.\n\nSecond passage about wind.';
+const TEXT = 'First chunk about heat.\n\nSecond chunk about wind.';
 const text: SourceText = {
   source_id: 'source',
   format: 'text',
   text: TEXT,
   pages: [],
-  passages: [
+  chunks: [
     { id: 'p0', chunk_index: 0, char_start: 0, char_end: 25, page_number: null, token_count: 5 },
     {
       id: 'p1',
@@ -111,7 +111,7 @@ describe('a kind of file the viewer cannot show', () => {
 });
 
 describe('a text source opened from a citation', () => {
-  it('shows the text and selects the cited passage', async () => {
+  it('shows the text and selects the cited chunk', async () => {
     vi.mocked(getSource).mockResolvedValue(source('text/plain'));
     vi.mocked(getSourceText).mockResolvedValue(text);
 
@@ -129,12 +129,12 @@ describe('a text source opened from a citation', () => {
     });
 
     const cited = await screen.findByRole('button', { current: true });
-    expect(cited).toHaveProperty('dataset.passage', 'p1');
+    expect(cited).toHaveProperty('dataset.chunk', 'p1');
     expect(document.querySelector('.viewer-text')?.textContent).toBe(TEXT);
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
 
-  it('says so when the cited passage is no longer there', async () => {
+  it('says so when the cited chunk is no longer there', async () => {
     vi.mocked(getSource).mockResolvedValue(source('text/plain'));
     vi.mocked(getSourceText).mockResolvedValue(text);
 

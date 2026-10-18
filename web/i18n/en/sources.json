@@ -1,7 +1,7 @@
 {
   "title": "Sources",
   "count": "{count} files",
-  "intro": "Upload papers and notes for the AI to answer from. Its answers cite the passages they use.",
+  "intro": "Upload papers and notes for the AI to answer from. Its answers cite the chunks they use.",
   "drop": "Drop files here, or {choose}",
   "choose": "choose files",
   "dropActive": "Drop to upload",
@@ -28,14 +28,13 @@
     "failed": "Failed"
   },
   "pages": "Pages: {count}",
-  "passages": "Passages: {count}",
   "retry": "Retry",
   "retryLater": "Worth trying again later.",
   "permanent": "Trying again will not help with this file.",
   "unknownFailure": "Processing failed.",
   "delete": "Delete {name}",
   "deleteTitle": "Delete this source?",
-  "deleteMessage": "{name}, its passages and the stored file will be removed. Answers that cited it will show the citation as unavailable.",
+  "deleteMessage": "{name}, its chunks and the stored file will be removed. Answers that cited it will show the citation as unavailable.",
   "dismiss": "Dismiss",
   "types": {
     "pdf": "PDF",
@@ -62,15 +61,16 @@
     "noMatches": "No matches",
     "previousMatch": "Previous",
     "nextMatch": "Next",
-    "showPassages": "Show passages",
-    "passagesTitle": "Indexed passages",
-    "passagesHint": "What the AI reads of this file, passage by passage. Text outside them is never sent to it.",
-    "passage": "Passage {number}",
-    "passageOnPage": "Passage {number} · page {page}",
-    "noPassages": "Nothing in this file could be indexed.",
-    "notReady": "This source is still being read. Its passages appear here once it is ready.",
-    "citationMissing": "The cited passage is no longer in this source: it has been read again since the answer was written.",
+    "showChunks": "Show chunks",
+    "chunksTitle": "Indexed chunks",
+    "chunksHint": "What the AI reads of this file, chunk by chunk. Text outside them is never sent to it.",
+    "chunk": "Chunk {number}",
+    "chunkOnPage": "Chunk {number} · page {page}",
+    "noChunks": "Nothing in this file could be indexed.",
+    "notReady": "This source is still being read. Its chunks appear here once it is ready.",
+    "citationMissing": "The cited chunk is no longer in this source: it has been read again since the answer was written.",
     "unsupported": "This kind of file cannot be shown here. Download it to open it on your computer.",
     "pdfFailed": "This PDF could not be shown here — it may be damaged or protected. Download it to open it on your computer."
-  }
+  },
+  "chunks": "Chunks: {count}"
 }

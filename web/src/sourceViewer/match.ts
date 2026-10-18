@@ -1,4 +1,4 @@
-/** Finding a passage in text that was extracted differently: pypdf on the
+/** Finding a chunk in text that was extracted differently: pypdf on the
  *  server and pdf.js here disagree about spaces and line breaks, and a
  *  rendered Word file joins its blocks differently from the extracted
  *  text, whose table cells are joined by " | ". Matching ignores
@@ -9,11 +9,11 @@ export interface Span {
   end: number;
 }
 
-export interface PassageMatch extends Span {
-  /** How much of the passage was found, from its start, as a fraction. A
-   *  passage running on past its page is found only in part. */
+export interface ChunkMatch extends Span {
+  /** How much of the chunk was found, from its start, as a fraction. A
+   *  chunk running on past its page is found only in part. */
   found: number;
-  /** The passage after the part found, to look for on the next page. */
+  /** The chunk after the part found, to look for on the next page. */
   rest: string;
 }
 
@@ -67,12 +67,12 @@ export class Haystack {
   }
 
   /**
-   * Where `passage` is -- or, failing that, the longest start of it that is
+   * Where `chunk` is -- or, failing that, the longest start of it that is
    * here. Null when not even `minimum` characters of it are. `near` picks
    * between repeats, by distance from that index.
    */
-  findPassage(passage: string, options: { minimum?: number; near?: number } = {}): PassageMatch | null {
-    const needle = squeeze(passage);
+  findChunk(chunk: string, options: { minimum?: number; near?: number } = {}): ChunkMatch | null {
+    const needle = squeeze(chunk);
     if (!needle.text) return null;
     const haystack = this.squeezed.text;
     let low = Math.min(options.minimum ?? 16, needle.text.length);
@@ -93,11 +93,11 @@ export class Haystack {
         if (distance(at) < distance(best)) best = at;
       }
     }
-    const restFrom = low < needle.text.length ? needle.origin[low]! : passage.length;
+    const restFrom = low < needle.text.length ? needle.origin[low]! : chunk.length;
     return {
       ...this.span(best, low),
       found: low / needle.text.length,
-      rest: passage.slice(restFrom),
+      rest: chunk.slice(restFrom),
     };
   }
 }
