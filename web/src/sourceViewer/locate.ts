@@ -1,14 +1,14 @@
-import type { Citation, SourcePassage, SourceText } from '../types/api';
+import type { Citation, SourceTextChunk, SourceText } from '../types/api';
 
 /** What the viewer scrolls to and highlights. */
 export interface Target {
-  /** Null when the passage is no longer among the source's passages. */
-  passageId: string | null;
+  /** Null when the chunk is no longer among the source's chunks. */
+  chunkId: string | null;
   start: number;
   end: number;
-  /** For a paged format: where the passage starts. */
+  /** For a paged format: where the chunk starts. */
   page: number | null;
-  /** The passage itself, for formats matched by text rather than offset. */
+  /** The chunk itself, for formats matched by text rather than offset. */
   excerpt: string;
 }
 
@@ -22,30 +22,30 @@ export function pageAt(text: SourceText, at: number): number | null {
   return page;
 }
 
-export function passageTarget(text: SourceText, passage: SourcePassage): Target {
+export function chunkTarget(text: SourceText, chunk: SourceTextChunk): Target {
   return {
-    passageId: passage.id,
-    start: passage.char_start,
-    end: passage.char_end,
-    page: passage.page_number ?? pageAt(text, passage.char_start),
-    excerpt: text.text.slice(passage.char_start, passage.char_end),
+    chunkId: chunk.id,
+    start: chunk.char_start,
+    end: chunk.char_end,
+    page: chunk.page_number ?? pageAt(text, chunk.char_start),
+    excerpt: text.text.slice(chunk.char_start, chunk.char_end),
   };
 }
 
 /**
- * Where a citation points. The passage it was resolved to, by id, while the
+ * Where a citation points. The chunk it was resolved to, by id, while the
  * source still has it; otherwise its stored page and offsets -- still right
  * unless the source was read again with different text -- or null when they
  * no longer fall inside the text.
  */
 export function citationTarget(text: SourceText, citation: Citation): Target | null {
-  const passage = text.passages.find((candidate) => candidate.id === citation.chunk_id);
-  if (passage) return passageTarget(text, passage);
+  const chunk = text.chunks.find((candidate) => candidate.id === citation.chunk_id);
+  if (chunk) return chunkTarget(text, chunk);
 
   const { char_start: start, char_end: end } = citation;
   if (start < 0 || end <= start || end > text.text.length) return null;
   return {
-    passageId: null,
+    chunkId: null,
     start,
     end,
     page: citation.page_number ?? pageAt(text, start),

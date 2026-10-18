@@ -43,13 +43,13 @@ async function pageText(pdf: PDFDocumentProxy, number: number): Promise<PageText
   return { text, offsets };
 }
 
-/** The cited passage on each page it covers: found on its first page, and
+/** The cited chunk on each page it covers: found on its first page, and
  *  whatever of it was not, at the top of the pages after. */
 function citedSpans(pages: PageText[], first: number, excerpt: string): Map<number, Span> {
   const spans = new Map<number, Span>();
   let rest = excerpt;
   for (let number = first; number <= pages.length && rest.trim(); number += 1) {
-    const found = new Haystack(pages[number - 1]!.text).findPassage(rest, { minimum: 12 });
+    const found = new Haystack(pages[number - 1]!.text).findChunk(rest, { minimum: 12 });
     if (!found) break;
     spans.set(number, found);
     rest = found.rest;
@@ -64,7 +64,7 @@ export default function PdfView({
   query,
   current,
   onMatches,
-  showPassages,
+  showChunks,
   zoom,
   page,
   onPage,
@@ -134,16 +134,16 @@ export default function PdfView({
   const marks = useMemo(() => {
     if (!pages?.[page - 1]) return [];
     const found: Mark[] = [];
-    if (showPassages && text) {
+    if (showChunks && text) {
       const haystack = new Haystack(pages[page - 1]!.text);
-      for (const passage of text.passages) {
-        if (passage.page_number !== page) continue;
-        const span = haystack.findPassage(text.text.slice(passage.char_start, passage.char_end), {
+      for (const chunk of text.chunks) {
+        if (chunk.page_number !== page) continue;
+        const span = haystack.findChunk(text.text.slice(chunk.char_start, chunk.char_end), {
           minimum: 12,
         });
         if (span) {
-          const parity = passage.chunk_index % 2 ? 'odd' : 'even';
-          found.push({ ...span, className: `viewer-passage-${parity}` });
+          const parity = chunk.chunk_index % 2 ? 'odd' : 'even';
+          found.push({ ...span, className: `viewer-chunk-${parity}` });
         }
       }
     }
@@ -155,7 +155,7 @@ export default function PdfView({
       found.push({ ...match.span, className });
     }
     return found;
-  }, [pages, page, showPassages, text, cited, matches, active]);
+  }, [pages, page, showChunks, text, cited, matches, active]);
 
   const renderText = useCallback(
     ({ str, itemIndex }: { str: string; itemIndex: number }) =>

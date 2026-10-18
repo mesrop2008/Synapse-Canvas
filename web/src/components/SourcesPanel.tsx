@@ -328,7 +328,7 @@ function SourceRow({
     t(typeLabel(source.content_type)),
     formatBytes(source.size_bytes, locale),
     source.page_count !== null ? t('sources.pages', { count: source.page_count }) : null,
-    source.status === 'ready' ? t('sources.passages', { count: source.chunk_count }) : null,
+    source.status === 'ready' ? t('sources.chunks', { count: source.chunk_count }) : null,
     formatRelative(source.created_at),
   ].filter(Boolean);
 

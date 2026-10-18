@@ -1,5 +1,5 @@
 """The source viewer's two endpoints: the file as uploaded and the text its
-passages index into. Sources go through the real upload and the worker's
+chunks index into. Sources go through the real upload and the worker's
 own processing, on committed rows, as the viewer would meet them."""
 
 from __future__ import annotations
@@ -116,7 +116,7 @@ async def world(redis_client: Redis, tmp_path: Path) -> AsyncIterator[World]:
 
 @pytest.fixture
 def small_chunks(rate_limits: Any) -> None:
-    """Several passages from a short file."""
+    """Several chunks from a short file."""
     rate_limits(chunk_target_tokens=12, chunk_overlap_tokens=2, chunk_max_tokens=16)
 
 
@@ -160,7 +160,7 @@ def page_of(text: dict[str, Any], offset: int) -> int | None:
 # --- The text ---
 
 
-async def test_the_text_is_the_one_every_passage_was_cut_from(
+async def test_the_text_is_the_one_every_chunk_was_cut_from(
     world: World, small_chunks: None
 ) -> None:
     source_id = await add(world, "study.pdf", pdf_bytes(PAGE_ONE, PAGE_TWO))
@@ -175,17 +175,17 @@ async def test_the_text_is_the_one_every_passage_was_cut_from(
     assert [page["number"] for page in text["pages"]] == [1, 2]
     stored = await chunks_of(source_id)
     assert len(stored) > 2
-    assert [p["id"] for p in text["passages"]] == [str(c.id) for c in stored]
-    for passage, chunk in zip(text["passages"], stored, strict=True):
-        assert text["text"][passage["char_start"] : passage["char_end"]] == chunk.content
-        assert passage["page_number"] == page_of(text, passage["char_start"])
+    assert [p["id"] for p in text["chunks"]] == [str(c.id) for c in stored]
+    for listed, chunk in zip(text["chunks"], stored, strict=True):
+        assert text["text"][listed["char_start"] : listed["char_end"]] == chunk.content
+        assert listed["page_number"] == page_of(text, listed["char_start"])
     assert text["html"] is None
 
 
 async def test_a_citation_resolves_to_its_page_and_offsets(
     world: World, small_chunks: None
 ) -> None:
-    """What a citation stores -- passage id, page, offsets -- points at the
+    """What a citation stores -- chunk id, page, offsets -- points at the
     same words in the text the viewer is given."""
     source_id = await add(world, "study.pdf", pdf_bytes(PAGE_ONE, PAGE_TWO))
     on_page_two = next(c for c in await chunks_of(source_id) if c.page_number == 2)

@@ -186,7 +186,7 @@ export function canEdit(role: WorkspaceRole): boolean {
 /** `sources` asks, answered from the workspace's sources alone. */
 export type AIQueryMode = 'continue' | 'rewrite' | 'summarize' | 'ask' | 'sources';
 
-/** A [n] in a response, resolved by the server to the passage it was sent. */
+/** A [n] in a response, resolved by the server to the chunk it was sent. */
 export interface Citation {
   marker: number;
   chunk_id: string;
@@ -221,7 +221,7 @@ export interface AIQuery {
   completion_tokens: number | null;
   created_at: Timestamp;
   completed_at: Timestamp | null;
-  /** Passages sent with the prompt, [1] first. Null when the mode does not
+  /** Chunks sent with the prompt, [1] first. Null when the mode does not
    *  search sources; empty when the search found nothing. */
   retrieved_chunk_ids: string[] | null;
   citations: Citation[];
@@ -306,8 +306,8 @@ export interface SourceChunk {
   char_end: number;
 }
 
-/** One passage of a source: what the AI is given to read. */
-export interface SourcePassage {
+/** One chunk of a source: what the AI is given to read. */
+export interface SourceTextChunk {
   id: string;
   chunk_index: number;
   /** Offsets into SourceText.text. */
@@ -326,7 +326,7 @@ export interface SourceText {
   text: string;
   /** Empty for formats without pages. */
   pages: Array<{ number: number; start: number }>;
-  passages: SourcePassage[];
+  chunks: SourceTextChunk[];
   /** A Word file rendered and escaped by the server. */
   html: string | null;
 }

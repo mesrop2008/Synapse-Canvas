@@ -1,4 +1,4 @@
-"""What the source viewer reads: a source's extracted text, its passages
+"""What the source viewer reads: a source's extracted text, its chunks
 with the offsets citations use, and for a Word file a rendering of it.
 
 The file itself goes out through the API with the workspace check, never
@@ -56,7 +56,7 @@ class SourceTextUnavailableError(AppError):
 
 
 @dataclass(frozen=True, slots=True)
-class Passage:
+class TextChunk:
     id: uuid.UUID
     chunk_index: int
     char_start: int
@@ -71,7 +71,7 @@ class SourceView:
     format: SourceFormat
     text: str
     page_starts: list[int]
-    passages: list[Passage]
+    chunks: list[TextChunk]
     # A Word file as HTML; None for other formats, or when the file cannot
     # be rendered, and the text is shown instead.
     html: str | None
@@ -131,8 +131,8 @@ async def view(
     if stored is None:
         data, stored = await _read_again(db, storage, source)
 
-    passages = [
-        Passage(*row)
+    chunks = [
+        TextChunk(*row)
         for row in (
             await db.execute(
                 select(
@@ -159,7 +159,7 @@ async def view(
         format=kind,
         text=stored.text,
         page_starts=list(stored.page_starts),
-        passages=passages,
+        chunks=chunks,
         html=html,
     )
 

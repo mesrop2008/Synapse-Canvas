@@ -17,7 +17,7 @@ import { codeMessage, errorMessage } from '../../api/errors';
 import { getSource, getSourceFile, getSourceText } from '../../api/sources';
 import { saveFile } from '../../download';
 import { useI18n } from '../../hooks/useI18n';
-import { citationTarget, passageTarget, type Target } from '../../sourceViewer/locate';
+import { citationTarget, chunkTarget, type Target } from '../../sourceViewer/locate';
 import type { Citation, Source, SourceText } from '../../types/api';
 import { Alert } from '../Alert';
 import { DownloadIcon, MinusIcon, PlusIcon } from '../icons';
@@ -29,7 +29,7 @@ export interface ViewerRequest {
   workspaceId: string;
   sourceId: string;
   filename: string;
-  /** Opens at the passage it cites. */
+  /** Opens at the chunk it cites. */
   citation?: Citation;
 }
 
@@ -112,7 +112,7 @@ function SourceViewer({ request, onClose }: { request: ViewerRequest; onClose: (
   const [query, setQuery] = useState('');
   const [current, setCurrent] = useState(0);
   const [matchCount, setMatchCount] = useState(0);
-  const [showPassages, setShowPassages] = useState(true);
+  const [showChunks, setShowChunks] = useState(true);
   const [pdfFailed, setPdfFailed] = useState(false);
   const [downloadFailed, setDownloadFailed] = useState<unknown>(null);
 
@@ -153,7 +153,7 @@ function SourceViewer({ request, onClose }: { request: ViewerRequest; onClose: (
     query,
     current,
     onMatches: setMatchCount,
-    showPassages,
+    showChunks,
     zoom,
   };
   const unsupported =
@@ -297,10 +297,10 @@ function SourceViewer({ request, onClose }: { request: ViewerRequest; onClose: (
             <button
               type="button"
               className="btn btn-ghost btn-sm"
-              aria-pressed={showPassages}
-              onClick={() => setShowPassages((shown) => !shown)}
+              aria-pressed={showChunks}
+              onClick={() => setShowChunks((shown) => !shown)}
             >
-              {t('sources.viewer.showPassages')}
+              {t('sources.viewer.showChunks')}
             </button>
           </div>
         )}
@@ -348,12 +348,12 @@ function SourceViewer({ request, onClose }: { request: ViewerRequest; onClose: (
             )}
           </div>
 
-          {showPassages && kind && !unsupported && (
-            <Passages
+          {showChunks && kind && !unsupported && (
+            <ChunkList
               source={source.data}
               text={text.data}
               textError={text.error}
-              active={target?.passageId ?? null}
+              active={target?.chunkId ?? null}
               onPick={(target) => setChosen(target)}
             />
           )}
@@ -379,8 +379,8 @@ function Fallback({ message, onDownload }: { message: string; onDownload: () => 
 // Clamped to a few lines by CSS; no more is worth laying out.
 const EXCERPT = 400;
 
-/** What the AI reads of the file: its passages, in order. */
-function Passages({
+/** What the AI reads of the file: its chunks, in order. */
+function ChunkList({
   source,
   text,
   textError,
@@ -399,7 +399,7 @@ function Passages({
   useEffect(() => {
     if (!active) return;
     list.current
-      ?.querySelector(`[data-passage="${active}"]`)
+      ?.querySelector(`[data-chunk="${active}"]`)
       ?.scrollIntoView({ block: 'nearest' });
   }, [active, text]);
 
@@ -415,31 +415,31 @@ function Passages({
     body = <p className="hint">{errorMessage(textError)}</p>;
   } else if (!text) {
     body = <p className="placeholder">{t('sources.viewer.loading')}</p>;
-  } else if (text.passages.length === 0) {
-    body = <p className="hint">{t('sources.viewer.noPassages')}</p>;
+  } else if (text.chunks.length === 0) {
+    body = <p className="hint">{t('sources.viewer.noChunks')}</p>;
   } else {
     body = (
-      <ol className="viewer-passages" ref={list}>
-        {text.passages.map((passage) => {
-          const excerpt = text.text.slice(passage.char_start, passage.char_end);
+      <ol className="viewer-chunks" ref={list}>
+        {text.chunks.map((chunk) => {
+          const excerpt = text.text.slice(chunk.char_start, chunk.char_end);
           return (
-            <li key={passage.id}>
+            <li key={chunk.id}>
               <button
                 type="button"
-                className="viewer-passage"
-                data-passage={passage.id}
-                aria-current={passage.id === active ? 'true' : undefined}
-                onClick={() => onPick(passageTarget(text, passage))}
+                className="viewer-chunk"
+                data-chunk={chunk.id}
+                aria-current={chunk.id === active ? 'true' : undefined}
+                onClick={() => onPick(chunkTarget(text, chunk))}
               >
-                <span className="viewer-passage-meta">
-                  {passage.page_number !== null
-                    ? t('sources.viewer.passageOnPage', {
-                        number: passage.chunk_index + 1,
-                        page: passage.page_number,
+                <span className="viewer-chunk-meta">
+                  {chunk.page_number !== null
+                    ? t('sources.viewer.chunkOnPage', {
+                        number: chunk.chunk_index + 1,
+                        page: chunk.page_number,
                       })
-                    : t('sources.viewer.passage', { number: passage.chunk_index + 1 })}
+                    : t('sources.viewer.chunk', { number: chunk.chunk_index + 1 })}
                 </span>
-                <span className="viewer-passage-text">{excerpt.slice(0, EXCERPT)}</span>
+                <span className="viewer-chunk-text">{excerpt.slice(0, EXCERPT)}</span>
               </button>
             </li>
           );
@@ -449,12 +449,12 @@ function Passages({
   }
 
   return (
-    <section className="viewer-side" aria-label={t('sources.viewer.passagesTitle')}>
+    <section className="viewer-side" aria-label={t('sources.viewer.chunksTitle')}>
       <h3 className="viewer-side-title">
-        {t('sources.viewer.passagesTitle')}
-        {text && <span className="badge">{text.passages.length}</span>}
+        {t('sources.viewer.chunksTitle')}
+        {text && <span className="badge">{text.chunks.length}</span>}
       </h3>
-      <p className="hint">{t('sources.viewer.passagesHint')}</p>
+      <p className="hint">{t('sources.viewer.chunksHint')}</p>
       {body}
     </section>
   );

@@ -7,7 +7,7 @@ material, and query an LLM that answers with citations from those sources.
 assistant whose responses stream over server-sent events and are inserted as
 ordinary versioned edits, and uploaded sources it answers from with citations.
 Password recovery by emailed code. A word-processor toolbar, Word import
-and export, and a viewer that opens a citation at the passage it cites.
+and export, and a viewer that opens a citation at the chunk it cites.
 English and Russian. 515 backend tests and 65 client tests.
 
 ## Stack
@@ -232,7 +232,7 @@ plain-text and Markdown files, watch each one move from *queued* through
 *reading* to *ready*, and see storage used against the workspace's quota. In the
 AI panel, **ask** now searches those sources as well as the document, and a
 fifth mode, **sources**, answers from the sources alone. An answer's `[1]`
-markers become buttons once it is done; each opens the passage it cites, with
+markers become buttons once it is done; each opens the chunk it cites, with
 its file and page, and the files an answer used are listed beneath it.
 
 ### How a file becomes searchable
@@ -247,7 +247,7 @@ its file and page, and the files an answer used are listed beneath it.
    again returns the first copy rather than being embedded twice.
 2. The **worker** (`arq api.worker.WorkerSettings`, the `worker` service in
    compose) extracts the text in a child process it kills if parsing overruns,
-   cuts it into passages of about `CHUNK_TARGET_TOKENS` at paragraph, sentence,
+   cuts it into chunks of about `CHUNK_TARGET_TOKENS` at paragraph, sentence,
    line and only then word boundaries, embeds them in batches and stores them
    with their page and character offsets.
 3. The source turns `ready`, or `failed` with a reason the panel words for
@@ -255,8 +255,8 @@ its file and page, and the files an answer used are listed beneath it.
    damaged file, a password-protected one, or a scan with no text layer (OCR
    is not supported) is not, and says so.
 
-The job can run twice, or crash half-way, without duplicating a passage or
-paying for one again: under a per-source lock it keeps the passages it would
+The job can run twice, or crash half-way, without duplicating a chunk or
+paying for one again: under a per-source lock it keeps the chunks it would
 produce identically, deletes the rest before embedding what is missing, and
 commits after each batch. Redis keeps nothing across a restart, so the worker
 also queues again, once a minute, any source left pending.
@@ -272,9 +272,9 @@ also queues again, once a minute, any source left pending.
 **Gemini.** The model returns 3072 dimensions by default; pgvector 0.8.7 can
 index at most 2,000 with HNSW, so the API is asked for `EMBEDDING_DIMENSION`
 (1536). Each text may be at most 2,048 tokens, and a longer one is cut without
-an error, so every passage is checked against the limit before anything is
+an error, so every chunk is checked against the limit before anything is
 sent, with a token estimate that over-counts. The free tier allows about 100
-requests a minute and 1,000 a day: passages go `EMBEDDING_BATCH_SIZE` to a
+requests a minute and 1,000 a day: chunks go `EMBEDDING_BATCH_SIZE` to a
 request, a 429 is retried with exponential backoff (not when Gemini says the
 daily quota is gone), and every request -- retries and search queries included
 -- counts against `EMBEDDING_DAILY_REQUEST_LIMIT` per workspace, so running out
@@ -289,13 +289,13 @@ EMBEDDING_DIMENSION=384
 ```
 
 The model (about 470 MB) is downloaded on first use and kept on a volume. Its
-inputs stop at 512 tokens, so passages are smaller than with Gemini. On the
+inputs stop at 512 tokens, so chunks are smaller than with Gemini. On the
 host, `pip install -r requirements-local.txt`.
 
 ### Switching models means re-embedding
 
 Vectors from different models, or of different sizes, cannot be compared.
-Every passage records its model and dimension; a search refuses a workspace
+Every chunk records its model and dimension; a search refuses a workspace
 that holds more than one model, or another model than the one configured; and
 the API and worker refuse to start when `EMBEDDING_DIMENSION` no longer matches
 the `vector(N)` column the migration created. The local model's 384 dimensions
@@ -317,23 +317,23 @@ and each costs its embedding requests again. On a fresh database the first
 
 ### Retrieval
 
-`POST /workspaces/{id}/search` returns the passages closest to a query with
+`POST /workspaces/{id}/search` returns the chunks closest to a query with
 their source, page, offsets and similarity -- the same retrieval the AI uses,
 for judging it before it reaches a model. The query is compared by cosine
-distance with this workspace's passages only: the filter is part of the SQL,
+distance with this workspace's chunks only: the filter is part of the SQL,
 with pgvector's iterative index scan so a small workspace in a large table
 still gets its own nearest rows. Then a similarity floor
 (`RETRIEVAL_MIN_SIMILARITY`, by default the model's own: 0.6 for Gemini, 0.35
 for the local model), so an unrelated question finds nothing; one of any
-near-identical passages of a source; and `RETRIEVAL_TOKEN_BUDGET`.
+near-identical chunks of a source; and `RETRIEVAL_TOKEN_BUDGET`.
 
 ### Citations
 
-Passages go into the prompt as `<source marker="[n]">`, and the model is told
+Chunks go into the prompt as `<source marker="[n]">`, and the model is told
 to end a sentence that relies on one with its marker and never to write file
 names or links. When the answer completes, the server reads the markers and
-resolves each against the passages that request actually sent; a number with
-no passage behind it is dropped. The query keeps the ids of the passages it
+resolves each against the chunks that request actually sent; a number with
+no chunk behind it is dropped. The query keeps the ids of the chunks it
 was sent and its resolved citations, so a past answer still names its sources,
 and a citation whose source has since been deleted reads as unavailable --
 the panel lists your earlier answers on the document this way.
@@ -341,32 +341,32 @@ In **sources** mode with nothing relevant found, the model is never asked: the
 answer says the sources do not cover the question.
 
 Uploaded files are untrusted in a way the document is not: a PDF can carry text
-written to steer the model. Passages are fenced so they cannot close their tag,
+written to steer the model. Chunks are fenced so they cannot close their tag,
 and the system instruction says they are evidence, never instructions. That
 narrows prompt injection; it does not prevent it, which is one reason answers
 stay proposals the user inserts, and citations come from the server rather
 than from the model.
 
-With `LLM_PROVIDER=fake` the scripted reply cites the first passage it was
+With `LLM_PROVIDER=fake` the scripted reply cites the first chunk it was
 sent, so a keyless setup shows citations end to end.
 
 ### The source viewer
 
 Every source in the Sources panel opens in a side panel, and so does every
-citation in an answer: at the cited passage, scrolled into view and
+citation in an answer: at the cited chunk, scrolled into view and
 highlighted. A PDF is drawn page by page (react-pdf, loaded only when one
 is opened) and opens on the cited page; plain text and Markdown are shown
-as the text the passages were cut from, so their offsets point exactly; a
+as the text the chunks were cut from, so their offsets point exactly; a
 Word file is shown as the server renders it. The panel pages, zooms,
 searches the whole file and downloads the original, and lists the
-**indexed passages** -- what the AI reads of the file -- tinted in the
+**indexed chunks** -- what the AI reads of the file -- tinted in the
 text, so a user can see what was left out. A kind of file it cannot show,
 or a PDF that will not open, is offered as a download instead.
 
 `GET /workspaces/{id}/sources/{source_id}/content` streams the file as
 uploaded, for any member: its sniffed type (text with the charset it was
 read in), shown inline, with a sandboxing CSP. `GET .../text` returns the
-extracted text, page starts and every passage's offsets, and for a Word
+extracted text, page starts and every chunk's offsets, and for a Word
 file escaped HTML built by the server. Both go through the same
 membership check as everything else; no storage path or static URL ever
 reaches the client, which would let a link outlive a revoked membership.
@@ -375,13 +375,13 @@ The worker now keeps the text it extracts, in `source_texts`. A source
 processed before that has none; the first time it is opened it is read
 again, in the worker's isolated parser, and kept.
 
-A PDF's passages come from pypdf on the server and its pages from pdf.js
+A PDF's chunks come from pypdf on the server and its pages from pdf.js
 in the browser, which space text differently, and a Word file's rendering
-joins blocks differently from its extracted text: in both, passages are
+joins blocks differently from its extracted text: in both, chunks are
 found by their words, ignoring whitespace, case and the bars between
-extracted table cells, and a passage running onto the next page is
+extracted table cells, and a chunk running onto the next page is
 followed there. Highlights use the CSS Custom Highlight API; a browser
-without it still scrolls to the passage, unmarked.
+without it still scrolls to the chunk, unmarked.
 
 ### Not done yet
 

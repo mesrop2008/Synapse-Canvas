@@ -51,12 +51,12 @@ class SourceRead(BaseModel):
         )
 
 
-class SourcePassageRead(BaseModel):
+class SourceTextChunkRead(BaseModel):
     id: uuid.UUID
     chunk_index: int
-    char_start: int = Field(description="Offset into `text`, where the passage starts.")
+    char_start: int = Field(description="Offset into `text`, where the chunk starts.")
     char_end: int
-    page_number: int | None = Field(description="The page the passage starts on.")
+    page_number: int | None = Field(description="The page the chunk starts on.")
     token_count: int
 
 
@@ -66,14 +66,14 @@ class SourcePageRead(BaseModel):
 
 
 class SourceTextRead(BaseModel):
-    """The text a source's passages index into, and the passages: what the
+    """The text a source's chunks index into, and the chunks: what the
     AI can read of it."""
 
     source_id: uuid.UUID
     format: Literal["pdf", "docx", "markdown", "text"]
     text: str
     pages: list[SourcePageRead] = Field(description="Empty for formats without pages.")
-    passages: list[SourcePassageRead]
+    chunks: list[SourceTextChunkRead]
     html: str | None = Field(
         description="A Word file rendered for reading, escaped by the server; "
         "null for other formats or when the file cannot be rendered."
@@ -86,7 +86,7 @@ class SourceChunkRead(BaseModel):
     filename: str
     chunk_index: int
     content: str
-    page_number: int | None = Field(description="The page the passage starts on.")
+    page_number: int | None = Field(description="The page the chunk starts on.")
     char_start: int = Field(description="Offset into the text extracted from the source.")
     char_end: int
 

@@ -46,7 +46,7 @@ class SourceNotFoundError(NotFoundError):
 
 
 class ChunkNotFoundError(NotFoundError):
-    detail = "That passage no longer exists"
+    detail = "That chunk no longer exists"
     code = ErrorCode.SOURCE_CHUNK_NOT_FOUND
 
 

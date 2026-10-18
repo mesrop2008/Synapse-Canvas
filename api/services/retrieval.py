@@ -34,7 +34,7 @@ _CANDIDATES_PER_RESULT = 4
 class MixedEmbeddingModelsError(AppError):
     status_code = 409
     detail = (
-        "This workspace holds passages embedded by more than one model; their "
+        "This workspace holds chunks embedded by more than one model; their "
         "vectors cannot be compared. Re-embed its sources with one model."
     )
     code = ErrorCode.RETRIEVAL_MIXED_MODELS
@@ -43,7 +43,7 @@ class MixedEmbeddingModelsError(AppError):
 class EmbeddingModelMismatchError(AppError):
     status_code = 409
     detail = (
-        "This workspace's passages were embedded by a different model from the "
+        "This workspace's chunks were embedded by a different model from the "
         "one configured now. Re-embed its sources before searching them."
     )
     code = ErrorCode.RETRIEVAL_MODEL_MISMATCH

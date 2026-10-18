@@ -41,7 +41,7 @@ interface CitedAnswerProps {
 export function CitedAnswer({ workspaceId, query, text, citations }: CitedAnswerProps) {
   const { t } = useI18n();
   const openViewer = useSourceViewer();
-  // The viewer opens at the passage, scrolled to it and highlighted.
+  // The viewer opens at the chunk, scrolled to it and highlighted.
   const open = (citation: Citation) =>
     openViewer({
       workspaceId,

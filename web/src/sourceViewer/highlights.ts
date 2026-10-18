@@ -7,8 +7,8 @@ export type HighlightName =
   | 'source-cited'
   | 'source-match'
   | 'source-match-current'
-  | 'source-passage-even'
-  | 'source-passage-odd';
+  | 'source-chunk-even'
+  | 'source-chunk-odd';
 
 /** Offsets into `root.textContent` as ranges, in the order given. */
 export function rangesFor(root: Node, spans: Span[]): Range[] {
@@ -69,8 +69,8 @@ export function clearAll(): void {
     'source-cited',
     'source-match',
     'source-match-current',
-    'source-passage-even',
-    'source-passage-odd',
+    'source-chunk-even',
+    'source-chunk-odd',
   ] satisfies HighlightName[]) {
     highlights.delete(name);
   }
